@@ -1,18 +1,26 @@
 require 'pprint'
 require 'autograd'
 
-local a = torch.FloatTensor(3,3):fill(2)
--- a:__node()
 
-local b = 3.2
-print(b.__node)
-b.__node['hello'] = 3
-local c = 1.0
-print(b.__node)
+function scale(A)
+	return adtorch.mul(A,3.0)
+end
+
+dscale = grad(scale)
+
+A = torch.FloatTensor(3,3):fill(2)
+
+print(scale(A))
+print(dscale(A))
+
+-- print(b.__node)
+-- b.__node['hello'] = 3
+-- local c = 1.0
+-- print(b.__node)
 -- b:__node()
 -- pprint(getmetatable(b)['__node'](b))
 
-pprint(isnode(a))
+-- pprint(isnode(a))
 
 -- pprint(tape)
 -- pprint(torch.FloatTensor(3,3):fill(2):add(1))

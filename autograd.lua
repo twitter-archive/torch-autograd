@@ -1,9 +1,7 @@
 torch = torch or require('torch')
 adtorch = {}
-print(torch.pow)
 class = require 'class'
--- require 'util'
-
+require 'util'
 
 op = {
 	add = function(a,b) return a+b end,
@@ -51,9 +49,10 @@ function nodeapply(fun, ...)
     local arg = {...}
     local parents = filter(isnode, arg)
     if #parents > 0 then
-        vals = map(getval,arg)
-        value = nodeapply(fun,unpack(map(getval,arg)))
-        return Node(value, fun, arg, parents[1].tape)
+        local vals = map(getval,arg)
+        local value = nodeapply(fun,unpack(map(getval,arg)))
+        local out = Node(value, fun, arg, parents[1].tape)
+        return out
     else
         return fun(unpack(arg))
     end
@@ -66,7 +65,9 @@ function grad(fun, argnum)
 	gradfun = function(...)
 		local arg = {...}
 		local tape = {}
+
 		arg[argnum] = Node(arg[argnum], nil, nil, tape)
+		
 		ans = fun(unpack(arg))
 		if not isnode(ans) then
 			return 0.0
