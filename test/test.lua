@@ -2,16 +2,30 @@ require 'pprint'
 require 'autograd'
 
 
-function scale(A)
-	return adtorch.mul(A,3.0)
+function fn_scale(A)
+	B = A * 3.0 + A
+	return B
 end
 
-dscale = grad(scale)
+A = torch.DoubleTensor(3,3):fill(2)
+print(fn_scale(A))
 
-A = torch.FloatTensor(3,3):fill(2)
+dfn_scale = grad(fn_scale)
+Q = torch.DoubleTensor(3,3):fill(2)
+print(dfn_scale(Q))
 
-print(scale(A))
-print(dscale(A))
+-- function fn_pow(A)
+-- 	B = torch.pow(A,3.0)
+-- 	return B
+-- end
+
+-- -- A = torch.DoubleTensor(3,3):fill(2)
+-- -- print(fn_pow(A))
+
+-- dfn_pow = grad(fn_pow)
+-- Q = torch.DoubleTensor(3,3):fill(2)
+-- print(dfn_pow(Q))
+
 
 -- print(b.__node)
 -- b.__node['hello'] = 3
