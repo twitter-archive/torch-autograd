@@ -3,7 +3,7 @@ require 'autograd'
 
 function fn_dot(A)
 	B = A*A
-	return B
+	return torch.sum(B)
 end
 A = torch.DoubleTensor(3,3):fill(2)
 print(fn_dot(A))

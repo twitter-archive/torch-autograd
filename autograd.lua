@@ -8,6 +8,10 @@ debug = require 'debug'
 -- local STP = require "StackTracePlus"
 -- debug.traceback = STP.stacktrace
 
+function to_scalar(x)
+	return torch.sum(torch.sin(x))
+end
+
 local op = {
 	add = function(a,b) return a+b end,
 	mult = function(a,b) return a*b end,
@@ -145,12 +149,6 @@ function grad(fun, argnum)
 end
 
 
-local override = { 
-	"__add", "add", 
-	"__mul", "mul", "cmul",
-	"pow", "__pow",
-	"sum", "dot", "exp", 'tanh'
-	}
 
 
 local function elemwise_mult(a,b)
@@ -231,9 +229,6 @@ gradfuns[torch.pow] = {
 	"torch.pow",
 	function(g, x, y) return elemwise_mult(elemwise_mult(g,y),torch.pow(x,y-1)) end
 }
-gradfuns[torch.dot] = {
-
-}
 gradfuns[torch.exp] = {
 	"exp",
 	function(g,x) return elemwise_mult(torch.exp(x), g) end,
@@ -253,6 +248,26 @@ gradfuns[torch.abs] = {
 		end
 	end
 }
+gradfuns[torch.sum] = {
+	"sum",
+	function(g,x,axis)
+		if axis then
+			local sizes = x:size():fill(1)
+			sizes[axis] = x:size(axis)
+			return torch.repeatTensor(g, sizes)
+		else
+			return x:clone():fill(g)
+		end
+		return g
+	end
+}
+local override = { 
+	"__add", "add", 
+	"__mul", "mul", "cmul",
+	"pow", "__pow",
+	"exp", 'tanh',
+	'abs', 'sum'
+	}
 
 
 -- First, override all the Torch functions
