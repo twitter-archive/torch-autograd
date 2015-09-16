@@ -1,5 +1,6 @@
 -- TODO
--- Error reporting of __index failure on gradfuns
+-- Disallow overwriting anything
+-- 
 
 torch = torch or require('torch')
 class = require 'class'
@@ -14,6 +15,7 @@ end
 
 local op = {
 	add = function(a,b) return a+b end,
+	sub = function(a,b) return a-b end,
 	mult = function(a,b) return a*b end,
 	div = function(a,b) return a/b end, 
 	pow = function(a,b) return a^b end,
@@ -54,32 +56,32 @@ end
 local number_mt = {
 	__add = function(a,b)
 		if torch.type(a) == "number" and torch.isTensor(b) then
-			return b + a
+			return nodeapply(op.add, b, a)
 		else
-			return a + b
+			return nodeapply(op.add, a, b)
 		end
 	end,
 	__sub = function(a,b)
 		if torch.type(a) == "number" and torch.isTensor(b) then
-			return -b + a
+			return nodeapply(op.add, -b, a)
 		else
-			return a - b
+			return nodeapply(op.add, a, -b) -- TODO subtraction
 		end
 	end,
 	__mul = function(a,b)
 		if torch.type(a) == "number" and torch.isTensor(b) then
-			return b * a
+			return nodeapply(op.mult, b, a)
 		else
-			return a * b
+			return nodeapply(opt.mult, a, b)
 		end
 	end,
 	__div = function(a,b)
 		if torch.type(a) == "number" and torch.isTensor(b) then
 			-- THIS IS INSANE
 			c = torch.ones(b:size())
-			return torch.cdiv(c,b) * a
+			return node.apply(op.mult, torch.cdiv(c,b), a)
 		else
-			return a / b
+			return node.apply(op.div, a, b)
 		end
 	end
 }
@@ -93,12 +95,17 @@ debug.setmetatable(1.0, number_mt)
 nodeapply = function(fun, ...)
     local arg = {...}
     local parents = filter(isnode, arg)
-    if #parents > 0 then
+    print("--")
+    print("=====================")
+    print(count(parents))
+    print("=====================")
+    -- print("")
+    if count(parents) > 0 then
         local vals = map(getval,arg)
         local value = nodeapply(fun,unpack(map(getval,arg)))
         return Node(value, fun, arg, parents[1].tape)
     else
-        return fun(unpack(arg))
+        return fun(unpack(map(getval,arg)))
     end
 end
 
@@ -110,6 +117,7 @@ function grad(fun, argnum)
 		local arg = {...}
 		local tape = {}
 		arg[argnum] = Node(arg[argnum], nil, nil, tape)
+
 		local ans = fun(unpack(arg))
 		if not isnode(ans) then
 			return 0.0
@@ -117,18 +125,17 @@ function grad(fun, argnum)
 		ans.outgrad = 1.0
 		local node
 
-		print(map(function(t)
-				if t.fun then
-					return gradfuns[t.fun][1]
-				else
-					return nil
-				end
-			end,
-			ans.tape))
+		-- print(map(function(t)
+		-- 		if t.fun then
+		-- 			return gradfuns[t.fun][1]
+		-- 		else
+		-- 			return nil
+		-- 		end
+		-- 	end,
+		-- 	ans.tape))
 
 		for i=#ans.tape,1,-1 do
 			node = ans.tape[i]
-			print(node.outgrad)
 			for iarg=1,#node.args do
 				-- print("====================================")
 				-- print(node.args)
@@ -148,9 +155,6 @@ function grad(fun, argnum)
 	return do_grad
 end
 
-
-
-
 local function elemwise_mult(a,b)
 	if torch.isTensor(a) and torch.isTensor(b) then
 		return torch.cmul(a,b)
@@ -166,6 +170,14 @@ local function elemwise_div(a,b)
 		return a/b
 	end
 end
+
+local gradMt = {}
+gradMt.__index = function(table, key)
+	print("")
+	print(debug.getinfo(key))
+	error("No adjoint found for function " .. tostring(key) .. ". Debug info above.")
+end
+setmetatable(gradfuns, gradMt)
 
 gradfuns[op.add] = {
 	"add",
@@ -210,6 +222,11 @@ gradfuns[op.pow] = {
 	"pow",
 	function(g, x, y) return elemwise_mult(elemwise_mult(g,y),torch.pow(x, (y-1))) end,
 }
+-- gradfuns.__mul = gradfuns[op.mult]
+-- gradfuns.__add = gradfuns[op.add]
+-- gradfuns.__div = gradfuns[op.div]
+-- gradfuns.__pow = gradfuns[op.pow]
+-- gradfuns.__sub = gradfuns[op.sub]
 gradfuns[torch.add] = {
 	"torch.add",
 	function(g, x, y) return g end,
@@ -261,6 +278,24 @@ gradfuns[torch.sum] = {
 		return g
 	end
 }
+gradfuns[torch.sqrt] = {
+	"sqrt",
+	function(g,x) return elemwise_mult(elemwise_mult(g,0.5), torch.pow(x,-0.5)) end
+}
+gradfuns[torch.sin] = {
+	"sin",
+	function(g,x) return elemwise_mult(g, torch.cos(x)) end
+}
+gradfuns[torch.cos] = {
+	"cos",
+	function(g,x) return elemwise_mult(g, -torch.sin(x)) end
+}
+gradfuns[torch.tan] = {
+	"tan",
+	function(g,x) return elemwise_div(g, torch.pow(torch.cos(x), 2.0)) end
+}
+gradfuns[torch.getmetatable('torch.DoubleTensor').__mul] = gradfuns[op.mult]
+
 local override = { 
 	"__add", "add", 
 	"__mul", "mul", "cmul",
@@ -268,7 +303,6 @@ local override = {
 	"exp", 'tanh',
 	'abs', 'sum'
 	}
-
 
 -- First, override all the Torch functions
 for ifn,fn_name in pairs(override) do
@@ -289,12 +323,17 @@ local tensor_types = {
 	'FloatTensor',
 	'DoubleTensor'
 }
+old_fn = torch.DoubleTensor.admm
+new_fn = function(...) 
+	return nodeapply(old_fn, ...)
+end
+
 for _,tensor_type in pairs(tensor_types) do
 	local mt = torch.getmetatable('torch.' .. tensor_type)
 	for ifn,fn_name in pairs(override) do
 		local old = mt[fn_name]
 		local new_fn = function(...)
-			print("Running metatable " .. fn_name)
+			print("Running metamethod " .. fn_name)
 			return nodeapply(old, ...)
 		end
 		rawset(mt, fn_name, new_fn)

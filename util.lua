@@ -9,6 +9,9 @@ local keys = function(tbl)
     return keyset
 end
 
+function count(tbl)
+    return #keys(tbl)
+end
 
 function map(func, tbl)
     local newtbl = {}
@@ -22,7 +25,7 @@ function filter(func, tbl)
     local newtbl= {}
     for i,v in pairs(tbl) do
         if func(v) then
-        newtbl[i]=v
+        newtbl[#newtbl+1]=v
         end
     end
     return newtbl
