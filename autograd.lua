@@ -3,9 +3,10 @@
 -- 
 
 torch = torch or require('torch')
+have_cutorch,cutorch = pcall(require,'cutorch')
 class = require 'class'
-require 'util'
 debug = require 'debug'
+require 'util'
 -- local STP = require "StackTracePlus"
 -- debug.traceback = STP.stacktrace
 
@@ -323,6 +324,9 @@ local tensor_types = {
 	'FloatTensor',
 	'DoubleTensor'
 }
+if have_cutorch then
+	tensor_types[#tensor_types+1] = 'CudaTensor'
+end
 
 -- Override metamethods like __mul and __add
 elem_op_override = {

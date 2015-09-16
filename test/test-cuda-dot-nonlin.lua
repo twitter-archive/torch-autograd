@@ -9,8 +9,8 @@ end
 
 the_fn = fn_dot_tanh
 
-x = torch.FloatTensor(1,32):fill(0.5)
-W = torch.FloatTensor(32, 100):fill(0.5)
+x = torch.CudaTensor(1,32):fill(0.5)
+W = torch.CudaTensor(32, 100):fill(0.5)
 print(the_fn(W,x))
 
 dthe_fn = grad(the_fn)
