@@ -1,6 +1,6 @@
 -- TODO
 -- Disallow overwriting anything
--- 
+-- Tables
 
 torch = torch or require('torch')
 have_cutorch,cutorch = pcall(require,'cutorch')
@@ -14,6 +14,7 @@ function to_scalar(x)
 	return torch.sum(torch.sin(x))
 end
 
+-- Declare the ops we'd like to override directly
 local op = {
 	add = function(a,b) return a+b end,
 	sub = function(a,b) return a-b end,
@@ -21,11 +22,22 @@ local op = {
 	div = function(a,b) return a/b end, 
 	pow = function(a,b) return a^b end,
 }
+
+-- Some local declarations ahead of time
 local gradfuns = {}
 local nodeapply
 
-Node = class("Node")
+-- Define the tensor types for which we'll allow automatic differentiation
+local tensor_types = {
+	'FloatTensor',
+	'DoubleTensor'
+}
+if have_cutorch then
+	tensor_types[#tensor_types+1] = 'CudaTensor'
+end
 
+-- Make a node class, which will capture computation as they're used
+Node = class("Node")
 function Node:__init(value, fun, args, tape)
     self.value = value
     self.fun = fun
@@ -57,6 +69,7 @@ function Node.__unm(l)
 	return nodeapply(op.mul, -1, l)
 end
 
+-- Override operations for number types
 local number_mt = {
 	__add = function(a,b)
 		if torch.type(a) == "number" and torch.isTensor(b) then
@@ -109,6 +122,57 @@ nodeapply = function(fun, ...)
     end
 end
 
+local new_start_node
+new_start_node = function(val, tape)
+	-- If our target argument is a table, we'll need to walk its members and node-ify them.
+	-- For now, if we see a number or a tensor, we'll node-ify it, otherwise,
+	-- if it's a table, we'll try to walk it
+	if torch.isTensor(val) then
+		return Node(val, nil, nil, tape)
+	elseif type(val) == "table" then
+		print("YEAH")
+		for k,v in pairs(val) do
+			val[k] = new_start_node(v, tape)
+		end
+		return val
+	end
+end
+
+-- If we passed in just a tensor, return the outgrad.
+-- If we passed in a table, return all the outgrads.
+local function get_outgrad(arg)
+
+	local val = getval(arg)
+
+	-- If we have a tensor, we just have one out gradient
+	if torch.isTensor(val) then
+		return arg.outgrad
+
+	-- If we have a table, then we can recurse the table and spit out the gradient
+	elseif type(val) == "table" and not isnode(val) then
+		local out = {}
+		for k,v in pairs(arg) do
+			out[k] = get_outgrad(v)
+		end
+		return out
+	end
+end
+
+local function check_input(arg)
+	if torch.isTensor(arg) then
+		is_valid_type = false
+		for _,tensor_type in pairs(tensor_types) do
+			is_valid_type = is_valid_type or 'torch.' .. tensor_type == torch.typename(arg)
+		end
+		if not is_valid_type then
+			err_msg = "Input tensor is invalid type " .. torch.typename(arg) .. ". Valid types are"
+			for _, tensor_type in pairs(tensor_types) do
+				err_msg = err_msg .. " " .. tensor_type
+			end
+			error(err_msg)
+		end
+	end
+end
 
 -- Step through and take the gradient
 function grad(fun, argnum)
@@ -116,32 +180,34 @@ function grad(fun, argnum)
 	local do_grad = function(...)
 		local arg = {...}
 		local tape = {}
-		arg[argnum] = Node(arg[argnum], nil, nil, tape)
 
+		-- Check the argument, to make sure it's alright.
+		check_input(arg[argnum])
+
+		-- If our target argument is a table, we'll need to walk its members and node-ify them.
+		-- For now, if we see a number or a tensor, we'll node-ify it, otherwise,
+		-- if it's a table, we'll try to walk it
+		arg[argnum] = new_start_node(arg[argnum], tape)
+		print(type(arg[argnum]))
 		local ans = fun(unpack(arg))
 		if not isnode(ans) then
 			return 0.0
 		end
+
+		print(map(function(t)
+				if t.fun then
+					return gradfuns[t.fun][1]
+				else
+					return nil
+				end
+			end,
+			ans.tape))
+
 		ans.outgrad = 1.0
 		local node
-
-		-- print(map(function(t)
-		-- 		if t.fun then
-		-- 			return gradfuns[t.fun][1]
-		-- 		else
-		-- 			return nil
-		-- 		end
-		-- 	end,
-		-- 	ans.tape))
-
 		for i=#ans.tape,1,-1 do
 			node = ans.tape[i]
 			for iarg=1,#node.args do
-				-- print("====================================")
-				-- print(node.args)
-				-- print(node.outgrad)
-				-- print(iarg)
-				-- print("====================================")
 				local this_arg = node.args[iarg]
 				if isnode(this_arg) then
 					local gradfun = gradfuns[node.fun][iarg+1]
@@ -150,7 +216,7 @@ function grad(fun, argnum)
 				end
 			end
 		end
-		return node.outgrad
+		return get_outgrad(arg[argnum])
 	end
 	return do_grad
 end
@@ -227,11 +293,6 @@ gradfuns[op.pow] = {
 	"pow",
 	function(g, x, y) return elemwise_mul(elemwise_mul(g,y),torch.pow(x, (y-1))) end,
 }
--- gradfuns.__mul = gradfuns[op.mul]
--- gradfuns.__add = gradfuns[op.add]
--- gradfuns.__div = gradfuns[op.div]
--- gradfuns.__pow = gradfuns[op.pow]
--- gradfuns.__sub = gradfuns[op.sub]
 gradfuns[torch.add] = {
 	"torch.add",
 	function(g, x, y) return g end,
@@ -305,6 +366,7 @@ local override = {
 	"__mul", "mul", "cmul",
 	"pow", "__pow",
 	"exp", 'tanh',
+	"sin", "cos", "tan", "sqrt",
 	'abs', 'sum'
 	}
 
@@ -320,14 +382,6 @@ end
 
 
 -- Now override class methods and metamethods on tensors
-local tensor_types = {
-	'FloatTensor',
-	'DoubleTensor'
-}
-if have_cutorch then
-	tensor_types[#tensor_types+1] = 'CudaTensor'
-end
-
 -- Override metamethods like __mul and __add
 elem_op_override = {
 	__mul = op.mul,

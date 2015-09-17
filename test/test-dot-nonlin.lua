@@ -1,10 +1,10 @@
 require 'autograd'
 
 function fn_dot_tanh(W, x)
-	local W2 = x * W
-	local W3 = torch.tanh(W2)
-	local out = torch.sum(W3)
-	return out
+	-- local W2 = x * W
+	-- local W3 = torch.tanh(W2)
+	-- local out = torch.sum(W3)
+	return torch.sum(torch.tanh(W))
 end
 
 the_fn = fn_dot_tanh
