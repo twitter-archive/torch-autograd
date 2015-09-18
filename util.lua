@@ -1,19 +1,3 @@
--- function checkgrad(f, g, x, eps)
---     eps = eps or 1e-4
---     print(x)
---     print(g(x):view(1))
-
---     grad_exact = g(x):view(x:nElement())
---     print(grad_exact)
---     -- Flatten the gradient
---     -- for i=1,#
--- end
-
-f = function(x) return torch.sin(x) end
-g = function(x) return torch.cos(x) end
-x = torch.FloatTensor{1}
-checkgrad(f,g,x,eps)
-
 local keys = function(tbl)
     local keyset={}
     local n=0

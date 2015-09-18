@@ -13,19 +13,17 @@ testData.y = one_hot(testData.y)
 inputSize = trainData.x[1]:nElement()
 confusionMatrix = optim.ConfusionMatrix(classes)
 
-function sigmoid(x) return 1.0/(torch.exp(-x)) end
-
 -- Define our neural net
-function neural_net(params, input, target, return_prediction)
-	local W2 = torch.tanh(input * params.W[1] + params.B[1])
-	local W3 = torch.tanh(W2 * params.W[2] + params.B[2])
-	local W4 = W3 * params.W[3] + params.B[3]
-	local out = logsoftmax(W4)
-	if return_prediction then
-		return out
-	else
-		return logMultiNomialLoss(out, target)
-	end
+function neuralNet(params, input, target, return_prediction)
+   local W2 = torch.tanh(input * params.W[1] + params.B[1])
+   local W3 = torch.tanh(W2 * params.W[2] + params.B[2])
+   local W4 = W3 * params.W[3] + params.B[3]
+   local out = logsoftmax(W4)
+   if return_prediction then
+      return out
+   else
+      return logMultiNomialLoss(out, target)
+   end
 end
 
 -- Define our parameters
@@ -39,54 +37,34 @@ W3 = uniform(-1/math.sqrt(10),1/math.sqrt(10), 50, #classes)
 B3 = torch.FloatTensor(#classes):fill(0)
 
 local params = {
-	W = {W1, W2, W3}, 
-	B = {B1, B2, B3},
+   W = {W1, W2, W3}, 
+   B = {B1, B2, B3},
 }
 
 
 -- Train a neural network
 for epoch=1,100 do
-	print('EPOCH #'..epoch)
-	for i=1,trainData.size do
-		local x = trainData.x[i]:view(1,inputSize)
-		local y = torch.view(trainData.y[i], 1, 10):clone()
+   print('EPOCH #'..epoch)
+   for i=1,trainData.size do
+      local x = trainData.x[i]:view(1,inputSize)
+      local y = torch.view(trainData.y[i], 1, 10):clone()
 
-		local dneural_net = grad(neural_net, 1, false)
-		grads = dneural_net(params,x,y)
-		prediction = neural_net(params,x,y,true)
+      local dneural_net = grad(neural_net, 1, false)
+      grads = dneural_net(params,x,y)
+      prediction = neural_net(params,x,y,true)
 
-		-- Update weights and biases
-		for i=1,#params.W do
-			params.W[i] = params.W[i] - grads.W[i] * 0.01
-			params.B[i] = params.B[i] - grads.B[i] * 0.01
-		end
+      -- Update weights and biases
+      for i=1,#params.W do
+         params.W[i] = params.W[i] - grads.W[i] * 0.01
+         params.B[i] = params.B[i] - grads.B[i] * 0.01
+      end
 
-		confusionMatrix:add(prediction, y)
-		if i % 5000 == 0 then
-			print(params.B[1][1])
-			print(torch.sum(grads.W[1]))
-			print(confusionMatrix)
-			confusionMatrix:zero()
-		end
-	end
+      confusionMatrix:add(prediction, y)
+      if i % 5000 == 0 then
+         print(params.B[1][1])
+         print(torch.sum(grads.W[1]))
+         print(confusionMatrix)
+         confusionMatrix:zero()
+      end
+   end
 end
-
--- print(tape)
-
--- os.exit()
--- -- momgradW = [w*0.0 for w in weights]
--- -- for epoch in xrange(1000):
--- --   l.append(loss(weights, inputs, values, hypers))
--- --   gradW = gradWfun(weights, inputs, values, hypers)
-
--- --   for i in xrange(len(gradW)):
--- --     gradW[i] = np.clip(gradW[i], -5.0, 5.0)
--- --     momgradW[i] = 0.9 * momgradW[i] + 0.1*gradW[i]
--- --     weights[i]  = weights[i] - 0.01 * momgradW[i]
-
--- Do an SGD step
--- print(torch.sum(out.W[1]))
--- print(torch.sum(out.B[1]))
-
--- print(torch.sum(x))
--- print(trainData.y[1])
