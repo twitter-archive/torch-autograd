@@ -56,7 +56,7 @@ for epoch=1,100 do
 		end
 
 		confusionMatrix:add(prediction, y)
-		if i % 5000 == 0 then
+		if i % 1000 == 0 then
 			print(params.B[1][1])
 			print(torch.sum(grads.W[1]))
 			print(confusionMatrix)
