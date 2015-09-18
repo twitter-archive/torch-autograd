@@ -1,10 +1,7 @@
 require 'autograd'
 
 function fn_sum(A)
-	B = A + 3
-	C = 3 + B
-	D = C + C
-	E = torch.sum(D)
+	E = torch.pow(A,3)
 	return E
 end
 
@@ -13,4 +10,5 @@ print(fn_sum(A))
 
 dfn_sum = grad(fn_sum)
 Q = torch.FloatTensor(3,3):fill(2)
-print(dfn_sum(Q))
+out1 = dfn_sum(Q)
+out2 = dfn_sum(Q)
