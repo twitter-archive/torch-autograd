@@ -351,7 +351,7 @@ gradfuns[torch.exp] = {
 }
 gradfuns[torch.tanh] = {
 	"tanh",
-	function(g,x) return 1 - torch.pow(torch.tanh(x), 2.0) end,
+	function(g,x) return elemwise_div(g,torch.pow(torch.cosh(x), 2.0)) end
 }
 gradfuns[torch.abs] = {
 	"abs",
