@@ -16,7 +16,7 @@ confusionMatrix = optim.ConfusionMatrix(classes)
 function sigmoid(x) return 1.0/(torch.exp(-x)) end
 
 -- Define our neural net
-function neural_net(params, input, target, return_prediction)
+function neuralNet(params, input, target, return_prediction)
 	local W2 = input * params.W[1] + params.B[1]
 	local out = logsoftmax(W2)
 	if return_prediction then
@@ -45,9 +45,9 @@ for epoch=1,100 do
 		local x = trainData.x[i]:view(1,inputSize)
 		local y = torch.view(trainData.y[i], 1, 10):clone()
 
-		local dneural_net = grad(neural_net, 1, false)
-		grads = dneural_net(params,x,y)
-		prediction = neural_net(params,x,y,true)
+		local dneuralNet = grad(neuralNet, 1, false)
+		grads = dneuralNet(params,x,y)
+		prediction = neuralNet(params,x,y,true)
 
 		-- Update weights and biases
 		for i=1,#params.W do

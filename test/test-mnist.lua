@@ -9,13 +9,13 @@ local function uniform(min, max, h, w) return torch.mul(torch.FloatTensor():rand
 
 -- Load in MNIST
 trainData, testData, classes = require('./setup-data.lua')()
-trainData.y = one_hot(trainData.y)
-testData.y = one_hot(testData.y)
+trainData.y = oneHot(trainData.y)
+testData.y = oneHot(testData.y)
 inputSize = trainData.x[1]:nElement()
 confusionMatrix = optim.ConfusionMatrix(classes)
 
 -- Define our neural net
-function neural_net(params, input, target, return_prediction)
+function neuralNet(params, input, target, return_prediction)
    local W2 = torch.tanh(input * params.W[1] + params.B[1])
    local W3 = torch.tanh(W2 * params.W[2] + params.B[2])
    local W4 = W3 * params.W[3] + params.B[3]
@@ -50,9 +50,9 @@ for epoch=1,100 do
       local x = trainData.x[i]:view(1,inputSize)
       local y = torch.view(trainData.y[i], 1, 10):clone()
 
-      local dneural_net = grad(neural_net)
-      grads = dneural_net(params,x,y)
-      prediction = neural_net(params,x,y,true)
+      local dneuralNet = grad(neuralNet)
+      grads = dneuralNet(params,x,y)
+      prediction = neuralNet(params,x,y,true)
 
       -- Update weights and biases
       for i=1,#params.W do

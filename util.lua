@@ -43,7 +43,7 @@ function getval(v)
     end
 end
 
-function one_hot(labels, n)
+function oneHot(labels, n)
     --[[
     Assume labels is a 1D tensor of contiguous class IDs, starting at 1.
     Turn it into a 2D tensor of size labels:size(1) x nUniqueLabels

@@ -12,9 +12,6 @@ require 'util'
 -- local STP = require "StackTracePlus"
 -- debug.traceback = STP.stacktrace
 
-function to_scalar(x)
-	return torch.sum(torch.sin(x))
-end
 
 -- Declare the ops we'd like to override directly
 local op = {
@@ -31,12 +28,12 @@ local gradfuns = {}
 local nodeapply
 
 -- Define the tensor types for which we'll allow automatic differentiation
-local tensor_types = {
+local tensorTypes = {
 	'FloatTensor',
 	'DoubleTensor'
 }
 if have_cutorch then
-	tensor_types[#tensor_types+1] = 'CudaTensor'
+	tensorTypes[#tensorTypes+1] = 'CudaTensor'
 end
 
 -- Make a node class, which will capture computation as they're used
@@ -77,7 +74,7 @@ function Node.__unm(l)
 end
 
 -- Override operations for number types
-local number_mt = {
+local numberMetatable = {
 	__add = function(a,b)
 		if torch.type(a) == "number" and torch.isTensor(b) then
 			return nodeapply(op.add, b, a)
@@ -112,7 +109,7 @@ local number_mt = {
 		error("UNDEFINED")
 	end
 }
-debug.setmetatable(1.0, number_mt)
+debug.setmetatable(1.0, numberMetatable)
 
 -- A wrapper for a function
 -- Anytime we try to apply a function to some arguments,
@@ -133,7 +130,7 @@ end
 
 -- If we passed in just a tensor, return the outgrad.
 -- If we passed in a table, return all the outgrads.
-local function get_outgrad(arg)
+local function getOutgrad(arg)
 
 	local val = getval(arg)
 
@@ -145,64 +142,63 @@ local function get_outgrad(arg)
 	elseif type(val) == "table" and not isnode(val) then
 		local out = {}
 		for k,v in pairs(arg) do
-			out[k] = get_outgrad(v)
+			out[k] = getOutgrad(v)
 		end
 		return out
 	end
 end
 
-local function check_input(arg)
+local function checkInput(arg)
 	if torch.isTensor(arg) then
-		is_valid_type = false
-		for _,tensor_type in pairs(tensor_types) do
-			is_valid_type = is_valid_type or 'torch.' .. tensor_type == torch.typename(arg)
+		isValidType = false
+		for _,tensorType in pairs(tensorTypes) do
+			isValidType = isValidType or 'torch.' .. tensorType == torch.typename(arg)
 		end
-		if not is_valid_type then
+		if not isValidType then
 			err_msg = "Input tensor is invalid type " .. torch.typename(arg) .. ". Valid types are"
-			for _, tensor_type in pairs(tensor_types) do
-				err_msg = err_msg .. " " .. tensor_type
+			for _, tensorType in pairs(tensorTypes) do
+				err_msg = err_msg .. " " .. tensorType
 			end
 			error(err_msg)
 		end
 	end
 end
-local new_start_node
-new_start_node = function(val, tape)
-	-- If our target argument is a table, we'll need to walk its members and node-ify them.
-	-- For now, if we see a number or a tensor, we'll node-ify it, otherwise,
-	-- if it's a table, we'll try to walk it
+
+local newStartNode
+newStartNode = function(val, tape)
+	-- If our argument is a tensor, just nodify it straight-up
 	if torch.isTensor(val) then
 		return Node(val, nil, nil, tape)
+	-- If our target argument is a table, we'll need to walk its members and node-ify them.
 	elseif type(val) == "table" then
 		for k,v in pairs(val) do
 			-- print(k)
-			val[k] = new_start_node(v, tape)
+			val[k] = newStartNode(v, tape)
 		end
 		return val
 	end
 end
 
--- Step through and take the gradient
+-- Step through the computation graph and find the gradient
 function grad(fun, argnum, return_tape)
 	argnum = argnum or 1
-	local do_grad = function(...)
+	local doGrad = function(...)
 		local arg = tablex.deepcopy({...})
 		local tape = {}
-		-- return arg[argnum]
 
 		-- Check the argument, to make sure it's alright.
-		check_input(arg[argnum])
+		checkInput(arg[argnum])
 
 		-- If our target argument is a table, we'll need to walk its members and node-ify them.
 		-- For now, if we see a number or a tensor, we'll node-ify it, otherwise,
 		-- if it's a table, we'll try to walk it
-		arg[argnum] = new_start_node(arg[argnum], tape)
+		arg[argnum] = newStartNode(arg[argnum], tape)
 		local ans = fun(unpack(arg))
 		if not isnode(ans) then
 			return 0.0
 		end
 
-		local fn_names = (map(function(t)
+		local fnNames = (map(function(t)
 				if t.fun then
 					return gradfuns[t.fun][1]
 				else
@@ -210,7 +206,7 @@ function grad(fun, argnum, return_tape)
 				end
 			end,
 			ans.tape))
-		-- print(fn_names)
+		-- print(fnNames)
 
 		ans.outgrad = 1.0
 
@@ -218,15 +214,15 @@ function grad(fun, argnum, return_tape)
 		for i=#ans.tape,1,-1 do
 			node = ans.tape[i]
 			for iarg=1,#node.args do
-				local this_arg = node.args[iarg]
-				if isnode(this_arg) then
+				local thisArg = node.args[iarg]
+				if isnode(thisArg) then
 					local gradfun = gradfuns[node.fun][iarg+1]
 					local grad_update = gradfun(node.outgrad, unpack(map(getval,node.args)))
-					this_arg.outgrad = this_arg.outgrad + grad_update
-					if this_arg.fun then
-						this_arg.name = gradfuns[this_arg.fun][1]
+					thisArg.outgrad = thisArg.outgrad + grad_update
+					if thisArg.fun then
+						thisArg.name = gradfuns[thisArg.fun][1]
 					else
-						this_arg.name = "data"
+						thisArg.name = "data"
 					end
 				end
 			end
@@ -234,16 +230,16 @@ function grad(fun, argnum, return_tape)
 
 		-- Now spit out the grads
 		if return_tape then
-			return get_outgrad(arg[argnum]), ans.value, ans.tape
+			return getOutgrad(arg[argnum]), ans.value, ans.tape
 		else
-			return get_outgrad(arg[argnum]), ans.value
+			return getOutgrad(arg[argnum]), ans.value
 		end
 	end
-	return do_grad
+	return doGrad
 end
 
 
-local function elemwise_mul(a,b)
+local function elemwiseMul(a,b)
 	if torch.isTensor(a) and torch.isTensor(b) then
 		return torch.cmul(a,b)
 	else
@@ -251,7 +247,7 @@ local function elemwise_mul(a,b)
 	end
 end
 
-local function elemwise_div(a,b)
+local function elemwiseDiv(a,b)
 	if torch.isTensor(a) and torch.isTensor(b) then
 		return torch.cdiv(a,b)
 	else
@@ -268,12 +264,6 @@ end
 setmetatable(gradfuns, gradMt)
 
 
---repeatTensor
---view
---viewAs
---expand
---expandAs
---fill
 gradfuns[op.add] = {
 	"add",
 	function(g, x, y) return g end,
@@ -288,7 +278,7 @@ gradfuns[op.mul] = {
 			elseif A:nDimension() == 2 then
 				return torch.ger(g, B) -- outer product
 			else
-				return g*B -- elemwise_mul required? what about 3D?
+				return g*B -- elemwiseMul required? what about 3D?
 			end
 		else
 			return g*B
@@ -314,8 +304,8 @@ gradfuns[op.unm] = {
 }
 gradfuns[op.div] = {
 	"div",
-	function(g, x, y) return elemwise_div(g,y) end,
-	function(g, x, y) return elemwise_mul(-g,elemwise_div(x,torch.pow(y,2))) end,
+	function(g, x, y) return elemwiseDiv(g,y) end,
+	function(g, x, y) return elemwiseMul(-g,elemwiseDiv(x,torch.pow(y,2))) end,
 }
 gradfuns[op.sub] = {
 	"sub",
@@ -324,7 +314,7 @@ gradfuns[op.sub] = {
 }
 gradfuns[op.pow] = {
 	"pow",
-	function(g, x, y) return elemwise_mul(elemwise_mul(g,y),torch.pow(x, (y-1))) end,
+	function(g, x, y) return elemwiseMul(elemwiseMul(g,y),torch.pow(x, (y-1))) end,
 }
 gradfuns[torch.add] = {
 	"torch.add",
@@ -333,34 +323,34 @@ gradfuns[torch.add] = {
 }
 gradfuns[torch.cmul] = {
 	"torch.cmul",
-	function(g, x, y) return elemwise_mul(y,g) end,
-	function(g, x, y) return elemwise_mul(x,g) end,	
+	function(g, x, y) return elemwiseMul(y,g) end,
+	function(g, x, y) return elemwiseMul(x,g) end,	
 }
 gradfuns[torch.mul] = {
 	"torch.mul",
-	function(g, x, y) return elemwise_mul(y,g) end,
-	function(g, x, y) return elemwise_mul(x,g) end,	
+	function(g, x, y) return elemwiseMul(y,g) end,
+	function(g, x, y) return elemwiseMul(x,g) end,	
 }
 gradfuns[torch.pow] = {
 	"torch.pow",
-	function(g, x, y) return elemwise_mul(elemwise_mul(g,y),torch.pow(x,y-1)) end
+	function(g, x, y) return elemwiseMul(elemwiseMul(g,y),torch.pow(x,y-1)) end
 }
 gradfuns[torch.exp] = {
 	"exp",
-	function(g,x) return elemwise_mul(torch.exp(x), g) end,
+	function(g,x) return elemwiseMul(torch.exp(x), g) end,
 }
 gradfuns[torch.tanh] = {
 	"tanh",
-	function(g,x) return elemwise_div(g,torch.pow(torch.cosh(x), 2.0)) end
+	function(g,x) return elemwiseDiv(g,torch.pow(torch.cosh(x), 2.0)) end
 }
 gradfuns[torch.abs] = {
 	"abs",
 	function(g,x)
 		if torch.isTensor(x) then
-			return elemwise_mul(g,torch.sign(x))
+			return elemwiseMul(g,torch.sign(x))
 		else
 			sign = x>0 and 1 or x<0 and -1 or 0
-			return elemwise_mul(g,sign)
+			return elemwiseMul(g,sign)
 		end
 	end
 }
@@ -372,7 +362,7 @@ local function _sum(x)
 		return x
 	end
 end
-local function repeat_to_match_shape(x,axis)
+local function repeatToMatchShape(x,axis)
 	-- Special sum function to deal with numbers or tensors
 
 	if not torch.isTensor(x) then
@@ -393,40 +383,31 @@ end
 gradfuns[torch.sum] = {
 	"sum",
 	function(g,x,axis)
-		local repeater, _ = repeat_to_match_shape(x, axis)
+		local repeater, _ = repeatToMatchShape(x, axis)
 		return repeater(g)
 	end
 }
 gradfuns[torch.sqrt] = {
 	"sqrt",
-	function(g,x) return elemwise_mul(elemwise_mul(g,0.5), torch.pow(x,-0.5)) end
+	function(g,x) return elemwiseMul(elemwiseMul(g,0.5), torch.pow(x,-0.5)) end
 }
 gradfuns[torch.sin] = {
 	"sin",
-	function(g,x) return elemwise_mul(g, torch.cos(x)) end
+	function(g,x) return elemwiseMul(g, torch.cos(x)) end
 }
 gradfuns[torch.cos] = {
 	"cos",
-	function(g,x) return elemwise_mul(g, -torch.sin(x)) end
+	function(g,x) return elemwiseMul(g, -torch.sin(x)) end
 }
 gradfuns[torch.tan] = {
 	"tan",
-	function(g,x) return elemwise_div(g, torch.pow(torch.cos(x), 2.0)) end
+	function(g,x) return elemwiseDiv(g, torch.pow(torch.cos(x), 2.0)) end
 }
 gradfuns[torch.log] = {
 	"log",
-	function(g,x) return elemwise_div(g,x) end
+	function(g,x) return elemwiseDiv(g,x) end
 }
--- gradfuns[torch.viewAs] = {
--- 	"viewAs",
--- 	function(g,x,y) return blah end
--- }
--- gradfuns[torch.expand] = {
--- 	"expand",
--- 	function(g,x,...)
--- 		error("NOT IMPLEMENTED")
--- 	end
--- }
+
 
 local override = { 
 	"__add", "add", 
@@ -439,28 +420,28 @@ local override = {
 	}
 
 -- First, override all the Torch functions
-for ifn,fn_name in pairs(override) do
-	local old = torch[fn_name]
+for ifn,fnName in pairs(override) do
+	local old = torch[fnName]
 	local new_fn = function(...)
-		-- print("Running new " .. fn_name)
+		-- print("Running new " .. fnName)
 		return nodeapply(old, ...)
 	end
-	torch[fn_name] = new_fn
+	torch[fnName] = new_fn
 end
 
 
 -- Now override class methods and metamethods on tensors
 -- Override metamethods like __mul and __add
-local elem_op_override = {
+local elemOpOverride = {
 	__mul = op.mul,
 	__sub = op.sub,
 	__div = op.div,
 	__add = op.add,
 	__unm = op.unm,
 }
-for _,tensor_type in pairs(tensor_types) do
-	local mt = torch.getmetatable('torch.' .. tensor_type)
-	for src,dest in pairs(elem_op_override) do
+for _,tensorType in pairs(tensorTypes) do
+	local mt = torch.getmetatable('torch.' .. tensorType)
+	for src,dest in pairs(elemOpOverride) do
 		gradfuns[mt[src]] = gradfuns[dest]
 	end
 end
@@ -468,14 +449,14 @@ end
 -- Make sure that all class functions
 -- hook into the autodiff engine
 -- (so that we capture evaluations of torch.sum() and also myTensor:sum())
-for _,tensor_type in pairs(tensor_types) do
-	local mt = torch.getmetatable('torch.' .. tensor_type)
-	for ifn,fn_name in pairs(override) do
-		local old = mt[fn_name]
+for _,tensorType in pairs(tensorTypes) do
+	local mt = torch.getmetatable('torch.' .. tensorType)
+	for ifn,fnName in pairs(override) do
+		local old = mt[fnName]
 		local new_fn = function(...)
-			-- print("Running metamethod " .. fn_name)
+			-- print("Running metamethod " .. fnName)
 			return nodeapply(old, ...)
 		end
-		rawset(mt, fn_name, new_fn)
+		rawset(mt, fnName, new_fn)
 	end
 end
