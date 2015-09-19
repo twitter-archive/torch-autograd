@@ -1,7 +1,6 @@
 require 'autograd'
-
-optim = require 'optim'
 require 'util'
+optim = require 'optim'
 
 local function logMultiNomialLoss(out, target) return -torch.sum(torch.cmul(out,target)) end
 local function logsumexp(array) return torch.log(torch.sum(torch.exp(array))) end
@@ -51,7 +50,7 @@ for epoch=1,100 do
       local x = trainData.x[i]:view(1,inputSize)
       local y = torch.view(trainData.y[i], 1, 10):clone()
 
-      local dneural_net = grad(neural_net, 1, false)
+      local dneural_net = grad(neural_net)
       grads = dneural_net(params,x,y)
       prediction = neural_net(params,x,y,true)
 
