@@ -1,18 +1,20 @@
-require 'autograd'
-require 'util'
-optim = require 'optim'
+-- Libs
+local grad = require 'autograd'
+local util = require 'autograd.util'
+local optim = require 'optim'
 
+-- Helpers:
 local function logMultiNomialLoss(out, target) return -torch.sum(torch.cmul(out,target)) end
 local function logsumexp(array) return torch.log(torch.sum(torch.exp(array))) end
 local function logsoftmax(array) return array - logsumexp(array) end
 local function uniform(min, max, h, w) return torch.mul(torch.FloatTensor():rand(h,w), (max-min)) + min end
 
 -- Load in MNIST
-trainData, testData, classes = require('./setup-data.lua')()
-trainData.y = oneHot(trainData.y)
-testData.y = oneHot(testData.y)
-inputSize = trainData.x[1]:nElement()
-confusionMatrix = optim.ConfusionMatrix(classes)
+local trainData, testData, classes = require('./setup-data.lua')()
+trainData.y = util.oneHot(trainData.y)
+testData.y = util.oneHot(testData.y)
+local inputSize = trainData.x[1]:nElement()
+local confusionMatrix = optim.ConfusionMatrix(classes)
 
 -- Define our neural net
 function neuralNet(params, input, target, return_prediction)
@@ -37,11 +39,11 @@ B2 = torch.FloatTensor(50):fill(0)
 W3 = uniform(-1/math.sqrt(10),1/math.sqrt(10), 50, #classes)
 B3 = torch.FloatTensor(#classes):fill(0)
 
+-- Trainable parameters:
 local params = {
-   W = {W1, W2, W3}, 
+   W = {W1, W2, W3},
    B = {B1, B2, B3},
 }
-
 
 -- Train a neural network
 for epoch=1,100 do
@@ -60,6 +62,7 @@ for epoch=1,100 do
          params.B[i] = params.B[i] - grads.B[i] * 0.01
       end
 
+      -- Log performance:
       confusionMatrix:add(prediction, y)
       if i % 1000 == 0 then
          print(params.B[1][1])
