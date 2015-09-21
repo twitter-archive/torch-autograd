@@ -18,6 +18,7 @@ dependencies = {
    "trepl",
    "moses",
    "penlight",
+   "nnfunc",
    "totem",
 }
 
