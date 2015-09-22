@@ -18,9 +18,6 @@ local isNode = util.isNode
 local map = util.map
 local filter = util.filter
 
--- local STP = require "StackTracePlus"
--- debug.traceback = STP.stacktrace
-
 -- Declare the ops we'd like to override directly
 local op = {
    add = function(a,b) return a+b end,
@@ -56,7 +53,7 @@ function Node:__init(value, fun, args, tape)
 end
 
 function Node:__tostring()
-   return "ABCDEF " .. tostring(self.value)
+   return tostring(self.value)
 end
 
 function Node.__add(l,r)
@@ -203,6 +200,12 @@ local function grad(fun, argnum, returnTape)
       local ans = fun(unpack(arg))
       if not isNode(ans) then
          return 0.0
+      end
+      if type(getValue(ans)) ~= "number" then
+         print("")
+         print("Autograd only supports scalar outputs. This is current functions output: ")
+         print(getValue(ans))
+         error("Autograd only supports scalar return values. Output is not scalar")
       end
 
       local fnNames = map(ans.tape,function(t)
