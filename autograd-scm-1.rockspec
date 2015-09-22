@@ -27,5 +27,7 @@ build = {
    modules = {
       ['autograd.init'] = 'autograd.lua',
       ['autograd.util'] = 'util.lua',
+      ['autograd.test'] = 'test.lua',
+      ['autograd.gradcheck'] = 'gradcheck.lua',
    },
 }
