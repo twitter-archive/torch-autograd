@@ -13,7 +13,6 @@ require 'trepl'
 
 -- Utilities
 local util = require './util'
-local getValue = util.getValue
 local isNode = util.isNode
 local map = util.map
 local filter = util.filter
@@ -42,14 +41,24 @@ if haveCutorch then
 end
 
 -- Make a node class, which will capture computation as they're used
-local Node = class("Node")
-function Node:__init(value, fun, args, tape)
-   self.value = value
-   self.fun = fun
-   self.args = args or {}
-   self.tape = tape or {}
-   self.tape[#self.tape+1] = self
-   self.outgrad = 0.0
+local noop = function() end
+-- Define the node
+local Node = {
+   value=0,
+   fun=nil,
+   args={},
+   tape={},
+   outgrad=0,
+   name=""
+}
+
+-- Niceties
+function Node:__tostring()
+   if type(self.value) == "table" then
+      return pretty.write(self.value)
+   else
+      return tostring(self.value)
+   end
 end
 
 function Node:__tostring()
@@ -77,6 +86,53 @@ end
 function Node.__unm(l)
    return nodeapply(op.unm, l)
 end
+
+
+function Node:new(value, fun, args, tape, name)
+   local o = {}
+   setmetatable(o, self)
+
+   o.tape = tape or {}
+   o.tape[#o.tape+1] = o
+   o.value = value
+   o.fun = fun
+   o.outgrad = 0.0
+   o.args = args or {}
+   o.name = "" or name
+   return o
+end
+
+local function isNode(n)
+   return getmetatable(n) == Node
+end
+
+function getValue(v)
+   if isNode(v) then
+      return v.value
+   else
+      return v
+   end
+end
+
+-- -- Proxy the table lookups.
+-- function Node.__index(tbl,key)
+--    if Node[key] then
+--       return Node[key]
+--    else
+--       local o = rawget(tbl, "value")
+--       return o[key]
+--    end
+-- end
+-- function Node.__newindex(tbl, k, v)
+--    if tbl[k] then
+--       rawset(tbl, k, v)
+--    else
+--       local o = rawget(tbl, "value")
+--       if type(o) ~= "table" then error("Node's value is not a table type. Cannot set members.") end
+--       rawset(o, k, v)
+--    end
+-- end
+
 
 -- Override operations for number types
 local numberMetatable = {
@@ -127,7 +183,7 @@ nodeapply = function(fun, ...)
    if _.count(parents) > 0 then
       local vals = map(arg,getValue)
       local value = nodeapply(fun,unpack(map(arg,getValue)))
-      return Node(value, fun, arg, parents[1].tape)
+      return Node:new(value, fun, arg, parents[1].tape)
    else
       return fun(unpack(map(arg,getValue)))
    end
@@ -169,11 +225,11 @@ local function checkInput(arg)
    end
 end
 
-local newStartNode
+-- local newStartNode
 newStartNode = function(val, tape)
    -- If our argument is a tensor, just nodify it straight-up
    if torch.isTensor(val) then
-      return Node(val, nil, nil, tape)
+      return Node:new(val, nil, nil, tape)
       -- If our target argument is a table, we'll need to walk its members and node-ify them.
    elseif type(val) == "table" then
       for k,v in pairs(val) do

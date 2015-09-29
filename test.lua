@@ -104,8 +104,8 @@ local tests = {
       local dFunc = autograd(func)
 
       -- Compute func and grads:
-      local pred = func({W=W, x=x})
-      local grads = dFunc({W=W, x=x})
+      local pred = func({x=x})
+      local grads = dFunc({x=x})
 
       -- Tests:
       tester:asserteq(type(pred), 'number', 'incorrect prediction')
