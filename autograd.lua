@@ -29,7 +29,7 @@ local op = {
 
 -- Some local declarations ahead of time
 local gradfuns = {}
-local nodeapply
+local nodeApply
 
 -- Define the tensor types for which we'll allow automatic differentiation
 local tensorTypes = {
@@ -66,25 +66,25 @@ function Node:__tostring()
 end
 
 function Node.__add(l,r)
-   return nodeapply(op.add, l, r)
+   return nodeApply(op.add, l, r)
 end
 
 function Node.__sub(l,r)
-   return nodeapply(op.sub, l, r)
+   return nodeApply(op.sub, l, r)
 end
 
 function Node.__mul(l,r)
-   return nodeapply(op.mul, l, r)
+   return nodeApply(op.mul, l, r)
 end
 
 function Node.__div(l,r)
-   return nodeapply(op.div, l, r)
+   return nodeApply(op.div, l, r)
 end
 function Node.__pow(l,r)
-   return nodeapply(op.pow, l, r)
+   return nodeApply(op.pow, l, r)
 end
 function Node.__unm(l)
-   return nodeapply(op.unm, l)
+   return nodeApply(op.unm, l)
 end
 
 
@@ -138,23 +138,23 @@ end
 local numberMetatable = {
    __add = function(a,b)
       if torch.type(a) == "number" and torch.isTensor(b) then
-         return nodeapply(op.add, b, a)
+         return nodeApply(op.add, b, a)
       else
-         return nodeapply(op.add, a, b)
+         return nodeApply(op.add, a, b)
       end
    end,
    __sub = function(a,b)
       if torch.type(a) == "number" and torch.isTensor(b) then
-         return nodeapply(op.add, -b, a)
+         return nodeApply(op.add, -b, a)
       else
-         return nodeapply(op.add, a, -b) -- TODO subtraction
+         return nodeApply(op.add, a, -b) -- TODO subtraction
       end
    end,
    __mul = function(a,b)
       if torch.type(a) == "number" and torch.isTensor(b) then
-         return nodeapply(op.mul, b, a)
+         return nodeApply(op.mul, b, a)
       else
-         return nodeapply(op.mul, a, b)
+         return nodeApply(op.mul, a, b)
       end
    end,
    __div = function(a,b)
@@ -177,12 +177,12 @@ debug.setmetatable(1.0, numberMetatable)
 -- we'd like to make sure that if we're passing nodes in,
 -- that we unpack the value in those nodes, apply the function
 -- to the underlying value, and then wrap the value in a node
-nodeapply = function(fun, ...)
+nodeApply = function(fun, ...)
    local arg = {...}
    local parents = filter(arg, isNode)
    if _.count(parents) > 0 then
       local vals = map(arg,getValue)
-      local value = nodeapply(fun,unpack(map(arg,getValue)))
+      local value = nodeApply(fun,unpack(map(arg,getValue)))
       return Node:new(value, fun, arg, parents[1].tape)
    else
       return fun(unpack(map(arg,getValue)))
@@ -486,7 +486,7 @@ for ifn,fnName in pairs(override) do
    local old = torch[fnName]
    local newFn = function(...)
       -- print("Running new " .. fnName)
-      return nodeapply(old, ...)
+      return nodeApply(old, ...)
    end
    torch[fnName] = newFn
 end
@@ -516,7 +516,7 @@ for _,tensorType in pairs(tensorTypes) do
       local old = mt[fnName]
       local newFn = function(...)
          -- print("Running metamethod " .. fnName)
-         return nodeapply(old, ...)
+         return nodeApply(old, ...)
       end
       rawset(mt, fnName, newFn)
    end
