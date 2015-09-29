@@ -7,19 +7,12 @@ local torch = require('torch')
 local haveCutorch,cutorch = pcall(require,'cutorch')
 local class = require 'class'
 local debug = require 'debug'
+local ops = require './ops'
 local _ = require 'moses'
 require 'pl'
 require 'trepl'
 
 -- Declare the ops we'd like to override directly
-local op = {
-   add = function(a,b) return a+b end,
-   sub = function(a,b) return a-b end,
-   mul = function(a,b) return a*b end,
-   div = function(a,b) return a/b end,
-   pow = function(a,b) return a^b end,
-   unm = function(a) return -1*a end -- TODO: more efficient way across numbers and torch?
-}
 
 -- Some local declarations ahead of time
 local gradfuns = {}
@@ -60,25 +53,25 @@ function Node:__tostring()
 end
 
 function Node.__add(l,r)
-   return nodeApply(op.add, l, r)
+   return nodeApply(ops.add, l, r)
 end
 
 function Node.__sub(l,r)
-   return nodeApply(op.sub, l, r)
+   return nodeApply(ops.sub, l, r)
 end
 
 function Node.__mul(l,r)
-   return nodeApply(op.mul, l, r)
+   return nodeApply(ops.mul, l, r)
 end
 
 function Node.__div(l,r)
-   return nodeApply(op.div, l, r)
+   return nodeApply(ops.div, l, r)
 end
 function Node.__pow(l,r)
-   return nodeApply(op.pow, l, r)
+   return nodeApply(ops.pow, l, r)
 end
 function Node.__unm(l)
-   return nodeApply(op.unm, l)
+   return nodeApply(ops.unm, l)
 end
 
 
@@ -132,32 +125,32 @@ end
 local numberMetatable = {
    __add = function(a,b)
       if torch.type(a) == "number" and torch.isTensor(b) then
-         return nodeApply(op.add, b, a)
+         return nodeApply(ops.add, b, a)
       else
-         return nodeApply(op.add, a, b)
+         return nodeApply(ops.add, a, b)
       end
    end,
    __sub = function(a,b)
       if torch.type(a) == "number" and torch.isTensor(b) then
-         return nodeApply(op.add, -b, a)
+         return nodeApply(ops.add, -b, a)
       else
-         return nodeApply(op.add, a, -b) -- TODO subtraction
+         return nodeApply(ops.add, a, -b) -- TODO subtraction
       end
    end,
    __mul = function(a,b)
       if torch.type(a) == "number" and torch.isTensor(b) then
-         return nodeApply(op.mul, b, a)
+         return nodeApply(ops.mul, b, a)
       else
-         return nodeApply(op.mul, a, b)
+         return nodeApply(ops.mul, a, b)
       end
    end,
    __div = function(a,b)
       if torch.type(a) == "number" and torch.isTensor(b) then
          -- THIS IS INSANE
          c = torch.ones(b:size())
-         return node.apply(op.mul, torch.cdiv(c,b), a)
+         return node.apply(ops.mul, torch.cdiv(c,b), a)
       else
-         return node.apply(op.div, a, b)
+         return node.apply(ops.div, a, b)
       end
    end,
    __unm = function(a,b)
@@ -328,12 +321,12 @@ gradMt.__index = function(table, key)
 end
 setmetatable(gradfuns, gradMt)
 
-gradfuns[op.add] = {
+gradfuns[ops.add] = {
    "add",
    function(g, x, y) return g end,
    function(g, x, y) return g end,
 }
-gradfuns[op.mul] = {
+gradfuns[ops.mul] = {
    "mult/dot",
    function(g, A, B)
       if torch.isTensor(A) and torch.isTensor(B) then
@@ -362,21 +355,21 @@ gradfuns[op.mul] = {
       end
    end,
 }
-gradfuns[op.unm] = {
+gradfuns[ops.unm] = {
    "negation",
    function(g, x) return -g end
 }
-gradfuns[op.div] = {
+gradfuns[ops.div] = {
    "div",
    function(g, x, y) return elemwiseDiv(g,y) end,
    function(g, x, y) return elemwiseMul(-g,elemwiseDiv(x,torch.pow(y,2))) end,
 }
-gradfuns[op.sub] = {
+gradfuns[ops.sub] = {
    "sub",
    function(g, x, y) return g end,
    function(g, x, y) return -g end,
 }
-gradfuns[op.pow] = {
+gradfuns[ops.pow] = {
    "pow",
    function(g, x, y) return elemwiseMul(elemwiseMul(g,y),torch.pow(x, (y-1))) end,
 }
@@ -496,11 +489,11 @@ end
 -- Now override class methods and metamethods on tensors
 -- Override metamethods like __mul and __add
 local elemOpOverride = {
-   __mul = op.mul,
-   __sub = op.sub,
-   __div = op.div,
-   __add = op.add,
-   __unm = op.unm,
+   __mul = ops.mul,
+   __sub = ops.sub,
+   __div = ops.div,
+   __add = ops.add,
+   __unm = ops.unm,
 }
 for _,tensorType in pairs(tensorTypes) do
    local mt = torch.getmetatable('torch.' .. tensorType)
