@@ -11,12 +11,6 @@ local _ = require 'moses'
 require 'pl'
 require 'trepl'
 
--- Utilities
-local util = require './util'
-local isNode = util.isNode
-local map = util.map
-local filter = util.filter
-
 -- Declare the ops we'd like to override directly
 local op = {
    add = function(a,b) return a+b end,
@@ -29,7 +23,7 @@ local op = {
 
 -- Some local declarations ahead of time
 local gradfuns = {}
-local nodeApply
+local nodeApply, getOutgrad
 
 -- Define the tensor types for which we'll allow automatic differentiation
 local tensorTypes = {
@@ -106,7 +100,7 @@ local function isNode(n)
    return getmetatable(n) == Node
 end
 
-function getValue(v)
+local function getValue(v)
    if isNode(v) then
       return v.value
    else
@@ -178,35 +172,43 @@ debug.setmetatable(1.0, numberMetatable)
 -- that we unpack the value in those nodes, apply the function
 -- to the underlying value, and then wrap the value in a node
 nodeApply = function(fun, ...)
-   local arg = {...}
-   local parents = filter(arg, isNode)
-   if _.count(parents) > 0 then
-      local vals = map(arg,getValue)
-      local value = nodeApply(fun,unpack(map(arg,getValue)))
-      return Node:new(value, fun, arg, parents[1].tape)
-   else
-      return fun(unpack(map(arg,getValue)))
+   local _nodeApply
+   _nodeApply = function(fun, ...)
+      local arg = {...}
+      local parents = _.filter(arg, function (k,v) return isNode(v) end)
+      if _.count(parents) > 0 then
+         local vals = _.map(arg,function(k,v) return getValue(v) end)
+         local value = _nodeApply(fun,unpack(_.map(arg, function(k,v) return getValue(v) end)))
+         return Node:new(value, fun, arg, parents[1].tape)
+      else
+         return fun(unpack(_.map(arg,function (k,v) return getValue(v) end)))
+      end
    end
+   return _nodeApply(fun, ...)
 end
 
 -- If we passed in just a tensor, return the outgrad.
 -- If we passed in a table, return all the outgrads.
-local function getOutgrad(arg)
+getOutgrad = function(arg)
+   local _getOutgrad
+   _getOutgrad = function(arg)
 
-   local val = getValue(arg)
+      local val = getValue(arg)
 
-   -- If we have a tensor, we just have one out gradient
-   if torch.isTensor(val) then
-      return arg.outgrad
+      -- If we have a tensor, we just have one out gradient
+      if torch.isTensor(val) then
+         return arg.outgrad
 
-      -- If we have a table, then we can recurse the table and spit out the gradient
-   elseif type(val) == "table" and not isNode(val) then
-      local out = {}
-      for k,v in pairs(arg) do
-         out[k] = getOutgrad(v)
+         -- If we have a table, then we can recurse the table and spit out the gradient
+      elseif type(val) == "table" and not isNode(val) then
+         local out = {}
+         for k,v in pairs(arg) do
+            out[k] = _getOutgrad(v)
+         end
+         return out
       end
-      return out
    end
+   return _getOutgrad(arg)
 end
 
 local function checkInput(arg)
@@ -264,7 +266,7 @@ local function grad(fun, argnum, returnTape)
          error("Autograd only supports scalar return values. Output is not scalar")
       end
 
-      local fnNames = map(ans.tape,function(t)
+      local fnNames = _.map(ans.tape,function(k,t)
          if t.fun then
             return gradfuns[t.fun][1]
          else
@@ -281,7 +283,7 @@ local function grad(fun, argnum, returnTape)
             local thisArg = node.args[iarg]
             if isNode(thisArg) then
                local gradfun = gradfuns[node.fun][iarg+1]
-               local gradUpdate = gradfun(node.outgrad, unpack(map(node.args,getValue)))
+               local gradUpdate = gradfun(node.outgrad, unpack(_.map(node.args, function(k,v) return getValue(v) end)))
                thisArg.outgrad = thisArg.outgrad + gradUpdate
                if thisArg.fun then
                   thisArg.name = gradfuns[thisArg.fun][1]
