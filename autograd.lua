@@ -533,7 +533,8 @@ local autograd = {
       Node = Node,
       isNode = isNode,
       getValue = getValue,
-      newStartNode = newStartNode
+      newStartNode = newStartNode,
+      nodeApply = nodeApply
    }
 }
 
