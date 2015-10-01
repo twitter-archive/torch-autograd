@@ -110,7 +110,7 @@ end
 
 -- -- Proxy the table lookups.
 -- function Node.__index(tbl,key)
---    if Node[key] then
+--    if Node[key] or key == "fun" then
 --       return Node[key]
 --    else
 --       local o = rawget(tbl, "value")
