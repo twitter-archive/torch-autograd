@@ -177,7 +177,6 @@ nodeApply = function(fun, ...)
       local arg = {...}
       local parents = _.filter(arg, function (k,v) return isNode(v) end)
       if _.count(parents) > 0 then
-         local vals = _.map(arg,function(k,v) return getValue(v) end)
          local value = _nodeApply(fun,unpack(_.map(arg, function(k,v) return getValue(v) end)))
          return Node:new(value, fun, arg, parents[1].tape)
       else
@@ -529,6 +528,7 @@ local autograd = {
    VERSION = '0.1',
    LICENSE = 'MIT',
    grad = grad,
+   gradfuns = gradfuns,
    _node = {
       Node = Node,
       isNode = isNode,
