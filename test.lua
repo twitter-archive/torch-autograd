@@ -262,6 +262,52 @@ local tests = {
       tester:asserteq(isNode(torch.randn(10)), false, "Did not detect class properly")
 
       -- TODO: more thorough testing of tables that contain nodes
+   end,
+   NNFunc = function()
+
+      nnfunc = require './nnfunc'
+
+      inputSize = 100
+      outputSize = 50
+      W = torch.FloatTensor(inputSize,outputSize):fill(.5)
+      b = torch.FloatTensor(outputSize):fill(0)
+      x = torch.FloatTensor(1,inputSize):fill(.5)
+      params = {W=W,b=b,x=x}
+
+      function f_nn(params)
+         funcout = nnfunc.Linear(params.W, params.b, params.x)
+         return torch.sum(funcout)
+      end
+
+      function f_autograd(params)
+         return torch.sum(params.x * params.W + params.b)
+      end
+
+      -- Get the NN predictions
+      pred_nn = f_nn(params)
+      g_nn = autograd(f_nn)
+      grad_nn = g_nn(params)
+
+      -- Get the autograd predictions
+      pred_autograd = f_autograd(params)
+      g_autograd = autograd(f_autograd)
+      grad_autograd = g_autograd(params)
+
+
+      -- TODO: why are they transposed??
+      -------------------------------------------------------------
+      print(grad_nn.W:size())
+      print(grad_autograd.W:size())
+      -------------------------------------------------------------
+
+      print(torch.sum(grad_nn.W))
+      print(torch.sum(grad_autograd.W))
+      tester:asserteq(torch.sum(grad_nn.W), torch.sum(grad_autograd.W), "Incorrect gradients")
+      -- tester:assertTensorEq(grad_nn.W:t(), grad_autograd.W, 0, "Incorrect gradients")
+
+      -- Test that params are untouched
+      -- print(torch.sum(grad_autograd.W))
+      -- print(torch.sum(grad_nn.W))   
    end
 }
 

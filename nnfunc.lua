@@ -1,3 +1,8 @@
+-- TODO
+-- Test that params are untouched
+-- Test that it can be run multiple times
+-- Test that it can be 
+
 autograd = require 'autograd'
 nn = require 'nn'
 
@@ -43,33 +48,4 @@ function nnfunc.Linear(W, b, x)
    return autograd._node.nodeApply(forward, W, b, x)
 end
 
-inputSize = 100
-outputSize = 50
-W = torch.FloatTensor(inputSize,outputSize):fill(.5)
-b = torch.FloatTensor(outputSize):fill(0)
-x = torch.FloatTensor(1,inputSize):fill(.5)
-params = {W=W,b=b,x=x}
-
-function f_nn(params)
-   funcout = nnfunc.Linear(params.W, params.b, params.x)
-   return torch.sum(funcout)
-end
-
-function f_autograd(params)
-   return torch.sum(params.x * params.W + params.b)
-end
-
-print(torch.sum(x))
-pred_nn = f_nn(params)
-g_nn = autograd(f_nn)
-grad_nn = g_nn(params)
-print(torch.sum(x))
-
-pred_autograd = f_autograd(params)
-g_autograd = autograd(f_autograd)
-grad_autograd = g_autograd(params)
-print(torch.sum(x))
-
--- Test that params are untouched
-print(torch.sum(grad_autograd.W))
-print(torch.sum(grad_nn.W))
+return nnfunc
