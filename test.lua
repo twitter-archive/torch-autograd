@@ -2,6 +2,9 @@
 local _ = require 'moses'
 local totem = require 'totem'
 local autograd = require 'autograd'
+local Node = autograd._node.Node
+local isNode = autograd._node.isNode
+local getValue = autograd._node.getValue
 local gradcheck = require './gradcheck'
 local tester = totem.Tester()
 
@@ -245,6 +248,21 @@ local tests = {
       tester:asserteq(grads.x:dim(), 1, 'incorrect dims for gradients')
       tester:asserteq(grads.x:size(1),100, 'incorrect dims for gradients')
    end,
+   NodeClass = function()
+      -- Build nodes
+      local n = Node:new(3, nil, nil, {})
+      local m = Node:new(torch.ones(10), nil, nil, {})
+
+      -- Test we can identify nodes
+      tester:asserteq(isNode(n), true, "Did not detect class properly")
+      tester:asserteq(isNode(m), true, "Did not detect class properly")
+      tester:asserteq(isNode({42}), false, "Did not detect class properly")
+      tester:asserteq(isNode(3), false, "Did not detect class properly")
+      tester:asserteq(isNode("hey"), false, "Did not detect class properly")
+      tester:asserteq(isNode(torch.randn(10)), false, "Did not detect class properly")
+
+      -- TODO: more thorough testing of tables that contain nodes
+   end
 }
 
 -- Run tests:

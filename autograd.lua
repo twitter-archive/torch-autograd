@@ -529,6 +529,12 @@ local autograd = {
    VERSION = '0.1',
    LICENSE = 'MIT',
    grad = grad,
+   _node = {
+      Node = Node,
+      isNode = isNode,
+      getValue = getValue,
+      newStartNode = newStartNode
+   }
 }
 
 -- Shortcut:
