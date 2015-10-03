@@ -1,6 +1,6 @@
 -- Libs
 local grad = require 'autograd'
-local util = require 'util'
+local util = require 'autograd.util'
 local optim = require 'optim'
 
 -- Helpers:
