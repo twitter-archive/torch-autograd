@@ -279,7 +279,7 @@ local tests = {
 
       -- nn version:
       function f_nn(params)
-         local funcout = nnfunc.Linear(params.W, params.b, params.x)
+         local funcout = nnfunc.Linear(params.x, params.W, params.b)
          return torch.sum(funcout)
       end
 
