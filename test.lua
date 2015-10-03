@@ -248,6 +248,7 @@ local tests = {
       tester:asserteq(grads.x:dim(), 1, 'incorrect dims for gradients')
       tester:asserteq(grads.x:size(1),100, 'incorrect dims for gradients')
    end,
+
    NodeClass = function()
       -- Build nodes
       local n = Node:new(3, nil, nil, {})
@@ -263,51 +264,61 @@ local tests = {
 
       -- TODO: more thorough testing of tables that contain nodes
    end,
+
    NNFunc = function()
+      -- lib:
+      local nnfunc = require './nnfunc'
 
-      nnfunc = require './nnfunc'
+      -- Tested params:
+      local inputSize = 100
+      local outputSize = 50
+      local W = torch.FloatTensor(inputSize,outputSize):fill(.5)
+      local b = torch.FloatTensor(outputSize):fill(0)
+      local x = torch.FloatTensor(1,inputSize):fill(.5)
+      local params = {W=W, b=b, x=x}
 
-      inputSize = 100
-      outputSize = 50
-      W = torch.FloatTensor(inputSize,outputSize):fill(.5)
-      b = torch.FloatTensor(outputSize):fill(0)
-      x = torch.FloatTensor(1,inputSize):fill(.5)
-      params = {W=W,b=b,x=x}
-
+      -- nn version:
       function f_nn(params)
-         funcout = nnfunc.Linear(params.W, params.b, params.x)
+         local funcout = nnfunc.Linear(params.W, params.b, params.x)
          return torch.sum(funcout)
       end
 
+      -- autograd version:
       function f_autograd(params)
          return torch.sum(params.x * params.W + params.b)
       end
 
       -- Get the NN predictions
-      pred_nn = f_nn(params)
-      g_nn = autograd(f_nn)
-      grad_nn = g_nn(params)
+      local pred_nn = f_nn(params)
+      local g_nn = autograd(f_nn)
+      local grad_nn = g_nn(params)
 
       -- Get the autograd predictions
-      pred_autograd = f_autograd(params)
-      g_autograd = autograd(f_autograd)
-      grad_autograd = g_autograd(params)
+      local pred_autograd = f_autograd(params)
+      local g_autograd = autograd(f_autograd)
+      local grad_autograd = g_autograd(params)
 
+      -- Check
+      tester:asserteq((grad_nn.W:t()-grad_autograd.W):abs():max(), 0, "Incorrect gradients")
+      tester:asserteq((grad_nn.x-grad_autograd.x):abs():max(), 0, "Incorrect gradients")
 
-      -- TODO: why are they transposed??
-      -------------------------------------------------------------
-      print(grad_nn.W:size())
-      print(grad_autograd.W:size())
-      -------------------------------------------------------------
+      -- Run a 2nd time - gradients should get recomputed:
+      W:fill(.75)
+      b:fill(1)
 
-      print(torch.sum(grad_nn.W))
-      print(torch.sum(grad_autograd.W))
-      tester:asserteq(torch.sum(grad_nn.W), torch.sum(grad_autograd.W), "Incorrect gradients")
-      -- tester:assertTensorEq(grad_nn.W:t(), grad_autograd.W, 0, "Incorrect gradients")
+      -- Get the NN predictions
+      local pred_nn = f_nn(params)
+      local g_nn = autograd(f_nn)
+      local grad_nn = g_nn(params)
 
-      -- Test that params are untouched
-      -- print(torch.sum(grad_autograd.W))
-      -- print(torch.sum(grad_nn.W))   
+      -- Get the autograd predictions
+      local pred_autograd = f_autograd(params)
+      local g_autograd = autograd(f_autograd)
+      local grad_autograd = g_autograd(params)
+
+      -- Check
+      tester:asserteq((grad_nn.W:t()-grad_autograd.W):abs():max(), 0, "Incorrect gradients")
+      tester:asserteq((grad_nn.x-grad_autograd.x):abs():max(), 0, "Incorrect gradients")
    end
 }
 

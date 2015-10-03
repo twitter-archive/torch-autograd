@@ -1,12 +1,12 @@
 -- TODO
 -- Test that params are untouched
 -- Test that it can be run multiple times
--- Test that it can be 
+-- Test that it can be
 
-autograd = require 'autograd'
-nn = require 'nn'
+local autograd = require 'autograd'
+local nn = require 'nn'
 
-nnfunc = {}
+local nnfunc = {}
 function nnfunc.Linear(W, b, x)
    local forward, backward
    local grads = {}
@@ -23,22 +23,22 @@ function nnfunc.Linear(W, b, x)
 
    function backward(arg,g,W,b,x)
       if not grads[arg] then
-         print("SHOULD ONLY RUN ONCE")
+         linearModule:updateGradInput(x, g)
          linearModule:accGradParameters(x, g)
          grads["W"] = linearModule.gradWeight
          grads["b"] = linearModule.gradBias
-         grads["x"] = torch.zeros(x:size())
+         grads["x"] = linearModule.gradInput
       end
       return grads[arg]
    end
 
    autograd.gradfuns[forward] = {
       "Linear",
-      function(g,W,b,x) 
-         return backward("W",g,W,b,x) 
+      function(g,W,b,x)
+         return backward("W",g,W,b,x)
       end,
-      function(g,W,b,x) 
-         return backward("b",g,W,b,x) 
+      function(g,W,b,x)
+         return backward("b",g,W,b,x)
       end,
       function(g,W,b,x)
          return backward("x",g,W,b,x)
