@@ -30,6 +30,11 @@ Autograd is work in progress. Current list of things to be developed includes:
 * add more useful examples of models
 * implement auto-buffering so that native torch functions can re-use memory
   (i.e. auto-generate code that's similar to what nn does for modules)
+* make the process of returning different intermediate outputs easier: right
+  now you have to define one function for each partial output, is it enough?
+  => write examples
+* when calling `dparams = df(...)`, return the result of `f` as a second
+  value: `dparams,loss = df(...)`, this way it doesn't have to be run twice.
 
 Examples
 --------
