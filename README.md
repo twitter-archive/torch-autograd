@@ -84,6 +84,23 @@ dparams = dneuralNet(params, x, y)
 
 See more complete examples in [examples](examples/).
 
+Assuming the model defined above, and a training set of `{x,y}` pairs,
+the model can easily be optimized using SGD:
+
+``lua
+for i,sample in datasetIterator() do
+   -- estimate gradients wrt params:
+   local dparams = neuralNet(params, sample.x, sample.y)
+
+   -- SGD step:
+   for i = 1,#params.W do
+      -- update params with an arbitrary learning rate:
+      params.W[i]:add(-.01, grads.W[i])
+      params.b[i]:add(-.01, grads.b[i])
+   end
+end
+```
+
 ### Wrapping nn modules
 
 The [nn](https://github.com/torch/nn) library provides with all sorts of very optimized
