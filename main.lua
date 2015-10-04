@@ -523,17 +523,16 @@ for _,tensorType in pairs(tensorTypes) do
    end
 end
 
--- Package
+-- Main functions:
 local autograd = {
-   VERSION = '0.1',
-   LICENSE = 'MIT',
    grad = grad,
    gradfuns = gradfuns,
    _node = {
       Node = Node,
       isNode = isNode,
       getValue = getValue,
-      newStartNode = newStartNode
+      newStartNode = newStartNode,
+      nodeApply = nodeApply
    }
 }
 
