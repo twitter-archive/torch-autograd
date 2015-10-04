@@ -25,9 +25,11 @@ dependencies = {
 build = {
    type = "builtin",
    modules = {
-      ['autograd.init'] = 'autograd.lua',
+      ['autograd.init'] = 'init.lua',
+      ['autograd.main'] = 'main.lua',
       ['autograd.util'] = 'util.lua',
       ['autograd.test'] = 'test.lua',
       ['autograd.gradcheck'] = 'gradcheck.lua',
+      ['autograd.nnfuncwrapper'] = 'nnfuncwrapper.lua',
    },
 }
