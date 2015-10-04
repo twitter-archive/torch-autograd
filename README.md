@@ -57,10 +57,10 @@ params = {
 
 -- define model
 neuralNet = function(params, x, y)
-   local h1 = torch.tanh(x * params.W[1] + params.b[1])
-   local h2 = torch.tanh(h1 * params.W[2] + params.b[2])
-   local yHat = h2 - torch.log(torch.sum(torch.exp(h2)))
-   local loss = - torch.sum(torch.cmul(yHat, y))
+   local h1 = t.tanh(x * params.W[1] + params.b[1])
+   local h2 = t.tanh(h1 * params.W[2] + params.b[2])
+   local yHat = h2 - t.log(t.sum(t.exp(h2)))
+   local loss = - t.sum(t.cmul(yHat, y))
    return loss
 end
 
@@ -82,28 +82,7 @@ dparams = dneuralNet(params, x, y)
 --  loss wrt to that Tensor.
 ```
 
-See more complete examples in `examples/`.
-
-### Gradient checks
-
-For ease of mind (and to write proper tests), a simple grad checker
-is provided. See `test.lua` for complete examples. In short, it can be
-used like this:
-
-```lua
-   -- Parameters:
-   local W = torch.Tensor(32,100):normal()
-   local x = torch.Tensor(100):normal()
-
-   -- Function:
-   local func = function(inputs)
-      return torch.sum(inputs.W * inputs.x)
-   end
-
-   -- Check grads:
-   tester:assert(gradcheck(func, {W=W, x=x}, 'x'), 'incorrect gradients on x')
-   tester:assert(gradcheck(func, {W=W, x=x}, 'W'), 'incorrect gradients on W')
-```
+See more complete examples in [examples](examples/).
 
 ### Wrapping nn modules
 
@@ -144,8 +123,8 @@ acts2 = grad.nn.Tanh()
 neuralNet = function(params, x, y)
    local h1 = acts1(linear1(x, params.W[1], params.b[1]))
    local h2 = acts2(linear2(h1, params.W[2], params.b[2]))
-   local yHat = h2 - torch.log(torch.sum(torch.exp(h2)))
-   local loss = - torch.sum(torch.cmul(yHat, y))
+   local yHat = h2 - t.log(t.sum(t.exp(h2)))
+   local loss = - t.sum(t.cmul(yHat, y))
    return loss
 end
 
@@ -159,11 +138,28 @@ y = t.Tensor(1,10):zero() y[1][3] = 1
 -- compute loss and gradients wrt all parameters in params:
 loss = neuralNet(params, x, y)
 dparams = dneuralNet(params, x, y)
-
--- in this case:
---> loss: is a scalar (Lua number)
---> dparams: is a table that mimics the structure of params; for
-    each Tensor in params, dparams provides the derivatives of the
-    loss wrt to that Tensor.
 ```
 
+This code is stricly equivalent to the code above, but will be more efficient
+(this is espacally true for more complex primitives like convolutions, ...).
+
+### Gradient checks
+
+For ease of mind (and to write proper tests), a simple grad checker
+is provided. See [test.lua](test.lua) for complete examples. In short, it can be
+used like this:
+
+```lua
+-- Parameters:
+local W = t.Tensor(32,100):normal()
+local x = t.Tensor(100):normal()
+
+-- Function:
+local func = function(inputs)
+   return t.sum(inputs.W * inputs.x)
+end
+
+-- Check grads:
+tester:assert(gradcheck(func, {W=W, x=x}, 'x'), 'incorrect gradients on x')
+tester:assert(gradcheck(func, {W=W, x=x}, 'W'), 'incorrect gradients on W')
+```
