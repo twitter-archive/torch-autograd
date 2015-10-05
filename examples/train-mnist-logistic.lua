@@ -16,15 +16,18 @@ local confusionMatrix = optim.ConfusionMatrix(classes)
 local f,params
 
 -- Define our neural net
-function f(params, input, target, predictionOnly)
+function predict(params, input, target, predictionOnly)
    local h1 = input * params.W[1] + params.B[1]
    local out = util.logSoftMax(h1)
-   if predictionOnly then
-      return out
-   else
-      return util.logMultiNomialLoss(out, target)
-   end
+   return out
 end
+
+function f(params, input, target)
+   local prediction = predict(params, input, target)
+   local loss = util.logMultiNomialLoss(prediction, target)
+   return loss, prediction
+end
+
 
 -- Define our parameters
 -- [-1/sqrt(#output), 1/sqrt(#output)]
@@ -50,8 +53,7 @@ for epoch = 1,100 do
       local y = torch.view(trainData.y[i], 1, 10)
 
       -- Grads:
-      local grads = df(params,x,y)
-      local prediction = f(params,x,y,true)
+      local grads, loss, prediction = df(params,x,y)
 
       -- Update weights and biases
       for i=1,#params.W do

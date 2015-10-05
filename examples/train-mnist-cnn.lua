@@ -29,17 +29,20 @@ local flatten = grad.nn.Reshape(16*5*5)
 local linear = grad.nn.Linear(16*5*5, 10)
 
 -- nn version:
-function f(params, input, target, predictionOnly)
+function predict(params, input, target)
    local h1 = pool1(acts1(conv1(reshape(input), params.W[1], params.B[1])))
    local h2 = pool2(acts2(conv2(h1, params.W[2], params.B[2])))
    local h3 = linear(flatten(h2), params.W[3], params.B[3])
    local out = util.logSoftMax(h3)
-   if predictionOnly then
-      return out
-   else
-      return util.logMultiNomialLoss(out, target)
-   end
+   return out
 end
+
+function f(params, input, target)
+   local prediction = predict(params, input, target)
+   local loss = util.logMultiNomialLoss(prediction, target)
+   return loss, prediction
+end
+
 
 -- Define our parameters
 -- [-1/sqrt(#output), 1/sqrt(#output)]
@@ -69,8 +72,7 @@ for epoch = 1,100 do
       local y = torch.view(trainData.y[i], 1, 10)
 
       -- Grads:
-      local grads = df(params,x,y)
-      local prediction = f(params,x,y,true)
+      local grads, loss, prediction = df(params,x,y)
 
       -- Update weights and biases
       for i=1,#params.W do
