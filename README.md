@@ -165,8 +165,7 @@ x = t.randn(1,100)
 y = t.Tensor(1,10):zero() y[1][3] = 1
 
 -- compute loss and gradients wrt all parameters in params:
-loss = neuralNet(params, x, y)
-dparams = dneuralNet(params, x, y)
+dparams, loss = dneuralNet(params, x, y)
 ```
 
 This code is stricly equivalent to the code above, but will be more efficient
