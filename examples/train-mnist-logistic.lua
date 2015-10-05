@@ -22,6 +22,7 @@ function predict(params, input, target, predictionOnly)
    return out
 end
 
+-- Define our loss function
 function f(params, input, target)
    local prediction = predict(params, input, target)
    local loss = util.logMultiNomialLoss(prediction, target)

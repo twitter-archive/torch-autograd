@@ -28,7 +28,7 @@ local pool2 = grad.nn.SpatialMaxPooling(2, 2, 2, 2)
 local flatten = grad.nn.Reshape(16*5*5)
 local linear = grad.nn.Linear(16*5*5, 10)
 
--- nn version:
+-- Define our network
 function predict(params, input, target)
    local h1 = pool1(acts1(conv1(reshape(input), params.W[1], params.B[1])))
    local h2 = pool2(acts2(conv2(h1, params.W[2], params.B[2])))
@@ -37,6 +37,8 @@ function predict(params, input, target)
    return out
 end
 
+
+-- Define our loss function
 function f(params, input, target)
    local prediction = predict(params, input, target)
    local loss = util.logMultiNomialLoss(prediction, target)
