@@ -73,11 +73,15 @@ local function isNode(n)
 end
 
 local function getValue(v)
-   if isNode(v) then
-      return v.value
-   else
-      return v
+   local _getValue
+   _getValue = function(v)
+      if isNode(v) then
+         return v.value
+      else
+         return v
+      end
    end
+   return _getValue(v)
 end
 
 -- A wrapper for a function

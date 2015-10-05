@@ -46,7 +46,8 @@ local function grad(fun, argnum, returnTape)
       -- For now, if we see a number or a tensor, we'll node-ify it, otherwise,
       -- if it's a table, we'll try to walk it
       arg[argnum] = newStartNode(arg[argnum], tape)
-      local ans = fun(unpack(arg))
+      local allAns = {fun(unpack(arg))}
+      local ans = allAns[1]
       if not isNode(ans) then
          return 0.0
       end
@@ -85,12 +86,18 @@ local function grad(fun, argnum, returnTape)
          end
       end
 
-      -- Now spit out the grads
-      if returnTape then
-         return getOutgrad(arg[argnum]), ans.value, ans.tape
+      -- Now spit out the grads, along with any answers returned along the way
+      local out = {}
+      out[1] = getOutgrad(arg[argnum])
+      local ansVal = getValue(allAns)
+      if type(allAns) == "table" then
+         for key,value in pairs(ansVal) do
+            out[#out+1] = getValue(value)
+         end
       else
-         return getOutgrad(arg[argnum]), ans.value
+         out[2] = ansVal
       end
+      return unpack(out)
    end
    return doGrad
 end

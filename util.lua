@@ -22,8 +22,4 @@ function util.logMultiNomialLoss(out, target) return -torch.sum(torch.cmul(out,t
 function util.logSumExp(array) return torch.log(torch.sum(torch.exp(array))) end
 function util.logSoftMax(array) return array - util.logSumExp(array) end
 
--- util.logMultiNomialLoss = logMultiNomialLoss
--- util.logSumExp = logSumExp
--- util.logSoftMax = logSoftMax
-
 return util
