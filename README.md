@@ -263,3 +263,8 @@ f,params = autograd.model.SpatialNetwork({
    dropoutProbs = {.1, .1},
 })
 ```
+
+### Loss Primitives
+
+Similarly to model primitives, we provide common loss functions in
+`autograd.loss`.
