@@ -192,3 +192,74 @@ end
 tester:assert(gradcheck(func, {W=W, x=x}, 'x'), 'incorrect gradients on x')
 tester:assert(gradcheck(func, {W=W, x=x}, 'W'), 'incorrect gradients on W')
 ```
+
+### Model Primitives
+
+To ease the construction of new models, we provide primitives to generate
+standard models.
+
+Each constructor returns 2 things:
+
+* `f`: the function, can be passed to `grad(f)` to get gradients
+* `params`: the list of trainable parameters
+
+Once instantiated, `f` and `params` can be used like this:
+
+```lua
+input = torch.randn(10)
+pred = f(params, input)
+grads = autograd(f)(params, input)
+```
+
+Current list of model primitives includes:
+
+#### autograd.model.NeuralNetwork
+
+API:
+
+```lua
+f,params = autograd.model.NeuralNetwork({
+   -- number of input features:
+   inputFeatures = 10,
+
+   -- number of hidden features, per layer, in this case
+   -- 2 layers, each with 100 and 10 features respectively:
+   hiddenFeatures = {100,10},
+
+   -- activation functions:
+   activations = 'ReLU',
+
+   -- if true, then no activation is used on the last layer;
+   -- this is useful to feed a loss function (logistic, ...)
+   classifier = false,
+
+   -- dropouts:
+   dropoutProbs = {.5, .5},
+})
+```
+
+#### autograd.model.SpatialNetwork
+
+API:
+
+```lua
+f,params = autograd.model.SpatialNetwork({
+   -- number of input features (maps):
+   inputFeatures = 3,
+
+   -- number of hidden features, per layer:
+   hiddenFeatures = {16, 32},
+
+   -- poolings, for each layer:
+   poolings = {2, 2},
+
+   -- activation functions:
+   activations = 'Sigmoid',
+
+   -- kernel size:
+   kernelSize = 3,
+
+   -- dropouts:
+   dropoutProbs = {.1, .1},
+})
+```

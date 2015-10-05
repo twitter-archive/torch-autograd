@@ -27,7 +27,6 @@ function model.NeuralLayer(opt, params, layers, layer2params)
    local batchNormalization = opt.batchNormalization or false
    local dropoutProb = opt.dropoutProb or 0
    local activations = opt.activations
-   local channelWise = opt.channelWise
 
    -- container
    layers = layers or {}
@@ -75,7 +74,6 @@ function model.NeuralNetwork(opt, params, layers, layer2params)
    local dropoutProb = opt.dropoutProb or 0
    local dropoutProbs = opt.dropoutProbs or {}
    local activations = opt.activations or 'ReLU'
-   local channelWise = opt.channelWise
    local classifier = opt.classifier or false
 
    -- container
@@ -97,7 +95,6 @@ function model.NeuralNetwork(opt, params, layers, layer2params)
          outputFeatures = hiddens,
          dropoutProb = dropoutProbs[i] or dropoutProb,
          activations = activations,
-         channelWise = channelWise,
          batchNormalization = batchNormalization,
       }, params, layers, layer2params)
       inputFeatures = hiddens
@@ -118,7 +115,6 @@ function model.SpatialLayer(opt, params, layers, layer2params)
    local batchNormalization = opt.batchNormalization or false
    local dropoutProb = opt.dropoutProb or 0
    local activations = opt.activations
-   local channelWise = opt.channelWise
    local pooling = opt.pooling or 1
    local inputStride = opt.inputStride or 1
 
@@ -172,7 +168,6 @@ function model.SpatialNetwork(opt, params, layers, layer2params)
    local dropoutProb = opt.dropoutProb or 0
    local dropoutProbs = opt.dropoutProbs or {}
    local activations = opt.activations or 'ReLU'
-   local channelWise = opt.channelWise
    local poolings = opt.poolings or {1,1,1}
    local inputStride = opt.inputStride or 1
 
@@ -190,7 +185,6 @@ function model.SpatialNetwork(opt, params, layers, layer2params)
          pooling = poolings[i],
          dropoutProb = dropoutProbs[i] or dropoutProb,
          activations = activations,
-         channelWise = channelWise,
          batchNormalization = batchNormalization,
          kernelSize = kernelSize,
          kernelSplit = kernelSplit,
