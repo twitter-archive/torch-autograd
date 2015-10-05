@@ -367,15 +367,15 @@ local tests = {
       local x = torch.Tensor(3, 8, 8):normal()
       local W1 = torch.Tensor(16, 3*3*3):normal()
       local b1 = torch.Tensor(16):normal()
-      local W2 = torch.Tensor(100, 16*8*8):normal()
-      local b2 = torch.Tensor(100):normal()
+      local W2 = torch.Tensor(10, 16*8*8):normal()
+      local b2 = torch.Tensor(10):normal()
       local params = {W1=W1, b1=b1, W2=W2, b2=b2, x=x}
 
       -- nn modules:
       local conv1 = autograd.nn.SpatialConvolutionMM(3, 16, 3, 3, 1, 1, 1, 1)
       local acts1 = autograd.nn.Tanh()
       local flatten = autograd.nn.Reshape(16*8*8)
-      local linear2 = autograd.nn.Linear(16*8*8, 100)
+      local linear2 = autograd.nn.Linear(16*8*8, 10)
       local acts2 = autograd.nn.Tanh()
 
       -- nn version:
