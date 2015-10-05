@@ -27,6 +27,7 @@ Autograd is work in progress. Current list of things to be developed includes:
 - [ ] gradients of gradients (Hessian)
 - [ ] Helpers for building weights
 - [ ] Helpers for building nnfunc modules (tedious to write out convolution parameters)
+- [ ] Debugging facilities (profile speed & gradient magnitude of each computation. Should just require nodeApply wrapper.)
 * add more useful examples of models
   - [x] MNIST logistic regression
   - [x] MNIST MLP
