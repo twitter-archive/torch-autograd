@@ -135,8 +135,8 @@ for epoch = 1,100 do
       local y = torch.view(trainData.y[i], 1, 10)
 
       -- Grads:
-      grads = df(params,x,y)
-      prediction = f(params,x,y,true)
+      local grads = df(params,x,y)
+      local prediction = f(params,x,y,true)
 
       -- Update weights and biases
       for i=1,#params.W do
