@@ -365,21 +365,21 @@ local tests = {
    NNFunc_CNN = function()
       -- Trainable parameters:
       local x = torch.Tensor(3, 8, 8):normal()
-      local W1 = torch.Tensor(16, 3*5*5):normal()
+      local W1 = torch.Tensor(16, 3*3*3):normal()
       local b1 = torch.Tensor(16):normal()
       local W2 = torch.Tensor(100, 16*8*8):normal()
       local b2 = torch.Tensor(100):normal()
       local params = {W1=W1, b1=b1, W2=W2, b2=b2, x=x}
 
       -- nn modules:
-      local conv1 = autograd.nn.SpatialConvolutionMM(3, 16, 5, 5, 1, 1, 2, 2)
+      local conv1 = autograd.nn.SpatialConvolutionMM(3, 16, 3, 3, 1, 1, 1, 1)
       local acts1 = autograd.nn.Tanh()
       local flatten = autograd.nn.Reshape(16*8*8)
       local linear2 = autograd.nn.Linear(16*8*8, 100)
       local acts2 = autograd.nn.Tanh()
 
       -- nn version:
-      function mlp(params)
+      function cnn(params)
          local h1 = acts1(conv1(params.x, params.W1, params.b1))
          local h2 = acts2(linear2(flatten(h1), params.W2, params.b2))
          local o = torch.sum(h2)
@@ -387,15 +387,54 @@ local tests = {
       end
 
       -- Eval:
-      local pred = mlp(params)
-      local grads = autograd(mlp)(params)
+      local pred = cnn(params)
+      local grads = autograd(cnn)(params)
 
       -- Check grads:
-      tester:assert(gradcheck(mlp, params, 'x'), 'incorrect gradients on x')
-      tester:assert(gradcheck(mlp, params, 'W1'), 'incorrect gradients on W1')
-      tester:assert(gradcheck(mlp, params, 'b1'), 'incorrect gradients on b1')
-      tester:assert(gradcheck(mlp, params, 'W2'), 'incorrect gradients on W2')
-      tester:assert(gradcheck(mlp, params, 'b2'), 'incorrect gradients on b2')
+      tester:assert(gradcheck(cnn, params, 'x'), 'incorrect gradients on x')
+      tester:assert(gradcheck(cnn, params, 'W1'), 'incorrect gradients on W1')
+      tester:assert(gradcheck(cnn, params, 'b1'), 'incorrect gradients on b1')
+      tester:assert(gradcheck(cnn, params, 'W2'), 'incorrect gradients on W2')
+      tester:assert(gradcheck(cnn, params, 'b2'), 'incorrect gradients on b2')
+   end,
+
+   NNFunc_Float = function()
+      -- More complex model:
+      local inputSize = 100
+      local hiddenSize = 50
+      local outputSize = 10
+
+      -- Trainable parameters:
+      local x = torch.FloatTensor(inputSize):normal()
+      local W1 = torch.FloatTensor(hiddenSize,inputSize):normal()
+      local b1 = torch.FloatTensor(hiddenSize):normal()
+      local W2 = torch.FloatTensor(outputSize,hiddenSize):normal()
+      local b2 = torch.FloatTensor(outputSize):normal()
+      local params = {W1=W1, b1=b1, W2=W2, b2=b2, x=x}
+
+      -- nn modules:
+      local linear1 = autograd.nn.Linear(inputSize, hiddenSize)
+      local acts1 = autograd.nn.Tanh()
+      local linear2 = autograd.nn.Linear(hiddenSize, outputSize)
+      local acts2 = autograd.nn.Tanh()
+
+      -- nn version:
+      function mlp(params)
+         local h1 = acts1(linear1(params.x, params.W1, params.b1))
+         local h2 = acts2(linear2(h1, params.W2, params.b2))
+         local o = torch.sum(h2)
+         return o
+      end
+
+      -- Eval:
+      local grads = autograd(mlp)(params)
+      local pred = mlp(params)
+
+      -- Check grads:
+      tester:asserteq(torch.typename(grads.W1), 'torch.FloatTensor', 'incorrect type')
+      tester:asserteq(torch.typename(grads.W2), 'torch.FloatTensor', 'incorrect type')
+      tester:asserteq(torch.typename(grads.b1), 'torch.FloatTensor', 'incorrect type')
+      tester:asserteq(torch.typename(grads.b2), 'torch.FloatTensor', 'incorrect type')
    end,
 }
 

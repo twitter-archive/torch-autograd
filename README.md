@@ -25,8 +25,6 @@ TODO
 Autograd is work in progress. Current list of things to be developed includes:
 
 * gradients of gradients (Hessian)
-* auto-type for nn-wrapped primitives (type should be inferred at runtime, as
-    is the case for autograd-generated code)
 * add more useful examples of models
 * implement auto-buffering so that native torch functions can re-use memory
   (i.e. auto-generate code that's similar to what nn does for modules)
