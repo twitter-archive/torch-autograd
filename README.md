@@ -92,7 +92,7 @@ See more complete examples in [examples](examples/).
 Assuming the model defined above, and a training set of `{x,y}` pairs,
 the model can easily be optimized using SGD:
 
-``lua
+```lua
 for i,sample in datasetIterator() do
    -- estimate gradients wrt params:
    local dparams = neuralNet(params, sample.x, sample.y)
