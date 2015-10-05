@@ -449,7 +449,7 @@ local tests = {
       -- Loss:
       local loss = function(params, input, target)
          local pred = f(params, input)
-         local loss = autograd.loss.leastSquares(pred,target)
+         local loss = autograd.loss.logistic(pred,target)
          return loss,pred
       end
 
@@ -491,6 +491,59 @@ local tests = {
       tester:assert(gradcheck(closure, inputs, 'b1'), 'incorrect gradients on b1')
       tester:assert(gradcheck(closure, inputs, 'W2'), 'incorrect gradients on W2')
       tester:assert(gradcheck(closure, inputs, 'b2'), 'incorrect gradients on b2')
+   end,
+
+   Models_SpatialNetwork = function()
+      -- Define model:
+      local f,params = autograd.model.SpatialNetwork({
+         inputFeatures = 3,
+         hiddenFeatures = {16, 16},
+         poolings = {4, 2},
+         kernelSize = 3,
+         activtions = 'Tanh',
+      })
+
+      -- Loss:
+      local loss = function(params, input, target)
+         local pred = f(params, input)
+         local loss = autograd.loss.leastSquares(pred,target)
+         return loss,pred
+      end
+
+      params[1].W:normal(0,0.01)
+      params[2].W:normal(0,0.01)
+
+      local i = torch.randn(3,8,8)
+      local t = torch.randn(16,1,1)
+
+      local l,pred = loss(params, i, t)
+      local grads = autograd(loss)(params, i, t)
+
+      tester:asserteq(type(l), 'number', 'loss should be a scalar')
+
+      -- Gradcheck doesn't support nested params,
+      -- need to do a bit of magic to test it.
+      local inputs = {
+         W1 = params[1].W,
+         b1 = params[1].b,
+         W2 = params[2].W,
+         b2 = params[2].b,
+         x = i,
+         y = t,
+      }
+      local closure = function(inputs)
+         local params = {
+            {W=inputs.W1, b=inputs.b1},
+            {W=inputs.W2, b=inputs.b2},
+         }
+         return loss(params, inputs.x, inputs.y)
+      end
+      closure(inputs)
+      tester:assert(gradcheck(closure, inputs, 'x'), 'incorrect gradients on x')
+      tester:assert(gradcheck(closure, inputs, 'W1'), 'incorrect gradients on W1')
+      tester:assert(gradcheck(closure, inputs, 'b1'), 'incorrect gradients on b1')
+      -- tester:assert(gradcheck(closure, inputs, 'W2'), 'incorrect gradients on W2')
+      -- tester:assert(gradcheck(closure, inputs, 'b2'), 'incorrect gradients on b2')
    end,
 }
 
