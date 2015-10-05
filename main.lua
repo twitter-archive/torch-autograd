@@ -5,25 +5,23 @@
 -- Deps
 local torch = require('torch')
 local haveCutorch,cutorch = pcall(require,'cutorch')
-local class = require 'class'
 local debug = require 'debug'
 local _ = require 'moses'
+local node = require 'autograd.node'
+local nodeApply = node.nodeApply
+local getOutgrad = node.getOutgrad
+local checkInput = node.checkInput
+local newStartNode = node.newStartNode
+local isNode = node.isNode
+local getValue = node.getValue
+local op = node.op
+require 'autograd.number'
 require 'pl'
 require 'trepl'
 
--- Declare the ops we'd like to override directly
-local op = {
-   add = function(a,b) return a+b end,
-   sub = function(a,b) return a-b end,
-   mul = function(a,b) return a*b end,
-   div = function(a,b) return a/b end,
-   pow = function(a,b) return a^b end,
-   unm = function(a) return -1*a end -- TODO: more efficient way across numbers and torch?
-}
 
 -- Some local declarations ahead of time
 local gradfuns = {}
-local nodeApply, getOutgrad
 
 -- Define the tensor types for which we'll allow automatic differentiation
 local tensorTypes = {
@@ -32,212 +30,6 @@ local tensorTypes = {
 }
 if haveCutorch then
    tensorTypes[#tensorTypes+1] = 'CudaTensor'
-end
-
--- Make a node class, which will capture computation as they're used
-local noop = function() end
--- Define the node
-local Node = {
-   value=0,
-   fun=nil,
-   args={},
-   tape={},
-   outgrad=0,
-   name=""
-}
-
--- Niceties
-function Node:__tostring()
-   if type(self.value) == "table" then
-      return pretty.write(self.value)
-   else
-      return tostring(self.value)
-   end
-end
-
-function Node:__tostring()
-   return tostring(self.value)
-end
-
-function Node.__add(l,r)
-   return nodeApply(op.add, l, r)
-end
-
-function Node.__sub(l,r)
-   return nodeApply(op.sub, l, r)
-end
-
-function Node.__mul(l,r)
-   return nodeApply(op.mul, l, r)
-end
-
-function Node.__div(l,r)
-   return nodeApply(op.div, l, r)
-end
-function Node.__pow(l,r)
-   return nodeApply(op.pow, l, r)
-end
-function Node.__unm(l)
-   return nodeApply(op.unm, l)
-end
-
-
-function Node:new(value, fun, args, tape, name)
-   local o = {}
-   setmetatable(o, self)
-
-   o.tape = tape or {}
-   o.tape[#o.tape+1] = o
-   o.value = value
-   o.fun = fun
-   o.outgrad = 0.0
-   o.args = args or {}
-   o.name = "" or name
-   return o
-end
-
-local function isNode(n)
-   return getmetatable(n) == Node
-end
-
-local function getValue(v)
-   if isNode(v) then
-      return v.value
-   else
-      return v
-   end
-end
-
--- -- Proxy the table lookups.
--- function Node.__index(tbl,key)
---    if Node[key] or key == "fun" then
---       return Node[key]
---    else
---       local o = rawget(tbl, "value")
---       return o[key]
---    end
--- end
--- function Node.__newindex(tbl, k, v)
---    if tbl[k] then
---       rawset(tbl, k, v)
---    else
---       local o = rawget(tbl, "value")
---       if type(o) ~= "table" then error("Node's value is not a table type. Cannot set members.") end
---       rawset(o, k, v)
---    end
--- end
-
-
--- Override operations for number types
-local numberMetatable = {
-   __add = function(a,b)
-      if torch.type(a) == "number" and torch.isTensor(b) then
-         return nodeApply(op.add, b, a)
-      else
-         return nodeApply(op.add, a, b)
-      end
-   end,
-   __sub = function(a,b)
-      if torch.type(a) == "number" and torch.isTensor(b) then
-         return nodeApply(op.add, -b, a)
-      else
-         return nodeApply(op.add, a, -b) -- TODO subtraction
-      end
-   end,
-   __mul = function(a,b)
-      if torch.type(a) == "number" and torch.isTensor(b) then
-         return nodeApply(op.mul, b, a)
-      else
-         return nodeApply(op.mul, a, b)
-      end
-   end,
-   __div = function(a,b)
-      if torch.type(a) == "number" and torch.isTensor(b) then
-         -- THIS IS INSANE
-         c = torch.ones(b:size())
-         return node.apply(op.mul, torch.cdiv(c,b), a)
-      else
-         return node.apply(op.div, a, b)
-      end
-   end,
-   __unm = function(a,b)
-      error("UNDEFINED")
-   end
-}
-debug.setmetatable(1.0, numberMetatable)
-
--- A wrapper for a function
--- Anytime we try to apply a function to some arguments,
--- we'd like to make sure that if we're passing nodes in,
--- that we unpack the value in those nodes, apply the function
--- to the underlying value, and then wrap the value in a node
-nodeApply = function(fun, ...)
-   local _nodeApply
-   _nodeApply = function(fun, ...)
-      local arg = {...}
-      local parents = _.filter(arg, function (k,v) return isNode(v) end)
-      if _.count(parents) > 0 then
-         local value = _nodeApply(fun,unpack(_.map(arg, function(k,v) return getValue(v) end)))
-         return Node:new(value, fun, arg, parents[1].tape)
-      else
-         return fun(unpack(_.map(arg,function (k,v) return getValue(v) end)))
-      end
-   end
-   return _nodeApply(fun, ...)
-end
-
--- If we passed in just a tensor, return the outgrad.
--- If we passed in a table, return all the outgrads.
-getOutgrad = function(arg)
-   local _getOutgrad
-   _getOutgrad = function(arg)
-
-      local val = getValue(arg)
-
-      -- If we have a tensor, we just have one out gradient
-      if torch.isTensor(val) then
-         return arg.outgrad
-
-         -- If we have a table, then we can recurse the table and spit out the gradient
-      elseif type(val) == "table" and not isNode(val) then
-         local out = {}
-         for k,v in pairs(arg) do
-            out[k] = _getOutgrad(v)
-         end
-         return out
-      end
-   end
-   return _getOutgrad(arg)
-end
-
-local function checkInput(arg)
-   if torch.isTensor(arg) then
-      local isValidType = false
-      for _,tensorType in pairs(tensorTypes) do
-         isValidType = isValidType or 'torch.' .. tensorType == torch.typename(arg)
-      end
-      if not isValidType then
-         local errMsg = "Input tensor is invalid type " .. torch.typename(arg) .. ". Valid types are"
-         for _, tensorType in pairs(tensorTypes) do
-            errMsg = errMsg .. " " .. tensorType
-         end
-         error(errMsg)
-      end
-   end
-end
-
--- local newStartNode
-newStartNode = function(val, tape)
-   -- If our argument is a tensor, just nodify it straight-up
-   if torch.isTensor(val) then
-      return Node:new(val, nil, nil, tape)
-      -- If our target argument is a table, we'll need to walk its members and node-ify them.
-   elseif type(val) == "table" then
-      for k,v in pairs(val) do
-         val[k] = newStartNode(v, tape)
-      end
-      return val
-   end
 end
 
 -- Step through the computation graph and find the gradient
@@ -254,7 +46,8 @@ local function grad(fun, argnum, returnTape)
       -- For now, if we see a number or a tensor, we'll node-ify it, otherwise,
       -- if it's a table, we'll try to walk it
       arg[argnum] = newStartNode(arg[argnum], tape)
-      local ans = fun(unpack(arg))
+      local allAns = {fun(unpack(arg))}
+      local ans = allAns[1]
       if not isNode(ans) then
          return 0.0
       end
@@ -293,12 +86,18 @@ local function grad(fun, argnum, returnTape)
          end
       end
 
-      -- Now spit out the grads
-      if returnTape then
-         return getOutgrad(arg[argnum]), ans.value, ans.tape
+      -- Now spit out the grads, along with any answers returned along the way
+      local out = {}
+      out[1] = getOutgrad(arg[argnum])
+      local ansVal = getValue(allAns)
+      if type(allAns) == "table" then
+         for key,value in pairs(ansVal) do
+            out[#out+1] = getValue(value)
+         end
       else
-         return getOutgrad(arg[argnum]), ans.value
+         out[2] = ansVal
       end
+      return unpack(out)
    end
    return doGrad
 end
@@ -527,13 +326,6 @@ end
 local autograd = {
    grad = grad,
    gradfuns = gradfuns,
-   _node = {
-      Node = Node,
-      isNode = isNode,
-      getValue = getValue,
-      newStartNode = newStartNode,
-      nodeApply = nodeApply
-   }
 }
 
 -- Shortcut:

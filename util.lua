@@ -1,6 +1,5 @@
 -- Utilities
 local util = {}
-local class = require 'class'
 
 function util.oneHot(labels, n)
    --[[
@@ -17,5 +16,10 @@ function util.oneHot(labels, n)
    end
    return out
 end
+
+-- Helpers:
+function util.logMultiNomialLoss(out, target) return -torch.sum(torch.cmul(out,target)) end
+function util.logSumExp(array) return torch.log(torch.sum(torch.exp(array))) end
+function util.logSoftMax(array) return array - util.logSumExp(array) end
 
 return util

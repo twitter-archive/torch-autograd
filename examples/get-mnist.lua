@@ -1,3 +1,5 @@
+local util = require 'autograd.util'
+
 -- Get/create dataset
 local function setupData(opt)
    if not path.exists('mnist') then
@@ -11,6 +13,8 @@ local function setupData(opt)
    local classes = {'0','1','2','3','4','5','6','7','8','9'}
    local trainData = torch.load('mnist/train.t7')
    local testData = torch.load('mnist/test.t7')
+   trainData.y = util.oneHot(trainData.y)
+   testData.y = util.oneHot(testData.y)
    return trainData, testData, classes
 end
 

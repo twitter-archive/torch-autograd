@@ -1,5 +1,6 @@
 -- Register all nnfunc grads into autograd
 local autograd = require 'autograd.main'
+local node = require 'autograd.node'
 local nnfunc = require 'nnfunc'
 
 -- Generic auto-wrapper of every function exposed
@@ -47,7 +48,7 @@ for name,Class in pairs(nnfunc.nn) do
             end
          }
 
-         return autograd._node.nodeApply(forward, x, W, b)
+         return node.nodeApply(forward, x, W, b)
       end
    end
 end
