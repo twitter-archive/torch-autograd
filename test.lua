@@ -279,13 +279,13 @@ local tests = {
       local linear1 = autograd.nn.Linear(inputSize, outputSize)
 
       -- nn version:
-      function f_nn(params)
+      local function f_nn(params)
          local funcout = linear1(params.x, params.W, params.b)
          return torch.sum(funcout)
       end
 
       -- autograd version:
-      function f_autograd(params)
+      local function f_autograd(params)
          return torch.sum(params.W * params.x + params.b)
       end
 
@@ -344,7 +344,7 @@ local tests = {
       local acts2 = autograd.nn.Tanh()
 
       -- nn version:
-      function mlp(params)
+      local function mlp(params)
          local h1 = acts1(linear1(params.x, params.W1, params.b1))
          local h2 = acts2(linear2(h1, params.W2, params.b2))
          local o = torch.sum(h2)
@@ -380,7 +380,7 @@ local tests = {
       local acts2 = autograd.nn.Tanh()
 
       -- nn version:
-      function cnn(params)
+      local function cnn(params)
          local h1 = acts1(conv1(params.x, params.W1, params.b1))
          local h2 = acts2(linear2(flatten(h1), params.W2, params.b2))
          local o = torch.sum(h2)
@@ -420,7 +420,7 @@ local tests = {
       local acts2 = autograd.nn.Tanh()
 
       -- nn version:
-      function mlp(params)
+      local function mlp(params)
          local h1 = acts1(linear1(params.x, params.W1, params.b1))
          local h2 = acts2(linear2(h1, params.W2, params.b2))
          local o = torch.sum(h2)
@@ -494,8 +494,8 @@ local tests = {
    end,
 
    Models_SpatialNetwork = function()
-      -- Define model:
-      local f,params = autograd.model.SpatialNetwork({
+      -- Define conv layers:
+      local f1,params1 = autograd.model.SpatialNetwork({
          inputFeatures = 3,
          hiddenFeatures = {16, 16},
          poolings = {4, 2},
@@ -503,18 +503,29 @@ local tests = {
          activtions = 'Tanh',
       })
 
-      -- Loss:
+      -- Define upper regular layers:
+      local f2,params2 = autograd.model.NeuralNetwork({
+         inputFeatures = 16,
+         hiddenFeatures = {32,2},
+         classifier = true,
+      })
+
+      -- Loss == full conv-net with least-squares loss:
       local loss = function(params, input, target)
-         local pred = f(params, input)
+         local conv = f1(params[1], input)
+         local pred = f2(params[2], conv)
          local loss = autograd.loss.leastSquares(pred,target)
          return loss,pred
       end
 
-      params[1].W:normal(0,0.01)
-      params[2].W:normal(0,0.01)
+      local params = {params1, params2}
+      params[1][1].W:normal(0,0.01)
+      params[1][2].W:normal(0,0.01)
+      params[2][1].W:normal(0,0.01)
+      params[2][2].W:normal(0,0.01)
 
       local i = torch.randn(3,8,8)
-      local t = torch.randn(16,1,1)
+      local t = torch.randn(2)
 
       local l,pred = loss(params, i, t)
       local grads = autograd(loss)(params, i, t)
@@ -524,26 +535,40 @@ local tests = {
       -- Gradcheck doesn't support nested params,
       -- need to do a bit of magic to test it.
       local inputs = {
-         W1 = params[1].W,
-         b1 = params[1].b,
-         W2 = params[2].W,
-         b2 = params[2].b,
+         W11 = params1[1].W,
+         b11 = params1[1].b,
+         W12 = params1[2].W,
+         b12 = params1[2].b,
+         W21 = params2[1].W,
+         b21 = params2[1].b,
+         W22 = params2[2].W,
+         b22 = params2[2].b,
          x = i,
          y = t,
       }
       local closure = function(inputs)
          local params = {
-            {W=inputs.W1, b=inputs.b1},
-            {W=inputs.W2, b=inputs.b2},
+            {
+               {W=inputs.W11, b=inputs.b11},
+               {W=inputs.W12, b=inputs.b12},
+            },
+            {
+               {W=inputs.W21, b=inputs.b21},
+               {W=inputs.W22, b=inputs.b22},
+            },
          }
          return loss(params, inputs.x, inputs.y)
       end
       closure(inputs)
       tester:assert(gradcheck(closure, inputs, 'x'), 'incorrect gradients on x')
-      tester:assert(gradcheck(closure, inputs, 'W1'), 'incorrect gradients on W1')
-      tester:assert(gradcheck(closure, inputs, 'b1'), 'incorrect gradients on b1')
-      -- tester:assert(gradcheck(closure, inputs, 'W2'), 'incorrect gradients on W2')
-      -- tester:assert(gradcheck(closure, inputs, 'b2'), 'incorrect gradients on b2')
+      tester:assert(gradcheck(closure, inputs, 'W11'), 'incorrect gradients on W11')
+      tester:assert(gradcheck(closure, inputs, 'b11'), 'incorrect gradients on b11')
+      tester:assert(gradcheck(closure, inputs, 'W12'), 'incorrect gradients on W12')
+      tester:assert(gradcheck(closure, inputs, 'b12'), 'incorrect gradients on b12')
+      tester:assert(gradcheck(closure, inputs, 'W21'), 'incorrect gradients on W21')
+      tester:assert(gradcheck(closure, inputs, 'b21'), 'incorrect gradients on b21')
+      tester:assert(gradcheck(closure, inputs, 'W22'), 'incorrect gradients on W22')
+      tester:assert(gradcheck(closure, inputs, 'b22'), 'incorrect gradients on b22')
    end,
 }
 

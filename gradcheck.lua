@@ -5,7 +5,7 @@ local autograd = require 'autograd'
 local perturbation = 1e-6
 
 -- Threshold:
-local threshold = 1e-6
+local threshold = 1e-5
 
 -- Compute grads with bprop:
 local function jacobianFromAutograd(func, input, var)
@@ -62,7 +62,11 @@ local function gradcheck(func, input, var)
    local err = (jacobian1 - jacobian2):abs():max()
 
    -- Threhold?
-   return err < threshold
+   local pass = err < threshold
+   if not pass then
+      print('error = ' .. err)
+   end
+   return pass
 end
 
 -- Return package

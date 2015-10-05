@@ -107,7 +107,7 @@ function model.NeuralNetwork(opt, params, layers, layer2params)
    return sequence(layers, layer2params), params, layers
 end
 
-function model.SpatialLayer(opt, params, layer, layer2params)
+function model.SpatialLayer(opt, params, layers, layer2params)
    -- options:
    opt = opt or {}
    local kernelSize = opt.kernelSize or 5
@@ -160,7 +160,7 @@ function model.SpatialLayer(opt, params, layer, layer2params)
    return sequence(layers, layer2params), params, layers
 end
 
-function model.SpatialNetwork(opt, params, layer, layer2params)
+function model.SpatialNetwork(opt, params, layers, layer2params)
    -- options:
    opt = opt or {}
    local kernelSize = opt.kernelSize or 5
