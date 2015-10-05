@@ -23,7 +23,7 @@ end
 -- Define our training loss
 function f(params, input, target)
    local prediction = predict(params, input, target)
-   local loss = util.logMultiNomialLoss(prediction, target)
+   local loss = util.logMultinomialLoss(prediction, target)
    return loss, prediction
 end
 

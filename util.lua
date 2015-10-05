@@ -18,7 +18,7 @@ function util.oneHot(labels, n)
 end
 
 -- Helpers:
-function util.logMultiNomialLoss(out, target) return -torch.sum(torch.cmul(out,target)) end
+function util.logMultinomialLoss(out, target) return -torch.sum(torch.cmul(out,target)) end
 function util.logSumExp(array) return torch.log(torch.sum(torch.exp(array))) end
 function util.logSoftMax(array) return array - util.logSumExp(array) end
 
