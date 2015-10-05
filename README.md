@@ -38,7 +38,7 @@ Autograd is work in progress. Current list of things to be developed includes:
 - [ ] make the process of returning different intermediate outputs easier: right
   now you have to define one function for each partial output, is it enough?
   => write examples
-- [ ] when calling `dparams = df(...)`, return the result of `f` as a second
+- [x] when calling `dparams = df(...)`, return the result of `f` as a second
   value: `dparams,loss = df(...)`, this way it doesn't have to be run twice.
 - [ ] for code clarity, `import 'torch'` can be used to provide all math symbols
   globally; this fails if `torch` is imported before `autograd`. Why?
