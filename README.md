@@ -35,7 +35,7 @@ Autograd is work in progress. Current list of things to be developed includes:
   - [ ] LSTM
 - [ ] implement auto-buffering so that native torch functions can re-use memory
   (i.e. auto-generate code that's similar to what nn does for modules)
-- [ ] make the process of returning different intermediate outputs easier: right
+- [x] make the process of returning different intermediate outputs easier: right
   now you have to define one function for each partial output, is it enough?
   => write examples
 - [x] when calling `dparams = df(...)`, return the result of `f` as a second
