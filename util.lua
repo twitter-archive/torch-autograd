@@ -1,6 +1,5 @@
 -- Utilities
 local util = {}
-local class = require 'class'
 
 function util.oneHot(labels, n)
    --[[

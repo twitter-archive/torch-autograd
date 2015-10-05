@@ -2,9 +2,10 @@
 local _ = require 'moses'
 local totem = require 'totem'
 local autograd = require 'autograd'
-local Node = autograd._node.Node
-local isNode = autograd._node.isNode
-local getValue = autograd._node.getValue
+local node = require 'autograd.node'
+local Node = node.Node
+local isNode = node.isNode
+local getValue = node.getValue
 local gradcheck = require 'autograd.gradcheck'
 local tester = totem.Tester()
 
