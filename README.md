@@ -31,7 +31,7 @@ Autograd is work in progress. Current list of things to be developed includes:
 * add more useful examples of models
   - [x] MNIST logistic regression
   - [x] MNIST MLP
-  - [ ] MNIST CNN (not working on public torch currently)
+  - [x] MNIST CNN
   - [ ] RNN (Penn?)
   - [ ] LSTM
 - [ ] implement auto-buffering so that native torch functions can re-use memory
