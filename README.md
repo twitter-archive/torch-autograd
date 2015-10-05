@@ -24,18 +24,20 @@ TODO
 
 Autograd is work in progress. Current list of things to be developed includes:
 
-- [ ] gradients of gradients (Hessian)
+- [ ] Gradients of gradients (Hessian)
 - [ ] Helpers for building weights
-- [ ] Helpers for building nnfunc modules (tedious to write out convolution parameters)
+* Helpers for building nnfunc modules (tedious to write out convolution parameters)
+  - [x] Basic helper logic for NN, CNN
+  - [ ] Improve cascading, and parameter grouping when cascading functions
 - [ ] Debugging facilities (profile speed & gradient magnitude of each computation. Should just require nodeApply wrapper.)
 - [ ] Add support for sparse gradients
-* add more useful examples of models
+* Add more useful examples of models
   - [x] MNIST logistic regression
   - [x] MNIST MLP
   - [x] MNIST CNN
   - [ ] RNN (Penn?)
   - [ ] LSTM
-- [ ] implement auto-buffering so that native torch functions can re-use memory
+- [ ] Implement auto-buffering so that native torch functions can re-use memory
   (i.e. auto-generate code that's similar to what nn does for modules)
 - [x] make the process of returning different intermediate outputs easier: right
   now you have to define one function for each partial output, is it enough?
