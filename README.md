@@ -85,8 +85,7 @@ x = t.randn(1,100)
 y = t.Tensor(1,10):zero() y[1][3] = 1
 
 -- compute loss and gradients wrt all parameters in params:
-loss = neuralNet(params, x, y)
-dparams = dneuralNet(params, x, y)
+dparams, loss = dneuralNet(params, x, y)
 
 -- in this case:
 --> loss: is a scalar (Lua number)
@@ -103,7 +102,7 @@ the model can easily be optimized using SGD:
 ```lua
 for i,sample in datasetIterator() do
    -- estimate gradients wrt params:
-   local dparams = neuralNet(params, sample.x, sample.y)
+   local grads, loss = dneuralNet(params, sample.x, sample.y)
 
    -- SGD step:
    for i = 1,#params.W do
