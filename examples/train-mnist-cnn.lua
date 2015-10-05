@@ -1,7 +1,3 @@
-local opt = lapp [[
-Train a classifier on MNIST.
-]]
-
 -- Libs
 local grad = require 'autograd'
 local util = require 'autograd.util'
@@ -13,7 +9,7 @@ local inputSize = trainData.x[1]:nElement()
 local confusionMatrix = optim.ConfusionMatrix(classes)
 
 -- What model to train:
-local f,params
+local predict,f,params
 -- for CNNs, we rely on efficient nn-provided primitives:
 local reshape = grad.nn.Reshape(1,32,32)
 
@@ -36,7 +32,6 @@ function predict(params, input, target)
    local out = util.logSoftMax(h3)
    return out
 end
-
 
 -- Define our loss function
 function f(params, input, target)

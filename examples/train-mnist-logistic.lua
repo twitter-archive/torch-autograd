@@ -1,7 +1,3 @@
-local opt = lapp [[
-Train a classifier on MNIST.
-]]
-
 -- Libs
 local grad = require 'autograd'
 local util = require 'autograd.util'
@@ -13,7 +9,7 @@ local inputSize = trainData.x[1]:nElement()
 local confusionMatrix = optim.ConfusionMatrix(classes)
 
 -- What model to train:
-local f,params
+local predict,f,params
 
 -- Define our neural net
 function predict(params, input, target, predictionOnly)
