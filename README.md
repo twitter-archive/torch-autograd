@@ -25,6 +25,8 @@ TODO
 Autograd is work in progress. Current list of things to be developed includes:
 
 - [ ] Gradients of gradients (Hessian)
+- [ ] Missing gradients for functions like `torch.sum(data,index)` if index is provided;
+      these are critical to implement mini-batch support! (for now batches cannot be used)
 - [ ] Helpers for building weights
 * Helpers for building nnfunc modules (tedious to write out convolution parameters)
   - [x] Basic helper logic for NN, CNN
