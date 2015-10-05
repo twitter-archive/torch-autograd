@@ -449,12 +449,12 @@ local tests = {
       -- Loss:
       local loss = function(params, input, target)
          local pred = f(params, input)
-         local loss = autograd.loss.logMultiNomial(pred,target)
+         local loss = autograd.loss.leastSquares(pred,target)
          return loss,pred
       end
 
+      params[1].W:normal(0,0.01)
       params[2].W:normal(0,0.01)
-      params[4].W:normal(0,0.01)
 
       local i = torch.randn(100)
       local t = torch.Tensor({1,0})
@@ -463,26 +463,24 @@ local tests = {
       local grads = autograd(loss)(params, i, t)
 
       tester:asserteq(type(l), 'number', 'loss should be a scalar')
-      tester:asserteq(grads[2].W:dim(), 2, 'weights for layer 2 have incorrect dims')
-      tester:asserteq(grads[2].b:dim(), 1, 'biases for layer 2 have incorrect dims')
-      tester:asserteq(grads[4].W:dim(), 2, 'weights for layer 4 have incorrect dims')
-      tester:asserteq(grads[4].b:dim(), 1, 'biases for layer 4 have incorrect dims')
+      tester:asserteq(grads[1].W:dim(), 2, 'weights for layer 2 have incorrect dims')
+      tester:asserteq(grads[1].b:dim(), 1, 'biases for layer 2 have incorrect dims')
+      tester:asserteq(grads[2].W:dim(), 2, 'weights for layer 4 have incorrect dims')
+      tester:asserteq(grads[2].b:dim(), 1, 'biases for layer 4 have incorrect dims')
 
       -- Gradcheck doesn't support nested params,
       -- need to do a bit of magic to test it.
       local inputs = {
-         W1 = params[2].W,
-         b1 = params[2].b,
-         W2 = params[4].W,
-         b2 = params[4].b,
+         W1 = params[1].W,
+         b1 = params[1].b,
+         W2 = params[2].W,
+         b2 = params[2].b,
          x = i,
          y = t,
       }
       local closure = function(inputs)
          local params = {
-            {},
             {W=inputs.W1, b=inputs.b1},
-            {},
             {W=inputs.W2, b=inputs.b2},
          }
          return loss(params, inputs.x, inputs.y)
