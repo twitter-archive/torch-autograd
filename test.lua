@@ -31,6 +31,7 @@ local tests = {
          tester:assert(gradcheck(selectFn2, {W=W,x=x}, param), "Incorrect gradient")
       end
    end,
+
    Narrow = function()
       local W = torch.Tensor(5,25):normal()
       local x1 = torch.Tensor(1,25):normal()
@@ -49,8 +50,8 @@ local tests = {
          tester:assert(gradcheck(NarrowFn1D, {W=W,x=x1}, param), "Incorrect gradient")
          tester:assert(gradcheck(NarrowFn2D, {W=W,x=x2}, param), "Incorrect gradient")
       end
-
    end,
+
    View = function()
       local W = torch.Tensor(5,5):normal()
       local x = torch.Tensor(1,25):normal()
@@ -68,8 +69,8 @@ local tests = {
          tester:assert(gradcheck(viewFn, {W=W,x=x}, param), "Incorrect gradient")
          tester:assert(gradcheck(viewAsFn, {W=W,x=x}, param), "Incorrect gradient")
       end
-
    end,
+
    Expand = function()
       local W = torch.Tensor(32,100):normal()
       local x1 = torch.Tensor(1,100):normal()
@@ -92,6 +93,7 @@ local tests = {
          end
       end
    end,
+
    Dot = function()
       -- Parameters:
       local W = torch.Tensor(32,100):fill(.5)

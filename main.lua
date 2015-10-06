@@ -302,7 +302,7 @@ gradfuns[torch.expandAs] = {
       return out
    end,
    function(g,x,template)
-      local o = torch.zeros(template:size())
+      local o = g.new(template:size()):zero()
       return o
    end
 }
@@ -315,12 +315,12 @@ gradfuns[torch.view] = {
 }
 gradfuns[torch.viewAs] = {
    "viewAs",
-   function(g,x,template) 
+   function(g,x,template)
       -- TODO: copy required?
       return torch.viewAs(g,x)
    end,
    function(g,x,template)
-      return torch.zeros(template:size())
+      return g.new(template:size()):zero()
    end
 }
 gradfuns[torch.select] = {
@@ -328,7 +328,7 @@ gradfuns[torch.select] = {
    function(g,x,dim,index)
       -- TODO: sparse tensors
       -- TODO: copy necessary here?
-      local out = torch.zeros(x:size())
+      local out = g.new(x:size()):zero()
       local slice = out:select(dim,index)
       slice:copy(g)
       return out
@@ -338,7 +338,7 @@ gradfuns[torch.narrow] = {
    "narrow",
    function(g,x,dim,index,size)
       -- TODO: copy necessary here?
-      local out = torch.zeros(x:size())
+      local out = g.new(x:size()):zero()
       local slice = out:narrow(dim,index,size)
       slice:copy(g)
       return out
