@@ -283,7 +283,7 @@ gradfuns[torch.expand] = {
       local out = g
       for dim,size in pairs(xSizes) do
          if size == 1 then
-            out = torch.narrow(out,dim,1,1)
+            out = torch.sum(out,dim)
          end
       end
       return out
@@ -292,17 +292,18 @@ gradfuns[torch.expand] = {
 gradfuns[torch.expandAs] = {
    "expandAs",
    function(g,x,template)
-      local xSizes = x:size():totable()
+      local sizes = x:size():totable()
       local out = g
-      for dim,size in pairs(xSizes) do
+      for dim,size in pairs(sizes) do
          if size == 1 then
-            out = torch.narrow(out,dim,1,1)
+            out = torch.sum(out,dim)
          end
       end
       return out
    end,
    function(g,x,template)
-      return 0
+      local o = torch.zeros(template:size())
+      return o
    end
 }
 gradfuns[torch.view] = {
@@ -319,7 +320,7 @@ gradfuns[torch.viewAs] = {
       return torch.viewAs(g,x)
    end,
    function(g,x,template)
-      return 0
+      return torch.zeros(template:size())
    end
 }
 gradfuns[torch.select] = {
@@ -402,6 +403,7 @@ local elemOpOverride = {
    __add = op.add,
    __unm = op.unm,
 }
+
 for _,tensorType in pairs(tensorTypes) do
    local mt = torch.getmetatable('torch.' .. tensorType)
    for src,dest in pairs(elemOpOverride) do

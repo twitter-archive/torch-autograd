@@ -11,6 +11,28 @@ local tester = totem.Tester()
 
 -- List of tests:
 local tests = {
+   Expand = function()
+      W = torch.Tensor(32,100):normal()
+      x1 = torch.Tensor(1,100):normal()
+      x2 = torch.Tensor(32,1):normal()
+      x3 = torch.Tensor(1,1):normal()
+
+      -- Function:
+      local expandFn = function(inputs)
+         return torch.sum(torch.sum(torch.expand(inputs.x, 32, 100) + inputs.W, 2))
+      end
+      local expandAsFn = function(inputs)
+         return torch.sum(torch.sum(torch.expandAs(inputs.x, inputs.W) + inputs.W, 2))
+      end
+
+      -- Check grads:
+      tester:assert(gradcheck(expandFn, {W=W, x=x1}, 'x'), "Incorrect gradient")
+      tester:assert(gradcheck(expandFn, {W=W, x=x2}, 'x'), "Incorrect gradient")
+      tester:assert(gradcheck(expandFn, {W=W, x=x3}, 'x'), "Incorrect gradient")
+      tester:assert(gradcheck(expandAsFn, {W=W, x=x1}, 'W'), "Incorrect gradient")
+      tester:assert(gradcheck(expandAsFn, {W=W, x=x2}, 'W'), "Incorrect gradient")
+      tester:assert(gradcheck(expandFn, {W=W, x=x3}, 'x'), "Incorrect gradient")
+   end,
    Dot = function()
       -- Parameters:
       local W = torch.Tensor(32,100):fill(.5)
