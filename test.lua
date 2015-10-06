@@ -11,11 +11,30 @@ local tester = totem.Tester()
 
 -- List of tests:
 local tests = {
+   View = function()
+      local W = torch.Tensor(5,5):normal()
+      local x = torch.Tensor(1,25):normal()
+
+      -- Function:
+      local viewFn = function(inputs)
+         return torch.sum(torch.view(inputs.x,5,5) + inputs.W)
+      end
+      local viewAsFn = function(inputs)
+         return torch.sum(torch.viewAs(inputs.x, inputs.W) + inputs.W)
+      end
+
+      -- Check grads:
+      for iparam,param in pairs({"x", "W"}) do
+         tester:assert(gradcheck(viewFn, {W=W,x=x}, param), "Incorrect gradient")
+         tester:assert(gradcheck(viewAsFn, {W=W,x=x}, param), "Incorrect gradient")
+      end
+
+   end,
    Expand = function()
-      W = torch.Tensor(32,100):normal()
-      x1 = torch.Tensor(1,100):normal()
-      x2 = torch.Tensor(32,1):normal()
-      x3 = torch.Tensor(1,1):normal()
+      local W = torch.Tensor(32,100):normal()
+      local x1 = torch.Tensor(1,100):normal()
+      local x2 = torch.Tensor(32,1):normal()
+      local x3 = torch.Tensor(1,1):normal()
 
       -- Function:
       local expandFn = function(inputs)
@@ -26,12 +45,12 @@ local tests = {
       end
 
       -- Check grads:
-      tester:assert(gradcheck(expandFn, {W=W, x=x1}, 'x'), "Incorrect gradient")
-      tester:assert(gradcheck(expandFn, {W=W, x=x2}, 'x'), "Incorrect gradient")
-      tester:assert(gradcheck(expandFn, {W=W, x=x3}, 'x'), "Incorrect gradient")
-      tester:assert(gradcheck(expandAsFn, {W=W, x=x1}, 'W'), "Incorrect gradient")
-      tester:assert(gradcheck(expandAsFn, {W=W, x=x2}, 'W'), "Incorrect gradient")
-      tester:assert(gradcheck(expandFn, {W=W, x=x3}, 'x'), "Incorrect gradient")
+      for ix,x in pairs({x1,x2,x3}) do
+         for iparam,param in pairs({"x", "W"}) do
+            tester:assert(gradcheck(expandFn, {W=W, x=x}, param), "Incorrect gradient")
+            tester:assert(gradcheck(expandAsFn, {W=W, x=x}, param), "Incorrect gradient")
+         end
+      end
    end,
    Dot = function()
       -- Parameters:
