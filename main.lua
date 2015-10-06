@@ -271,6 +271,9 @@ gradfuns[torch.cat] = {
    "cat",
    function(g,x,y,dim)
       error("NOT IMPLEMENTED")
+   end,
+   function(g,x,y,dim)
+      error("NOT IMPLEMENTED")
    end
 }
 gradfuns[torch.expand] = {
@@ -299,7 +302,7 @@ gradfuns[torch.expandAs] = {
       return out
    end,
    function(g,x,template)
-      return g
+      return 0
    end
 }
 gradfuns[torch.view] = {
@@ -316,7 +319,7 @@ gradfuns[torch.viewAs] = {
       return torch.viewAs(g,x)
    end,
    function(g,x,template)
-      return g
+      return 0
    end
 }
 gradfuns[torch.select] = {
