@@ -3,7 +3,6 @@
 -- Tables
 
 -- Deps
-local torch = require('torch')
 local haveCutorch,cutorch = pcall(require,'cutorch')
 local debug = require 'debug'
 local _ = require 'moses'
@@ -240,6 +239,7 @@ local function _sum(x)
       return x
    end
 end
+
 local function repeatToMatchShape(x,axis)
    -- Special sum function to deal with numbers or tensors
 
@@ -257,6 +257,38 @@ local function repeatToMatchShape(x,axis)
       return function(g) return torch.repeatTensor(g, size) end, size[axis]
    end
 end
+
+
+torch["select"] = function (A, dim, index)
+   print("HI")
+   print(A)
+   return A:select(dim, index)
+end
+
+torch["narrow"] = function(A, dim, index, size)
+   return A:narrow(dim, index, size)
+end
+
+gradfuns[torch.select] = {
+   "select",
+   function(g,x,dim,index)
+      -- TODO: sparse tensors
+      local out = torch.zeros(x:size())
+      local slice = out:select(dim,index)
+      slice:copy(g)
+      return out
+   end
+}
+
+gradfuns[torch.narrow] = {
+   "narrow",
+   function(g,x,dim,index,size)
+      local out = torch.zeros(x:size())
+      local slice = out:narrow(dim,index,size)
+      slice:copy(g)
+      return out
+   end
+}
 
 gradfuns[torch.sum] = {
    "sum",
@@ -294,7 +326,8 @@ local override = {
    "pow", "__pow",
    "exp", 'tanh',
    "sin", "cos", "tan", "sqrt",
-   "abs", "sum", "log", "viewAs"
+   "abs", "sum", "log", "viewAs",
+   "select", "narrow"
 }
 
 -- First, override all the Torch functions
