@@ -11,6 +11,46 @@ local tester = totem.Tester()
 
 -- List of tests:
 local tests = {
+   Select = function()
+      local W = torch.Tensor(5,25):normal()
+      local x = torch.Tensor(1,25):normal()
+
+      -- Function:
+      local selectFn = function(inputs)
+         return torch.sum(torch.select(inputs.W,1,1) + inputs.x)
+      end
+      local selectFn2 = function(inputs)
+         local a = torch.select(torch.viewAs(torch.select(inputs.W,1,1), inputs.x), 2, 1)
+         local b = torch.select(inputs.x, 2, 1)
+         return torch.sum(a + b)
+      end
+
+      -- Check grads:
+      for iparam,param in pairs({"x", "W"}) do
+         tester:assert(gradcheck(selectFn, {W=W,x=x}, param), "Incorrect gradient")
+         tester:assert(gradcheck(selectFn2, {W=W,x=x}, param), "Incorrect gradient")
+      end
+   end,
+   Narrow = function()
+      local W = torch.Tensor(5,25):normal()
+      local x1 = torch.Tensor(1,25):normal()
+      local x2 = torch.Tensor(3,25):normal()
+
+      -- Function:
+      local NarrowFn1D = function(inputs)
+         return torch.sum(torch.narrow(inputs.W,1,1,1) + inputs.x)
+      end
+      local NarrowFn2D = function(inputs)
+         return torch.sum(torch.narrow(inputs.W,1,1,3) + inputs.x)
+      end
+
+      -- Check grads:
+      for iparam,param in pairs({"x", "W"}) do
+         tester:assert(gradcheck(NarrowFn1D, {W=W,x=x1}, param), "Incorrect gradient")
+         tester:assert(gradcheck(NarrowFn2D, {W=W,x=x2}, param), "Incorrect gradient")
+      end
+
+   end,
    View = function()
       local W = torch.Tensor(5,5):normal()
       local x = torch.Tensor(1,25):normal()
