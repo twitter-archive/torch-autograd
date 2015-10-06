@@ -3,7 +3,6 @@
 -- Tables
 
 -- Deps
-local torch = require('torch')
 local haveCutorch,cutorch = pcall(require,'cutorch')
 local debug = require 'debug'
 local _ = require 'moses'
@@ -240,6 +239,7 @@ local function _sum(x)
       return x
    end
 end
+
 local function repeatToMatchShape(x,axis)
    -- Special sum function to deal with numbers or tensors
 
@@ -258,6 +258,92 @@ local function repeatToMatchShape(x,axis)
    end
 end
 
+
+torch["select"] = function (A, dim, index)
+   return A:select(dim, index)
+end
+
+torch["narrow"] = function(A, dim, index, size)
+   return A:narrow(dim, index, size)
+end
+
+gradfuns[torch.cat] = {
+   "cat",
+   function(g,x,y,dim)
+      error("NOT IMPLEMENTED")
+   end,
+   function(g,x,y,dim)
+      error("NOT IMPLEMENTED")
+   end
+}
+gradfuns[torch.expand] = {
+   "expand",
+   function(g,x,...)
+      local xSizes = x:size():totable()
+      local out = g
+      for dim,size in pairs(xSizes) do
+         if size == 1 then
+            out = torch.sum(out,dim)
+         end
+      end
+      return out
+   end
+}
+gradfuns[torch.expandAs] = {
+   "expandAs",
+   function(g,x,template)
+      local sizes = x:size():totable()
+      local out = g
+      for dim,size in pairs(sizes) do
+         if size == 1 then
+            out = torch.sum(out,dim)
+         end
+      end
+      return out
+   end,
+   function(g,x,template)
+      local o = g.new(template:size()):zero()
+      return o
+   end
+}
+gradfuns[torch.view] = {
+   "view",
+   function(g,x,sizes)
+      -- TODO: copy required?
+      return torch.view(g,x:size())
+   end
+}
+gradfuns[torch.viewAs] = {
+   "viewAs",
+   function(g,x,template)
+      -- TODO: copy required?
+      return torch.viewAs(g,x)
+   end,
+   function(g,x,template)
+      return g.new(template:size()):zero()
+   end
+}
+gradfuns[torch.select] = {
+   "select",
+   function(g,x,dim,index)
+      -- TODO: sparse tensors
+      -- TODO: copy necessary here?
+      local out = g.new(x:size()):zero()
+      local slice = out:select(dim,index)
+      slice:copy(g)
+      return out
+   end
+}
+gradfuns[torch.narrow] = {
+   "narrow",
+   function(g,x,dim,index,size)
+      -- TODO: copy necessary here?
+      local out = g.new(x:size()):zero()
+      local slice = out:narrow(dim,index,size)
+      slice:copy(g)
+      return out
+   end
+}
 gradfuns[torch.sum] = {
    "sum",
    function(g,x,axis)
@@ -294,7 +380,8 @@ local override = {
    "pow", "__pow",
    "exp", 'tanh',
    "sin", "cos", "tan", "sqrt",
-   "abs", "sum", "log", "viewAs"
+   "abs", "sum", "log", "viewAs", "view", "expand", "expandAs",
+   "select", "narrow"
 }
 
 -- First, override all the Torch functions
@@ -316,6 +403,7 @@ local elemOpOverride = {
    __add = op.add,
    __unm = op.unm,
 }
+
 for _,tensorType in pairs(tensorTypes) do
    local mt = torch.getmetatable('torch.' .. tensorType)
    for src,dest in pairs(elemOpOverride) do
