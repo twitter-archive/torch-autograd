@@ -252,7 +252,6 @@ local function repeatToMatchShape(x,axis)
       size = x:size()
       return function(g) return x.new(size):fill(_sum(g)) end, x:nElement()
    else
-      print("HI")
       size = x:size():fill(1)
       size[axis] = x:size(axis)
       return function(g) return torch.repeatTensor(g, size) end, size[axis]
