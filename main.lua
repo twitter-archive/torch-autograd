@@ -10,7 +10,6 @@ local _ = require 'moses'
 local node = require 'autograd.node'
 local nodeApply = node.nodeApply
 local getOutgrad = node.getOutgrad
-local checkInput = node.checkInput
 local newStartNode = node.newStartNode
 local isNode = node.isNode
 local getValue = node.getValue
@@ -30,6 +29,23 @@ local tensorTypes = {
 }
 if haveCutorch and cutorch then
    tensorTypes[#tensorTypes+1] = 'CudaTensor'
+end
+
+-- Make sure we've got the right thing going on
+local function checkInput(arg)
+   if torch.isTensor(arg) then
+      local isValidType = false
+      for _,tensorType in pairs(tensorTypes) do
+         isValidType = isValidType or 'torch.' .. tensorType == torch.typename(arg)
+      end
+      if not isValidType then
+         local errMsg = "Input tensor is invalid type " .. torch.typename(arg) .. ". Valid types are"
+         for _, tensorType in pairs(tensorTypes) do
+            errMsg = errMsg .. " " .. tensorType
+         end
+         error(errMsg)
+      end
+   end
 end
 
 -- Step through the computation graph and find the gradient
@@ -236,6 +252,7 @@ local function repeatToMatchShape(x,axis)
       size = x:size()
       return function(g) return x.new(size):fill(_sum(g)) end, x:nElement()
    else
+      print("HI")
       size = x:size():fill(1)
       size[axis] = x:size(axis)
       return function(g) return torch.repeatTensor(g, size) end, size[axis]

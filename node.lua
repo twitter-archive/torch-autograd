@@ -126,22 +126,6 @@ getOutgrad = function(arg)
    return _getOutgrad(arg)
 end
 
-local function checkInput(arg)
-   if torch.isTensor(arg) then
-      local isValidType = false
-      for _,tensorType in pairs(tensorTypes) do
-         isValidType = isValidType or 'torch.' .. tensorType == torch.typename(arg)
-      end
-      if not isValidType then
-         local errMsg = "Input tensor is invalid type " .. torch.typename(arg) .. ". Valid types are"
-         for _, tensorType in pairs(tensorTypes) do
-            errMsg = errMsg .. " " .. tensorType
-         end
-         error(errMsg)
-      end
-   end
-end
-
 -- local newStartNode
 newStartNode = function(val, tape)
    -- If our argument is a tensor, just nodify it straight-up
@@ -163,7 +147,6 @@ node = {
    getValue = getValue,
    nodeApply = nodeApply,
    getOutgrad = getOutgrad,
-   checkInput = checkInput,
    newStartNode = newStartNode,
 }
 return node
