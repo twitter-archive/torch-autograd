@@ -316,7 +316,8 @@ function model.RecurrentLSTMNetwork(opt, params)
          local outputGate = torch.select(sigmoids, 1,3)
 
          -- write inputs
-         local inputTanh = torch.tanh(torch.select(sums, 1,4))
+         local tanhs = torch.tanh( torch.narrow(sums, 1,1,4) )
+         local inputValue = torch.select(tanhs, 1,1)
 
          -- partial gatings:
          local t1
@@ -325,7 +326,7 @@ function model.RecurrentLSTMNetwork(opt, params)
          else
             t1 = zeros
          end
-         local t2 = torch.cmul(inputGate, inputTanh)
+         local t2 = torch.cmul(inputGate, inputValue)
          cs[t] = t1+t2
 
          -- next h
