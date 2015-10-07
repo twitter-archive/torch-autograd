@@ -4,6 +4,9 @@ local model = {}
 -- nn modules:
 local nn = require 'autograd.nnfuncwrapper'
 
+-- util
+local util = require 'autograd.util'
+
 -- generic generator, from sequential list of layers:
 local function sequence(layers, layer2params)
    return function(params, input)
@@ -108,7 +111,6 @@ function model.SpatialLayer(opt, params, layers, layer2params)
    -- options:
    opt = opt or {}
    local kernelSize = opt.kernelSize or 5
-   local kernelSplit = opt.kernelSplit
    local padding = opt.padding or math.ceil(kernelSize-1)/2
    local inputFeatures = opt.inputFeatures or 3
    local outputFeatures = opt.outputFeatures or 16
@@ -160,7 +162,6 @@ function model.SpatialNetwork(opt, params, layers, layer2params)
    -- options:
    opt = opt or {}
    local kernelSize = opt.kernelSize or 5
-   local kernelSplit = opt.kernelSplit
    local padding = opt.padding
    local inputFeatures = opt.inputFeatures or 3
    local hiddenFeatures = opt.hiddenFeatures or {16,32,64}
@@ -187,7 +188,6 @@ function model.SpatialNetwork(opt, params, layers, layer2params)
          activations = activations,
          batchNormalization = batchNormalization,
          kernelSize = kernelSize,
-         kernelSplit = kernelSplit,
          padding = padding,
          cuda = cuda,
       }, params, layers, layer2params)
@@ -197,6 +197,151 @@ function model.SpatialNetwork(opt, params, layers, layer2params)
 
    -- layers
    return sequence(layers, layer2params), params, layers
+end
+
+function model.RecurrentNetwork(opt, params)
+   -- options:
+   opt = opt or {}
+   local inputFeatures = opt.inputFeatures or 10
+   local hiddenFeatures = opt.hiddenFeatures or 100
+   local outputType = opt.outputType or 'last' -- 'last' or 'all'
+
+   -- TODO:
+   --> move hidden states to a tensor once __newindex and __index
+   --  are available in autograd, so that "all" mode returns a
+   --  tensor instead of a table
+
+   -- container:
+   params = params or {}
+
+   -- parameters:
+   local p = {
+      Wx = torch.zeros(hiddenFeatures, inputFeatures),
+      bx = torch.zeros(hiddenFeatures),
+      Wh = torch.zeros(hiddenFeatures, hiddenFeatures),
+      bh = torch.zeros(hiddenFeatures),
+   }
+   table.insert(params, p)
+
+   -- function:
+   local f = function(params, x)
+      -- dims:
+      local steps = x:size(1)
+      local dim = x:size(2)
+
+      -- hiddens:
+      local hs = {}
+
+      -- go over time:
+      for t = 1,steps do
+         local hx = p.Wx * torch.select(x,1,t) + p.bx
+         local hh
+         if t > 1 then
+            hh = p.Wh * hs[t-1] + p.bh
+         else
+            hh = p.bh
+         end
+         hs[t] = torch.tanh(hx+hh)
+      end
+
+      -- output:
+      if outputType == 'last' then
+         -- return last hidden code:
+         return hs[#hs]
+      else
+         -- return all:
+         return hs
+      end
+   end
+
+   -- layers
+   return f, params
+end
+
+function model.RecurrentLSTMNetwork(opt, params)
+   -- options:
+   opt = opt or {}
+   local inputFeatures = opt.inputFeatures or 10
+   local hiddenFeatures = opt.hiddenFeatures or 100
+   local outputType = opt.outputType or 'last' -- 'last' or 'all'
+
+   -- TODO:
+   --> move hidden states to a tensor once __newindex and __index
+   --  are available in autograd, so that "all" mode returns a
+   --  tensor instead of a table
+
+   -- container:
+   params = params or {}
+
+   -- parameters:
+   local p = {
+      Wx = torch.zeros(4 * hiddenFeatures, inputFeatures),
+      bx = torch.zeros(4 * hiddenFeatures),
+      Wh = torch.zeros(4 * hiddenFeatures, hiddenFeatures),
+      bh = torch.zeros(4 * hiddenFeatures),
+   }
+   table.insert(params, p)
+
+   -- TODO: another way of initializing the recursion?
+   local zeros = torch.zeros(hiddenFeatures)
+
+   -- function:
+   local f = function(params, x)
+      -- dims:
+      local steps = x:size(1)
+      local dim = x:size(2)
+
+      -- hiddens:
+      local hs = {}
+      local cs = {}
+
+      -- go over time:
+      for t = 1,steps do
+         -- pack all dot products:
+         local hx = p.Wx * torch.select(x,1,t) + p.bx
+         local hh
+         if t > 1 then
+            hh = p.Wh * hs[t-1] + p.bh
+         else
+            hh = p.bh
+         end
+         local sums = torch.view( torch.tanh(hx+hh), 4, hiddenFeatures)
+
+         -- batch compute gates:
+         local sigmoids = util.sigmoid( torch.narrow(sums, 1,1,3) )
+         local inputGate = torch.select(sigmoids, 1,1)
+         local forgetGate = torch.select(sigmoids, 1,2)
+         local outputGate = torch.select(sigmoids, 1,3)
+
+         -- write inputs
+         local inputTanh = torch.select(torch.tanh(sums), 1,4)
+
+         -- partial gatings:
+         local t1
+         if t > 1 then
+            t1 = torch.cmul(forgetGate, cs[t-1])
+         else
+            t1 = zeros
+         end
+         local t2 = torch.cmul(inputGate, inputTanh)
+         cs[t] = t1+t2
+
+         -- next h
+         hs[t] = torch.cmul(outputGate, torch.tanh(cs[t]))
+      end
+
+      -- output:
+      if outputType == 'last' then
+         -- return last hidden code:
+         return hs[#hs]
+      else
+         -- return all:
+         return hs
+      end
+   end
+
+   -- layers
+   return f, params
 end
 
 return model

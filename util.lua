@@ -21,5 +21,6 @@ end
 function util.logMultinomialLoss(out, target) return -torch.sum(torch.cmul(out,target)) end
 function util.logSumExp(array) return torch.log(torch.sum(torch.exp(array))) end
 function util.logSoftMax(array) return array - util.logSumExp(array) end
+function util.sigmoid(array) return torch.pow(torch.exp(-array) + 1, -1) end
 
 return util

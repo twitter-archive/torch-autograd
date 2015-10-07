@@ -583,7 +583,7 @@ local tests = {
          hiddenFeatures = {16, 16},
          poolings = {4, 2},
          kernelSize = 3,
-         activtions = 'Tanh',
+         activations = 'Tanh',
       })
 
       -- Define upper regular layers:
@@ -652,6 +652,44 @@ local tests = {
       tester:assert(gradcheck(closure, inputs, 'b21'), 'incorrect gradients on b21')
       tester:assert(gradcheck(closure, inputs, 'W22'), 'incorrect gradients on W22')
       tester:assert(gradcheck(closure, inputs, 'b22'), 'incorrect gradients on b22')
+   end,
+
+   Models_RecurrentNetwork = function()
+      -- Define RNN:
+      local f,params = autograd.model.RecurrentNetwork({
+         inputFeatures = 10,
+         hiddenFeatures = 100,
+         outputType = 'last',
+      })
+
+      -- Test on sequence data:
+      local i = torch.randn(13, 10)
+      local o = f(params, i)
+      local g = autograd(f)(params, i)
+
+      -- Checks
+      tester:asserteq(o:dim(), 1, 'incorrect pred dim')
+      tester:asserteq(o:size(1), 100, 'incorrect pred size')
+      tester:asserteq(type(g), 'table', 'gradients could not be computed')
+   end,
+
+   Models_RecurrentLSTMNetwork = function()
+      -- Define RNN:
+      local f,params = autograd.model.RecurrentLSTMNetwork({
+         inputFeatures = 10,
+         hiddenFeatures = 100,
+         outputType = 'last',
+      })
+
+      -- Test on sequence data:
+      local i = torch.randn(13, 10)
+      local o = f(params, i)
+      local g = autograd(f)(params, i)
+
+      -- Checks
+      tester:asserteq(o:dim(), 1, 'incorrect pred dim')
+      tester:asserteq(o:size(1), 100, 'incorrect pred size')
+      tester:asserteq(type(g), 'table', 'gradients could not be computed')
    end,
 }
 
