@@ -284,9 +284,6 @@ function model.RecurrentLSTMNetwork(opt, params)
    }
    table.insert(params, p)
 
-   -- TODO: another way of initializing the recursion?
-   local zeros = torch.zeros(hiddenFeatures)
-
    -- function:
    local f = function(params, x)
       -- dims:
@@ -316,18 +313,15 @@ function model.RecurrentLSTMNetwork(opt, params)
          local outputGate = torch.select(sigmoids, 1,3)
 
          -- write inputs
-         local tanhs = torch.tanh( torch.narrow(sums, 1,1,4) )
+         local tanhs = torch.tanh( torch.narrow(sums, 1,4,1) )
          local inputValue = torch.select(tanhs, 1,1)
 
          -- partial gatings:
-         local t1
          if t > 1 then
-            t1 = torch.cmul(forgetGate, cs[t-1])
+            cs[t] = torch.cmul(forgetGate, cs[t-1]) + torch.cmul(inputGate, inputValue)
          else
-            t1 = zeros
+            cs[t] = torch.cmul(inputGate, inputValue)
          end
-         local t2 = torch.cmul(inputGate, inputValue)
-         cs[t] = t1+t2
 
          -- next h
          hs[t] = torch.cmul(outputGate, torch.tanh(cs[t]))
