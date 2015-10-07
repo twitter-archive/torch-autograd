@@ -6,6 +6,8 @@ local nn = require 'autograd.nnfuncwrapper'
 
 -- util
 local util = require 'autograd.util'
+local node = require 'autograd.node'
+local getValue = node.getValue
 
 -- generic generator, from sequential list of layers:
 local function sequence(layers, layer2params)
@@ -226,8 +228,8 @@ function model.RecurrentNetwork(opt, params)
    -- function:
    local f = function(params, x)
       -- dims:
-      local steps = x:size(1)
-      local dim = x:size(2)
+      local p = params[1] or params
+      local steps = getValue(x):size(1)
 
       -- hiddens:
       local hs = {}
@@ -288,8 +290,8 @@ function model.RecurrentLSTMNetwork(opt, params)
    -- function:
    local f = function(params, x)
       -- dims:
-      local steps = x:size(1)
-      local dim = x:size(2)
+      local p = params[1] or params
+      local steps = getValue(x):size(1)
 
       -- hiddens:
       local hs = {}
@@ -314,7 +316,7 @@ function model.RecurrentLSTMNetwork(opt, params)
          local outputGate = torch.select(sigmoids, 1,3)
 
          -- write inputs
-         local inputTanh = torch.select(torch.tanh(sums), 1,4)
+         local inputTanh = torch.tanh(torch.select(sums, 1,4))
 
          -- partial gatings:
          local t1

@@ -658,38 +658,96 @@ local tests = {
       -- Define RNN:
       local f,params = autograd.model.RecurrentNetwork({
          inputFeatures = 10,
-         hiddenFeatures = 100,
+         hiddenFeatures = 10,
          outputType = 'last',
       })
 
+      -- Loss
+      local loss = function(params, input)
+         return torch.sum(f(params, input))
+      end
+
       -- Test on sequence data:
       local i = torch.randn(13, 10)
-      local o = f(params, i)
-      local g = autograd(f)(params, i)
+      local o = loss(params, i)
+      local g = autograd(loss)(params, i)
 
       -- Checks
-      tester:asserteq(o:dim(), 1, 'incorrect pred dim')
-      tester:asserteq(o:size(1), 100, 'incorrect pred size')
       tester:asserteq(type(g), 'table', 'gradients could not be computed')
+
+      -- Gradcheck doesn't support nested params,
+      -- need to do a bit of magic to test it.
+      local inputs = {
+         Wx = params[1].Wx,
+         bx = params[1].bx,
+         Wh = params[1].Wh,
+         bh = params[1].bh,
+         x = i,
+      }
+      local closure = function(inputs)
+         local params = {
+            Wx = inputs.Wx,
+            bx = inputs.bx,
+            Wh = inputs.Wh,
+            bh = inputs.bh,
+         }
+         return loss(params, inputs.x)
+      end
+      closure(inputs)
+      autograd(closure)(inputs)
+      tester:assert(gradcheck(closure, inputs, 'x'), 'incorrect gradients on x')
+      tester:assert(gradcheck(closure, inputs, 'Wx'), 'incorrect gradients on Wx')
+      tester:assert(gradcheck(closure, inputs, 'bx'), 'incorrect gradients on bx')
+      tester:assert(gradcheck(closure, inputs, 'Wh'), 'incorrect gradients on Wh')
+      tester:assert(gradcheck(closure, inputs, 'bh'), 'incorrect gradients on bh')
    end,
 
    Models_RecurrentLSTMNetwork = function()
       -- Define RNN:
       local f,params = autograd.model.RecurrentLSTMNetwork({
          inputFeatures = 10,
-         hiddenFeatures = 100,
+         hiddenFeatures = 10,
          outputType = 'last',
       })
 
+      -- Loss
+      local loss = function(params, input)
+         return torch.sum(f(params, input))
+      end
+
       -- Test on sequence data:
       local i = torch.randn(13, 10)
-      local o = f(params, i)
-      local g = autograd(f)(params, i)
+      local o = loss(params, i)
+      local g = autograd(loss)(params, i)
 
       -- Checks
-      tester:asserteq(o:dim(), 1, 'incorrect pred dim')
-      tester:asserteq(o:size(1), 100, 'incorrect pred size')
       tester:asserteq(type(g), 'table', 'gradients could not be computed')
+
+      -- Gradcheck doesn't support nested params,
+      -- need to do a bit of magic to test it.
+      local inputs = {
+         Wx = params[1].Wx,
+         bx = params[1].bx,
+         Wh = params[1].Wh,
+         bh = params[1].bh,
+         x = i,
+      }
+      local closure = function(inputs)
+         local params = {
+            Wx = inputs.Wx,
+            bx = inputs.bx,
+            Wh = inputs.Wh,
+            bh = inputs.bh,
+         }
+         return loss(params, inputs.x)
+      end
+      closure(inputs)
+      autograd(closure)(inputs)
+      tester:assert(gradcheck(closure, inputs, 'x'), 'incorrect gradients on x')
+      tester:assert(gradcheck(closure, inputs, 'Wx'), 'incorrect gradients on Wx')
+      tester:assert(gradcheck(closure, inputs, 'bx'), 'incorrect gradients on bx')
+      tester:assert(gradcheck(closure, inputs, 'Wh'), 'incorrect gradients on Wh')
+      tester:assert(gradcheck(closure, inputs, 'bh'), 'incorrect gradients on bh')
    end,
 }
 
