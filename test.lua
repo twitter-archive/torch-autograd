@@ -662,6 +662,12 @@ local tests = {
          outputType = 'last',
       })
 
+      -- Params:
+      params[1].Wx:normal(0,0.01)
+      params[1].bx:normal(0,0.01)
+      params[1].Wh:normal(0,0.01)
+      params[1].bh:normal(0,0.01)
+
       -- Loss
       local loss = function(params, input)
          return torch.sum(f(params, input))
@@ -709,6 +715,12 @@ local tests = {
          hiddenFeatures = 10,
          outputType = 'last',
       })
+
+      -- Params:
+      params[1].Wx:normal(0,0.01)
+      params[1].bx:normal(0,0.01)
+      params[1].Wh:normal(0,0.01)
+      params[1].bh:normal(0,0.01)
 
       -- Loss
       local loss = function(params, input)
