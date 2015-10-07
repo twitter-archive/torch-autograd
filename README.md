@@ -25,29 +25,27 @@ TODO
 Autograd is work in progress. Current list of things to be developed includes:
 
 - [ ] Gradients of gradients (Hessian)
-- [x] Missing gradients for functions like `torch.sum(data,index)` if index is provided;
-      these are critical to implement mini-batch support! (for now batches cannot be used)
 - [ ] Helpers for building weights
+- [ ] Debugging facilities (profile speed & gradient magnitude of each computation. Should just require nodeApply wrapper.)
+- [ ] Add support for sparse gradients
+- [ ] Implement auto-buffering so that native torch functions can re-use memory
+  (i.e. auto-generate code that's similar to what nn does for modules)
 * Helpers for building nnfunc modules (tedious to write out convolution parameters)
   - [x] Basic helper logic for NN, CNN
   - [ ] Improve cascading, and parameter grouping when cascading functions
-- [ ] Debugging facilities (profile speed & gradient magnitude of each computation. Should just require nodeApply wrapper.)
-- [ ] Add support for sparse gradients
 * Add more useful examples of models
   - [x] MNIST logistic regression
   - [x] MNIST MLP
   - [x] MNIST CNN
   - [ ] RNN (Penn?)
   - [ ] LSTM
-- [ ] Implement auto-buffering so that native torch functions can re-use memory
-  (i.e. auto-generate code that's similar to what nn does for modules)
+- [x] Missing gradients for functions like `torch.sum(data,index)` if index is provided;
+      these are critical to implement mini-batch support! (for now batches cannot be used)
 - [x] make the process of returning different intermediate outputs easier: right
   now you have to define one function for each partial output, is it enough?
   => write examples
 - [x] when calling `dparams = df(...)`, return the result of `f` as a second
   value: `dparams,loss = df(...)`, this way it doesn't have to be run twice.
-- [ ] for code clarity, `import 'torch'` can be used to provide all math symbols
-  globally; this fails if `torch` is imported before `autograd`. Why?
 
 Examples
 --------
