@@ -304,7 +304,7 @@ function model.RecurrentLSTMNetwork(opt, params)
          else
             hh = p.bh
          end
-         local sums = torch.view( torch.tanh(hx+hh), 4, hiddenFeatures)
+         local sums = torch.view(hx+hh, 4, hiddenFeatures)
 
          -- batch compute gates:
          local sigmoids = util.sigmoid( torch.narrow(sums, 1,1,3) )
