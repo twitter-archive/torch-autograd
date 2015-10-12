@@ -29,6 +29,10 @@ Autograd is work in progress. Current list of things to be developed includes:
 - [ ] Debugging facilities (profile speed & gradient magnitude of each computation. Should just require nodeApply wrapper.)
 - [ ] Add support for sparse gradients
 - [ ] Implement auto-buffering so that native torch functions can re-use memory
+- [ ] Implement missing gradients for `torch.max`, `torch.min`, ... more generally,
+      allow operators on input data if no gradients will be computed on them (if x:max() is
+      called to be used in a subsequent function, but we don't need the gradients wrt x,
+      we should still be able to call it)
   (i.e. auto-generate code that's similar to what nn does for modules)
 * Helpers for building nnfunc modules (tedious to write out convolution parameters)
   - [x] Basic helper logic for NN, CNN
