@@ -10,8 +10,8 @@ function loss.logistic(out, target)
 end
 
 function loss.leastSquares(out, target)
-   local prod = torch.cmul(out, target)
-   local sq = torch.cmul(prod, prod)
+   local diffs = out - target
+   local sq = torch.cmul(diffs, diffs)
    return torch.sum(sq)
 end
 
