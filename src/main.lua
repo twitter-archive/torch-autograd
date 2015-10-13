@@ -371,6 +371,28 @@ gradfuns[torch.log] = {
    "log",
    function(g,x) return elemwiseDiv(g,x) end
 }
+gradfuns[torch.min] = {
+   "min",
+   function(g,x,axis)
+      repeater = repeatToMatchShape(x,axis)
+      -- ATTN: THIS IS PROBABLY NOT SMART.
+      repeater = repeatToMatchShape(x,axis)
+      local out = repeater(g)
+      local mask = torch.ne(x,torch.min(x))
+      out[mask] = 0
+      return out
+   end
+}
+gradfuns[torch.max] = {
+   "max",
+   function(g,x,axis)
+      repeater = repeatToMatchShape(x,axis)
+      local out = repeater(g)
+      local mask = torch.ne(x,torch.max(x))
+      out[mask] = 0
+      return out
+   end
+}
 
 
 local override = {
@@ -381,7 +403,7 @@ local override = {
    "exp", 'tanh',
    "sin", "cos", "tan", "sqrt",
    "abs", "sum", "log", "viewAs", "view", "expand", "expandAs",
-   "select", "narrow"
+   "select", "narrow", "min", "max"
 }
 
 -- First, override all the Torch functions

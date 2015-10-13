@@ -162,6 +162,52 @@ local tests = {
       tester:asserteq(grads.x:dim(), 1, 'incorrect dims for gradients')
       tester:asserteq(grads.x:size(1),100, 'incorrect dims for gradients')
    end,
+   MinMax = function()
+      local fns = {torch.min,torch.max}
+      local preds = {{1,5},{2,10}}
+      
+      for i=1,2 do
+
+         local W = torch.ones(5,5):fill(2)
+         W[1] = 1
+         local fn = fns[i]
+
+         local func1 = function(inputs)
+            return fn(inputs.W)
+         end
+         local func2 = function(inputs)
+            local minVal,indices = fn(inputs.W, 1)
+            return torch.sum(minVal)
+         end
+
+         -- Grads:
+         local dFunc1 = autograd(func1)
+         local dFunc2 = autograd(func2)
+
+         -- Compute func and grads:
+         local grads, pred = dFunc1({W=W})
+
+         -- Tests:
+         tester:asserteq(type(pred), 'number', 'incorrect prediction')
+         tester:asserteq(pred, preds[i][1], 'incorrect prediction')
+         tester:asserteq(grads.W:dim(), 2, 'incorrect dims for gradients')
+         tester:asserteq(grads.W:size(1), 5, 'incorrect dims for gradients')
+         tester:asserteq(grads.W:size(2), 5, 'incorrect dims for gradients')
+         tester:assert(gradcheck(func1, {W=torch.ones(5,5):fill(2)}, 'W'), 'incorrect gradients on W')
+
+         -- Compute func and grads:
+         local grads, pred = dFunc2({W=W})
+
+         -- Tests:
+         tester:asserteq(type(pred), 'number', 'incorrect prediction')
+         tester:asserteq(pred, preds[i][2], 'incorrect prediction')
+         tester:asserteq(grads.W:dim(), 2, 'incorrect dims for gradients')
+         tester:asserteq(grads.W:size(1), 5, 'incorrect dims for gradients')
+         tester:asserteq(grads.W:size(2), 5, 'incorrect dims for gradients')
+         tester:assert(gradcheck(func1, {W=torch.ones(5,5):fill(2)}, 'W'), 'incorrect gradients on W')
+      end
+
+   end,
 
    GradCheck_Scale = function()
       -- Parameters:
