@@ -19,6 +19,22 @@ Autograd has multiple goals:
   with multiple loss functions and/or inputs
 * enable gradients of gradients for transparent computation of Hessians, ...
 
+Performance
+-----------
+
+Long-term, `autograd`'s goal is to become the most flexible way to describe
+arbitrary differentiable functions, with no compromise on performance. There
+are currently two main limitations to performance:
+
+* no support for sparse tensors: for excessively sparse tensor updates (e.g.
+  selecting a row in a tensor, and updating it), the gradient computation
+  will be naive and dense. The best way to address this would be to add
+  support for sparse tensors in Torch.
+* memory re-use: currently `autograd` doesn't do any memory caching, so each
+  gradient estimation can potentially allocate lots of intermediate tensors.
+  The best way to address this is to create a tensor pool, and have the tape
+  re-use tensors from this pool as needed. This is one of the main TODOs below.
+
 TODO
 ----
 
