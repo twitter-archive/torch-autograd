@@ -2,7 +2,7 @@
 local model = {}
 
 -- nn modules:
-local nn = require 'autograd.nnfuncwrapper'
+local nn = require('autograd.nnfuncwrapper')('nn')
 
 -- util
 local util = require 'autograd.util'

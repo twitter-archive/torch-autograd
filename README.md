@@ -199,6 +199,17 @@ dparams, loss = dneuralNet(params, x, y)
 This code is stricly equivalent to the code above, but will be more efficient
 (this is espacally true for more complex primitives like convolutions, ...).
 
+3rd party libraries that provide a similar API to nn can be
+registered like this:
+
+```lua
+local customnnfuncs = grad.functionalize('customnn')  -- requires 'customnn' and wraps it
+module = customnnfuncs.MyNnxModule(...)
+
+-- under the hood, this is already done for nn:
+grad.nn = grad.functionalize('nn')
+```
+
 ### Gradient checks
 
 For ease of mind (and to write proper tests), a simple grad checker
