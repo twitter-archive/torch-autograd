@@ -117,6 +117,11 @@ dparams, loss = dneuralNet(params, x, y)
 --  loss wrt to that Tensor.
 ```
 
+Important note: only variables packed in the first argument of the
+eval function will have their gradients computed. In the example above,
+if the gradients wrt x are needed, then x simply has to be moved into
+params. The params table can be arbitrarily nested.
+
 See more complete examples in [examples](examples/).
 
 Assuming the model defined above, and a training set of `{x,y}` pairs,
