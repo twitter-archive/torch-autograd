@@ -18,9 +18,25 @@ function util.oneHot(labels, n)
 end
 
 -- Helpers:
-function util.logMultinomialLoss(out, target) return -torch.sum(torch.cmul(out,target)) end
-function util.logSumExp(array) return torch.log(torch.sum(torch.exp(array))) end
-function util.logSoftMax(array) return array - util.logSumExp(array) end
-function util.sigmoid(array,p) p = p or 0 return torch.pow(torch.exp(-array) + 1, -1) * (1-p*2) + p end
+function util.logMultinomialLoss(out, target)
+   return -torch.sum(torch.cmul(out,target))
+end
+
+function util.logSumExp(array)
+   local max = 0
+   if torch.typename(array) then -- TODO: fix autograd (missing support for max)
+      max = array:max()
+   end
+   return torch.log(torch.sum(torch.exp(array-max))) + max
+end
+
+function util.logSoftMax(array)
+   return array - util.logSumExp(array)
+end
+
+function util.sigmoid(array,p)
+   p = p or 0
+   return torch.pow(torch.exp(-array) + 1, -1) * (1-p*2) + p
+end
 
 return util

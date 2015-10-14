@@ -606,7 +606,7 @@ local tests = {
       -- Loss:
       local loss = function(params, input, target)
          local pred = f(params, input)
-         local loss = autograd.loss.logistic(pred,target)
+         local loss = autograd.loss.crossEntropy(pred,target)
          return loss,pred
       end
 
