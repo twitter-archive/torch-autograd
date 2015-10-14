@@ -94,6 +94,35 @@ local tests = {
       end
    end,
 
+   Cat = function()
+      local x1 = torch.Tensor(3,5):normal()
+      local x2 = torch.Tensor(7,5):normal()
+
+      -- Function:
+      local fn = function(inputs)
+         return torch.sum(torch.cat(inputs.x1, inputs.x2, 1))
+      end
+
+      -- Check grads:
+      for iparam,param in pairs({"x1", "x2"}) do
+         tester:assert(gradcheck(fn, {x1=x1, x2=x2}, param), "Incorrect gradient")
+      end
+
+      -- Transpose, and cat along the last dim
+      local x1 = x1:t():contiguous()
+      local x2 = x2:t():contiguous()
+
+      -- Function:
+      local fn = function(inputs)
+         return torch.sum(torch.cat(inputs.x1, inputs.x2))
+      end
+
+      -- Check grads:
+      for iparam,param in pairs({"x1", "x2"}) do
+         tester:assert(gradcheck(fn, {x1=x1, x2=x2}, param), "Incorrect gradient")
+      end
+   end,
+
    Dot = function()
       -- Parameters:
       local W = torch.Tensor(32,100):fill(.5)
@@ -162,12 +191,12 @@ local tests = {
       tester:asserteq(grads.x:dim(), 1, 'incorrect dims for gradients')
       tester:asserteq(grads.x:size(1),100, 'incorrect dims for gradients')
    end,
+
    MinMax = function()
       local fns = {torch.min,torch.max}
       local preds = {{1,5},{2,10}}
-      
-      for i=1,2 do
 
+      for i=1,2 do
          local W = torch.ones(5,5):fill(2)
          W[1] = 1
          local fn = fns[i]
@@ -206,7 +235,6 @@ local tests = {
          tester:asserteq(grads.W:size(2), 5, 'incorrect dims for gradients')
          tester:assert(gradcheck(func1, {W=torch.ones(5,5):fill(2)}, 'W'), 'incorrect gradients on W')
       end
-
    end,
 
    GradCheck_Scale = function()

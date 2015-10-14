@@ -270,10 +270,12 @@ end
 gradfuns[torch.cat] = {
    "cat",
    function(g,x,y,dim)
-      error("NOT IMPLEMENTED")
+      dim = dim or x:nDimension()
+      return torch.narrow(g, dim, 1, x:size(dim))
    end,
    function(g,x,y,dim)
-      error("NOT IMPLEMENTED")
+      dim = dim or x:nDimension()
+      return torch.narrow(g, dim, x:size(dim)+1, y:size(dim))
    end
 }
 gradfuns[torch.expand] = {
@@ -403,7 +405,7 @@ local override = {
    "exp", 'tanh',
    "sin", "cos", "tan", "sqrt",
    "abs", "sum", "log", "viewAs", "view", "expand", "expandAs",
-   "select", "narrow", "min", "max"
+   "select", "narrow", "min", "max", "cat",
 }
 
 -- First, override all the Torch functions
