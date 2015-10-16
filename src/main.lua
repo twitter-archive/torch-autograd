@@ -47,6 +47,36 @@ local function checkInput(arg)
    end
 end
 
+-- Helps with resizing gradients
+-- Could also be called sumToMatchShape
+local function unbroadcast(g,ans,x)
+   if torch.isTensor(x) then
+      local size = torch.totable(x:size())
+      local ndim = x:nDimension()
+      local out = g -- check that we do a copy!
+      -- NOTE: I DO NOT KNOW HOW TO DO THIS IN ONE SHOT
+      -- Get the overall dimensionality the same
+      while g:nDimension() > ndim do
+         out = torch.sum(out,1)
+      end
+      -- Now trim the gradient to match the singleton 
+      -- dimensions in the input
+      for i=1,#size do
+         if size[i] == 1 then
+            out = torch.sum(out,i)
+         end
+      end
+      out = torch.viewAs(out,x)
+      return out
+   elseif torch.isTensor(ans) then
+      return torch.sum(g)
+   else
+      return g
+   end
+      
+end
+
+
 -- Step through the computation graph and find the gradient
 local function grad(fun, argnum, returnTape)
    argnum = argnum or 1
@@ -145,12 +175,12 @@ setmetatable(gradfuns, gradMt)
 
 gradfuns[op.add] = {
    "add",
-   function(g, ans, x, y) return g end,
-   function(g, ans, x, y) return g end,
+   function(g, ans, x, y) return unbroadcast(g,ans,x) end,
+   function(g, ans, x, y) return unbroadcast(g,ans,y) end,
 }
 gradfuns[op.mul] = {
    "mult/dot",
-   function(g,ans, A, B)
+   function(g, ans, A, B)
       if torch.isTensor(A) and torch.isTensor(B) then
          if B:nDimension() == 2 then
             return g*B:t()
@@ -179,52 +209,78 @@ gradfuns[op.mul] = {
 }
 gradfuns[op.unm] = {
    "negation",
-   function(g,ans, x) return -g end
+   function(g, ans, x) return -g end
 }
 gradfuns[op.div] = {
    "div",
-   function(g,ans, x, y) return elemwiseDiv(g,y) end,
-   function(g,ans, x, y) return elemwiseMul(-g,elemwiseDiv(x,torch.pow(y,2))) end,
+   function(g, ans, x, y) return unbroadcast(elemwiseDiv(g,y),ans,x) end,
+   function(g, ans, x, y) return unbroadcast(elemwiseMul(-g,elemwiseDiv(x,torch.pow(y,2))),ans,y) end,
 }
 gradfuns[op.sub] = {
    "sub",
-   function(g,ans, x, y) return g end,
-   function(g,ans, x, y) return -g end,
+   function(g, ans, x, y) return unbroadcast(g,ans,x) end,
+   function(g, ans, x, y) return unbroadcast(-g,ans,y) end,
 }
 gradfuns[op.pow] = {
    "pow",
-   function(g,ans, x, y) return elemwiseMul(elemwiseMul(g,y),torch.pow(x, (y-1))) end,
+   function(g, ans, x, y) 
+      local newg = elemwiseMul(elemwiseMul(g,y),torch.pow(x,y-1)) 
+      return unbroadcast(newg, ans, x)
+   end,
+   function(g, ans, x, y) 
+      local newg = elemwiseMul(g,elemwiseMul(torch.log(x),torch.pow(x,y)))
+      return unbroadcast(newg, ans, y)
+   end
 }
 gradfuns[torch.add] = {
-   "torch.add",
-   function(g,ans, x, y) return g end,
-   function(g,ans, x, y) return g end,
+   "add",
+   function(g, ans, x, y) return unbroadcast(g,ans,x) end,
+   function(g, ans, x, y) return unbroadcast(g,ans,y) end,
 }
 gradfuns[torch.cmul] = {
-   "torch.cmul",
-   function(g,ans, x, y) return elemwiseMul(y,g) end,
-   function(g,ans, x, y) return elemwiseMul(x,g) end,
+   "cmul",
+   function(g, ans, x, y) return unbroadcast(elemwiseMul(y,g),ans,x) end,
+   function(g, ans, x, y) return unbroadcast(elemwiseMul(x,g),ans,y) end,
 }
 gradfuns[torch.mul] = {
-   "torch.mul",
-   function(g,ans, x, y) return elemwiseMul(y,g) end,
-   function(g,ans, x, y) return elemwiseMul(x,g) end,
+   "mul",
+   function(g, ans, x, y) return unbroadcast(elemwiseMul(y,g),ans,x) end,
+   function(g, ans, x, y) return unbroadcast(elemwiseMul(x,g),ans,y) end,
 }
+gradfuns[torch.div] = {
+   "div",
+   function(g, ans, x, y) return unbroadcast(elemwiseDiv(g,y),ans,x) end,
+   function(g, ans, x, y) return unbroadcast(elemwiseMul(-g,elemwiseDiv(x,torch.pow(y,2))),ans,y) end,
+}
+gradfuns[torch.cdiv] = {
+   "cdiv",
+   function(g, ans, x, y) return unbroadcast(elemwiseDiv(g,y),ans,x) end,
+   function(g, ans, x, y) return unbroadcast(elemwiseMul(-g,elemwiseDiv(x,torch.pow(y,2))),ans,y) end,
+}
+
 gradfuns[torch.pow] = {
-   "torch.pow",
-   function(g,ans, x, y) return elemwiseMul(elemwiseMul(g,y),torch.pow(x,y-1)) end
+   "pow",
+   function(g, ans, x, y) 
+      local newg = elemwiseMul(elemwiseMul(g,y),torch.pow(x,y-1)) 
+      return unbroadcast(newg, ans, x)
+   end,
+   function(g, ans, x, y) 
+      local newg = elemwiseMul(g,elemwiseMul(torch.log(x),torch.pow(x,y)))
+      return unbroadcast(newg, ans, y)
+   end
 }
+
 gradfuns[torch.exp] = {
    "exp",
-   function(g,ans,x) return elemwiseMul(ans, g) end,
+   function(g, ans, x) return elemwiseMul(ans, g) end,
 }
 gradfuns[torch.tanh] = {
    "tanh",
-   function(g,ans,x) return elemwiseDiv(g,torch.pow(torch.cosh(x), 2.0)) end
+   function(g, ans, x) return elemwiseDiv(g,torch.pow(torch.cosh(x), 2.0)) end
 }
 gradfuns[torch.abs] = {
    "abs",
-   function(g,ans,x)
+   function(g, ans, x)
       if torch.isTensor(x) then
          return elemwiseMul(g,torch.sign(x))
       else
@@ -242,15 +298,6 @@ local function _sum(x)
    end
 end
 
--- local function unbroadcast(x,g,withTensor)
---    if torch.isTensor(x) then
-
---    elseif withTensor then
---       return function(grad)torch.sum(g)
---    else
---       return g
---    end
--- end
 
 local function repeatToMatchShape(x,axis)
    -- Special sum function to deal with numbers or tensors
@@ -281,18 +328,18 @@ end
 
 gradfuns[torch.cat] = {
    "cat",
-   function(g,ans,x,y,dim)
+   function(g, ans, x,y,dim)
       dim = dim or x:nDimension()
       return torch.narrow(g, dim, 1, x:size(dim))
    end,
-   function(g,ans,x,y,dim)
+   function(g, ans, x,y,dim)
       dim = dim or x:nDimension()
       return torch.narrow(g, dim, x:size(dim)+1, y:size(dim))
    end
 }
 gradfuns[torch.expand] = {
    "expand",
-   function(g,ans,x,...)
+   function(g, ans, x,...)
       local xSizes = x:size():totable()
       local out = g
       for dim,size in pairs(xSizes) do
@@ -305,7 +352,7 @@ gradfuns[torch.expand] = {
 }
 gradfuns[torch.expandAs] = {
    "expandAs",
-   function(g,ans,x,template)
+   function(g, ans, x,template)
       local sizes = x:size():totable()
       local out = g
       for dim,size in pairs(sizes) do
@@ -315,31 +362,31 @@ gradfuns[torch.expandAs] = {
       end
       return out
    end,
-   function(g,ans,x,template)
+   function(g, ans, x,template)
       local o = g.new(template:size()):zero()
       return o
    end
 }
 gradfuns[torch.view] = {
    "view",
-   function(g,ans,x,sizes)
+   function(g, ans, x,sizes)
       -- TODO: copy required?
       return torch.view(g,x:size())
    end
 }
 gradfuns[torch.viewAs] = {
    "viewAs",
-   function(g,ans,x,template)
+   function(g, ans, x,template)
       -- TODO: copy required?
       return torch.viewAs(g,x)
    end,
-   function(g,ans,x,template)
+   function(g, ans, x,template)
       return g.new(template:size()):zero()
    end
 }
 gradfuns[torch.select] = {
    "select",
-   function(g,ans,x,dim,index)
+   function(g, ans, x,dim,index)
       -- TODO: sparse tensors
       -- TODO: copy necessary here?
       local out = g.new(x:size()):zero()
@@ -350,7 +397,7 @@ gradfuns[torch.select] = {
 }
 gradfuns[torch.narrow] = {
    "narrow",
-   function(g,ans,x,dim,index,size)
+   function(g, ans, x,dim,index,size)
       -- TODO: copy necessary here?
       local out = g.new(x:size()):zero()
       local slice = out:narrow(dim,index,size)
@@ -360,34 +407,56 @@ gradfuns[torch.narrow] = {
 }
 gradfuns[torch.sum] = {
    "sum",
-   function(g,ans,x,axis)
+   function(g, ans, x,axis)
       local repeater = repeatToMatchShape(x, axis)
       return repeater(g)
    end
 }
+gradfuns[torch.mean] = {
+   "mean",
+   function(g,ans,x,axis)
+      local repeater,nrepeats = repeatToMatchShape(x,axis)
+      return repeater(g)/nrepeats
+   end
+}
+
+gradfuns[torch.var] = {
+   "var",
+   function(g,ans,x,axis)
+      error("NOT IMPLEMENTED, requires complex conjugate")
+      local repeater,nrepeats = repeatToMatchShape(x,axis)
+   end
+}
+gradfuns[torch.std] = {
+   "std",
+   function(g,ans,x,axis)
+      error("NOT IMPLEMENTED, requires complex conjugate")
+      local repeater,nrepeats = repeatToMatchShape(x,axis)
+   end
+}
 gradfuns[torch.sqrt] = {
    "sqrt",
-   function(g,ans,x) return elemwiseMul(elemwiseMul(g,0.5), torch.pow(x,-0.5)) end
+   function(g, ans, x) return elemwiseMul(elemwiseMul(g,0.5), torch.pow(x,-0.5)) end
 }
 gradfuns[torch.sin] = {
    "sin",
-   function(g,ans,x) return elemwiseMul(g, torch.cos(x)) end
+   function(g, ans, x) return elemwiseMul(g, torch.cos(x)) end
 }
 gradfuns[torch.cos] = {
    "cos",
-   function(g,ans,x) return elemwiseMul(g, -torch.sin(x)) end
+   function(g, ans, x) return elemwiseMul(g, -torch.sin(x)) end
 }
 gradfuns[torch.tan] = {
    "tan",
-   function(g,ans,x) return elemwiseDiv(g, torch.pow(torch.cos(x), 2.0)) end
+   function(g, ans, x) return elemwiseDiv(g, torch.pow(torch.cos(x), 2.0)) end
 }
 gradfuns[torch.log] = {
    "log",
-   function(g,ans,x) return elemwiseDiv(g,x) end
+   function(g, ans, x) return elemwiseDiv(g,x) end
 }
 gradfuns[torch.min] = {
    "min",
-   function(g,ans,x,axis)
+   function(g, ans, x,axis)
       repeater = repeatToMatchShape(x,axis)
       -- ATTN: THIS IS PROBABLY NOT SMART.
       repeater = repeatToMatchShape(x,axis)
@@ -399,7 +468,7 @@ gradfuns[torch.min] = {
 }
 gradfuns[torch.max] = {
    "max",
-   function(g,ans,x,axis)
+   function(g, ans, x,axis)
       repeater = repeatToMatchShape(x,axis)
       local out = repeater(g)
       local mask = torch.ne(x,repeater(ans))
@@ -413,7 +482,9 @@ local override = {
    "__add", "add",
    "__mul", "mul", "cmul",
    "__unm", "__sub",
+   "__div","div","cdiv",
    "pow", "__pow",
+   "mean", "var", "std",
    "exp", 'tanh',
    "sin", "cos", "tan", "sqrt",
    "abs", "sum", "log", "viewAs", "view", "expand", "expandAs",
