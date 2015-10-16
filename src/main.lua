@@ -64,13 +64,13 @@ local function grad(fun, argnum, returnTape)
       local allAns = {fun(unpack(arg))}
       local ans = allAns[1]
       if not isNode(ans) then
-         return 0.0
+         error("A node type was not returned. This is either because a gradient was not defined, or the input is independent of the output")
       end
       if type(getValue(ans)) ~= "number" then
          print("")
          print("Autograd only supports scalar outputs. This is current functions output: ")
          print(getValue(ans))
-         error("Autograd only supports scalar return values. Output is not scalar")
+         error("Autograd only supports scalar return values. Output is not scalar")         
       end
 
       local fnNames = _.map(ans.tape,function(k,t)
@@ -90,6 +90,7 @@ local function grad(fun, argnum, returnTape)
             local thisArg = node.args[iarg]
             if isNode(thisArg) then
                local gradfun = gradfuns[node.fun][iarg+1]
+               local a = getValue(node.args[iarg])
                local gradUpdate = gradfun(node.outgrad, unpack(_.map(node.args, function(k,v) return getValue(v) end)))
                thisArg.outgrad = thisArg.outgrad + gradUpdate
                if thisArg.fun then
@@ -104,6 +105,7 @@ local function grad(fun, argnum, returnTape)
       -- Now spit out the grads, along with any answers returned along the way
       local out = {}
       out[1] = getOutgrad(arg[argnum])
+
       local ansVal = getValue(allAns)
       if type(allAns) == "table" then
          for key,value in pairs(ansVal) do
@@ -239,6 +241,16 @@ local function _sum(x)
       return x
    end
 end
+
+-- local function unbroadcast(x,g,withTensor)
+--    if torch.isTensor(x) then
+
+--    elseif withTensor then
+--       return function(grad)torch.sum(g)
+--    else
+--       return g
+--    end
+-- end
 
 local function repeatToMatchShape(x,axis)
    -- Special sum function to deal with numbers or tensors

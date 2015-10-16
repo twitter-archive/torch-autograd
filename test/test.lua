@@ -195,11 +195,16 @@ local tests = {
    GradientTensorSize = function()
 
       local f = function(beta)
-        local maxed = torch.sum(beta)
-        local diff = beta - maxed
-        local summed = torch.sum(diff, 2)
-        local out = summed + maxed -- if you comment out maxed, this works
-        return torch.sum(out)
+         -- beta:  2x2
+         local maxed = torch.max(beta)
+         -- beta: 2x2, maxed: number
+         local diff = beta - maxed
+         -- diff: 2x2
+         local summed = torch.sum(diff, 2)
+         -- summed: 2x1, maxed: number
+         local out = summed + maxed -- if you comment out maxed, this works
+         -- out: 2x1
+         return torch.sum(out)
       end
 
       local beta = torch.eye(2,2)
