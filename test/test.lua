@@ -192,6 +192,23 @@ local tests = {
       tester:asserteq(grads.x:size(1),100, 'incorrect dims for gradients')
    end,
 
+   GradientTensorSize = function()
+
+      local f = function(beta)
+        local maxed = torch.sum(beta)
+        local diff = beta - maxed
+        local summed = torch.sum(diff, 2)
+        local out = summed + maxed -- if you comment out maxed, this works
+        return torch.sum(out)
+      end
+
+      local beta = torch.eye(2,2)
+      pred = f(beta)
+      g = autograd(f)
+      grad = g(beta)
+      tester:asserteq(type(pred), 'number', 'incorrect prediction')
+      tester:asserteq(grad:dim(), 2, 'incorrect dims for grad')
+   end,
    MinMax = function()
       local fns = {torch.min,torch.max}
       local preds = {{1,5},{2,10}}
