@@ -117,13 +117,7 @@ local function grad(fun, argnum, returnTape)
                for inodearg=1,#node.args do
                   thisArgs[inodearg] = getValue(node.args[inodearg])
                end
-               local gradUpdate = gradfun(node.outgrad, node.value, unpack(thisArgs))
-               thisArg.outgrad = thisArg.outgrad + gradUpdate
-               if thisArg.fun then
-                  thisArg.name = gradfuns[thisArg.fun][1]
-               else
-                  thisArg.name = "data"
-               end
+               thisArg.outgrad = thisArg.outgrad + gradfun(node.outgrad, node.value, unpack(thisArgs))
             end
          end
       end

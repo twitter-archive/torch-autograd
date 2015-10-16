@@ -91,12 +91,23 @@ nodeApply = function(fun, ...)
    local _nodeApply
    _nodeApply = function(fun, ...)
       local arg = {...}
-      local parents = _.filter(arg, function (k,v) return isNode(v) end)
-      if _.count(parents) > 0 then
-         local value = _nodeApply(fun,unpack(_.map(arg, function(k,v) return getValue(v) end)))
-         return Node:new(value, fun, arg, parents[1].tape)
+      local thisArgs = {}
+      for inodearg=1,#arg do
+         thisArgs[inodearg] = getValue(arg[inodearg])
+      end
+      local parent
+      for i=1,#arg do
+         local val = arg[i]
+         if isNode(val) then 
+            parent = val
+            break
+         end
+      end
+      if parent then
+         local value = _nodeApply(fun,unpack(thisArgs))
+         return Node:new(value, fun, arg, parent.tape)
       else
-         return fun(unpack(_.map(arg,function (k,v) return getValue(v) end)))
+         return fun(unpack(thisArgs))
       end
    end
    return _nodeApply(fun, ...)
