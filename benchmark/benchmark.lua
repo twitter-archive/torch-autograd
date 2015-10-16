@@ -4,6 +4,9 @@ local nn = require 'nn'
 local c = require 'trepl.colorize'
 local getValue = require 'autograd.node'.getValue
 
+-- fuck the GC
+collectgarbage('stop')
+
 -- Test 1: logistic regression
 local tests = {
    logistic = function()
