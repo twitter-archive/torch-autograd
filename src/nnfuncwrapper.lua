@@ -49,13 +49,13 @@ local function functionalize(pkg)
 
             autograd.gradfuns[forward] = {
                "Linear",
-               function(g,x,W,b)
+               function(g,ans,x,W,b)
                   return backward('x',g,x,W,b)
                end,
-               function(g,x,W,b)
+               function(g,ans,x,W,b)
                   return backward('W',g,x,W,b)
                end,
-               function(g,x,W,b)
+               function(g,ans,x,W,b)
                   return backward('b',g,x,W,b)
                end
             }
