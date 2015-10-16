@@ -158,6 +158,55 @@ local tests = {
 
       return tnn, tag
    end,
+
+   mlpForward = function()
+      local tnn, tag
+      local x = torch.FloatTensor(1000,100):normal()
+      local y = torch.FloatTensor(1000):random(1,10)
+      local yOneHot = d.util.oneHot(y)
+
+      do
+         local model = nn.Sequential()
+         model:add(nn.Linear(100,1000))
+         model:add(nn.Tanh())
+         model:add(nn.Linear(1000,10))
+         model:add(nn.LogSoftMax())
+         model:float()
+         local lossf = nn.ClassNLLCriterion()
+         lossf:float()
+
+         sys.tic()
+         for i = 1,x:size(1) do
+            model:zeroGradParameters()
+            local yhat = model:forward(x[i])
+            local loss = lossf:forward(yhat, y[i])
+         end
+         tnn = sys.toc()
+      end
+
+      do
+         local f = function(params, x, y)
+            local h1 = torch.tanh( params.W1 * x + params.b1 )
+            local h2 = params.W2 * h1 + params.b2
+            local loss, yhat = d.loss.crossEntropy(h2, y)
+            return loss
+         end
+         local params = {
+            W1 = torch.FloatTensor(1000, 100):normal(.01),
+            b1 = torch.FloatTensor(1000):zero(),
+            W2 = torch.FloatTensor(10, 1000):normal(.01),
+            b2 = torch.FloatTensor(10):zero(),
+         }
+
+         sys.tic()
+         for i = 1,x:size(1) do
+            local grads = f(params, x[i], yOneHot[i])
+         end
+         tag = sys.toc()
+      end
+
+      return tnn, tag
+   end,
 }
 
 for name,test in pairs(tests) do
