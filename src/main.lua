@@ -59,7 +59,7 @@ local function unbroadcast(g,ans,x)
       while g:nDimension() > ndim do
          out = torch.sum(out,1)
       end
-      -- Now trim the gradient to match the singleton 
+      -- Now trim the gradient to match the singleton
       -- dimensions in the input
       for i=1,#size do
          if size[i] == 1 then
@@ -73,7 +73,7 @@ local function unbroadcast(g,ans,x)
    else
       return g
    end
-      
+
 end
 
 
@@ -84,7 +84,6 @@ local function grad(fun, argnum, returnTape)
       local arg = tablex.deepcopy({...})
       local tape = {}
 
-      collectgarbage('stop')
       -- Check the argument, to make sure it's alright.
       checkInput(arg[argnum])
 
@@ -101,23 +100,24 @@ local function grad(fun, argnum, returnTape)
          print("")
          print("Autograd only supports scalar outputs. This is current functions output: ")
          print(getValue(ans))
-         error("Autograd only supports scalar return values. Output is not scalar")         
+         error("Autograd only supports scalar return values. Output is not scalar")
       end
 
       ans.outgrad = 1.0
 
-      local node
       for i=#ans.tape,1,-1 do
-         node = ans.tape[i]
+         local node = ans.tape[i]
          for iarg=1,#node.args do
             local thisArg = node.args[iarg]
             if isNode(thisArg) then
                local gradfun = gradfuns[node.fun][iarg+1]
-               local thisArgs = {}
-               for inodearg=1,#node.args do
-                  thisArgs[inodearg] = getValue(node.args[inodearg])
+               local gradUpdate = gradfun(node.outgrad, node.value, unpack(node.argValues))
+               thisArg.outgrad = thisArg.outgrad + gradUpdate
+               if thisArg.fun then
+                  thisArg.name = gradfuns[thisArg.fun][1]
+               else
+                  thisArg.name = "data"
                end
-               thisArg.outgrad = thisArg.outgrad + gradfun(node.outgrad, node.value, unpack(thisArgs))
             end
          end
       end
@@ -134,7 +134,6 @@ local function grad(fun, argnum, returnTape)
       else
          out[2] = ansVal
       end
-      collectgarbage('restart')
       return unpack(out)
    end
    return doGrad
@@ -214,11 +213,11 @@ gradfuns[op.sub] = {
 }
 gradfuns[op.pow] = {
    "pow",
-   function(g, ans, x, y) 
-      local newg = elemwiseMul(elemwiseMul(g,y),torch.pow(x,y-1)) 
+   function(g, ans, x, y)
+      local newg = elemwiseMul(elemwiseMul(g,y),torch.pow(x,y-1))
       return unbroadcast(newg, ans, x)
    end,
-   function(g, ans, x, y) 
+   function(g, ans, x, y)
       local newg = elemwiseMul(g,elemwiseMul(torch.log(x),torch.pow(x,y)))
       return unbroadcast(newg, ans, y)
    end
@@ -251,11 +250,11 @@ gradfuns[torch.cdiv] = {
 
 gradfuns[torch.pow] = {
    "pow",
-   function(g, ans, x, y) 
-      local newg = elemwiseMul(elemwiseMul(g,y),torch.pow(x,y-1)) 
+   function(g, ans, x, y)
+      local newg = elemwiseMul(elemwiseMul(g,y),torch.pow(x,y-1))
       return unbroadcast(newg, ans, x)
    end,
-   function(g, ans, x, y) 
+   function(g, ans, x, y)
       local newg = elemwiseMul(g,elemwiseMul(torch.log(x),torch.pow(x,y)))
       return unbroadcast(newg, ans, y)
    end

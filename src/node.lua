@@ -52,7 +52,7 @@ function Node.__unm(l)
 end
 
 
-function Node:new(value, fun, args, tape, name)
+function Node:new(value, fun, args, values, tape, name)
    local o = {}
    setmetatable(o, self)
 
@@ -62,6 +62,7 @@ function Node:new(value, fun, args, tape, name)
    o.fun = fun
    o.outgrad = 0.0
    o.args = args or {}
+   o.argValues = values or {}
    o.name = "" or name
    return o
 end
@@ -71,15 +72,11 @@ local function isNode(n)
 end
 
 local function getValue(v)
-   local _getValue
-   _getValue = function(v)
       if isNode(v) then
          return v.value
       else
          return v
       end
-   end
-   return _getValue(v)
 end
 
 -- A wrapper for a function
@@ -91,23 +88,22 @@ nodeApply = function(fun, ...)
    local _nodeApply
    _nodeApply = function(fun, ...)
       local arg = {...}
-      local thisArgs = {}
-      for inodearg=1,#arg do
-         thisArgs[inodearg] = getValue(arg[inodearg])
-      end
-      local parent
-      for i=1,#arg do
-         local val = arg[i]
-         if isNode(val) then 
-            parent = val
-            break
+      local parent = nil
+      local values = { }
+      for k = 1, #arg do
+         local v = arg[k]
+         if getmetatable(v) == Node then
+            parent = v
+            values[#values + 1] = v.value
+         else
+            values[#values + 1] = v
          end
       end
-      if parent then
-         local value = _nodeApply(fun,unpack(thisArgs))
-         return Node:new(value, fun, arg, parent.tape)
+      local value = fun(unpack(values))
+      if parent ~= nil then
+         return Node:new(value, fun, arg, values, parent.tape)
       else
-         return fun(unpack(thisArgs))
+         return value
       end
    end
    return _nodeApply(fun, ...)
@@ -141,7 +137,7 @@ end
 newStartNode = function(val, tape)
    -- If our argument is a tensor, just nodify it straight-up
    if torch.isTensor(val) then
-      return Node:new(val, nil, nil, tape)
+      return Node:new(val, nil, nil, nil, tape)
       -- If our target argument is a table, we'll need to walk its members and node-ify them.
    elseif type(val) == "table" then
       for k,v in pairs(val) do
