@@ -84,6 +84,7 @@ local function grad(fun, argnum, returnTape)
       local arg = tablex.deepcopy({...})
       local tape = {}
 
+      collectgarbage('stop')
       -- Check the argument, to make sure it's alright.
       checkInput(arg[argnum])
 
@@ -103,14 +104,6 @@ local function grad(fun, argnum, returnTape)
          error("Autograd only supports scalar return values. Output is not scalar")         
       end
 
-      local fnNames = _.map(ans.tape,function(k,t)
-         if t.fun then
-            return gradfuns[t.fun][1]
-         else
-            return nil
-         end
-      end)
-
       ans.outgrad = 1.0
 
       local node
@@ -120,8 +113,11 @@ local function grad(fun, argnum, returnTape)
             local thisArg = node.args[iarg]
             if isNode(thisArg) then
                local gradfun = gradfuns[node.fun][iarg+1]
-               local a = getValue(node.args[iarg])
-               local gradUpdate = gradfun(node.outgrad, node.value, unpack(_.map(node.args, function(k,v) return getValue(v) end)))
+               local thisArgs = {}
+               for inodearg=1,#node.args do
+                  thisArgs[inodearg] = getValue(node.args[inodearg])
+               end
+               local gradUpdate = gradfun(node.outgrad, node.value, unpack(thisArgs))
                thisArg.outgrad = thisArg.outgrad + gradUpdate
                if thisArg.fun then
                   thisArg.name = gradfuns[thisArg.fun][1]
@@ -144,6 +140,7 @@ local function grad(fun, argnum, returnTape)
       else
          out[2] = ansVal
       end
+      collectgarbage('restart')
       return unpack(out)
    end
    return doGrad
