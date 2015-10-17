@@ -12,6 +12,16 @@ local nn = require 'nn'
 local c = require 'trepl.colorize'
 local getValue = require 'autograd.node'.getValue
 
+-- tic/toc
+local tic = sys.tic
+local toc = sys.toc
+if opt.type == 'cuda' then
+   toc = function()
+      cutorch.synchronize()
+      sys.toc()
+   end
+end
+
 -- type
 local tensor = torch.FloatTensor
 local ttype = 'torch.FloatTensor'
@@ -29,7 +39,7 @@ local tests = {
    logistic = function()
       local tnn, tag
       local x = tensor(1000,100):normal()
-      local y = tensor(1000):random(1,10)
+      local y = tensor(1000):uniform(1.5,10.5):floor()
       local yOneHot = d.util.oneHot(y,10)
 
       do
@@ -40,7 +50,14 @@ local tests = {
          local lossf = nn.ClassNLLCriterion()
          lossf:type(ttype)
 
-         sys.tic()
+         -- force allocs
+         model:zeroGradParameters()
+         local yhat = model:forward(x[1])
+         local loss = lossf:forward(yhat, y[1])
+         local dloss_dyhat = lossf:backward(yhat, y[1])
+         model:backward(x[1], dloss_dyhat)
+
+         tic()
          for k = 1,10 do
             for i = 1,x:size(1) do
                model:zeroGradParameters()
@@ -50,7 +67,7 @@ local tests = {
                model:backward(x[i], dloss_dyhat)
             end
          end
-         tnn = sys.toc()
+         tnn = toc()
       end
 
       do
@@ -64,13 +81,16 @@ local tests = {
             b = tensor(10):zero(),
          }
 
-         sys.tic()
+         -- force allocs
+         local grads = d(f)(params, x[1], yOneHot[1])
+
+         tic()
          for k = 1,10 do
             for i = 1,x:size(1) do
                local grads = d(f)(params, x[i], yOneHot[i])
             end
          end
-         tag = sys.toc()
+         tag = toc()
       end
 
       return tnn, tag
@@ -79,7 +99,7 @@ local tests = {
    mlp = function()
       local tnn, tag
       local x = tensor(1000,100):normal()
-      local y = tensor(1000):random(1,10)
+      local y = tensor(1000):uniform(1.5,10.5):floor()
       local yOneHot = d.util.oneHot(y,10)
 
       do
@@ -92,7 +112,14 @@ local tests = {
          local lossf = nn.ClassNLLCriterion()
          lossf:type(ttype)
 
-         sys.tic()
+         -- force allocs
+         model:zeroGradParameters()
+         local yhat = model:forward(x[1])
+         local loss = lossf:forward(yhat, y[1])
+         local dloss_dyhat = lossf:backward(yhat, y[1])
+         model:backward(x[1], dloss_dyhat)
+
+         tic()
          for i = 1,x:size(1) do
             model:zeroGradParameters()
             local yhat = model:forward(x[i])
@@ -100,7 +127,7 @@ local tests = {
             local dloss_dyhat = lossf:backward(yhat, y[i])
             model:backward(x[i], dloss_dyhat)
          end
-         tnn = sys.toc()
+         tnn = toc()
       end
 
       do
@@ -117,11 +144,14 @@ local tests = {
             b2 = tensor(10):zero(),
          }
 
-         sys.tic()
+         -- force allocs
+         local grads = d(f)(params, x[1], yOneHot[1])
+
+         tic()
          for i = 1,x:size(1) do
             local grads = d(f)(params, x[i], yOneHot[i])
          end
-         tag = sys.toc()
+         tag = toc()
       end
 
       return tnn, tag
@@ -130,7 +160,7 @@ local tests = {
    mlpHybrid = function()
       local tnn, tag
       local x = tensor(1000,100):normal()
-      local y = tensor(1000):random(1,10)
+      local y = tensor(1000):uniform(1.5,10.5):floor()
       local yOneHot = d.util.oneHot(y,10)
 
       do
@@ -143,7 +173,14 @@ local tests = {
          local lossf = nn.ClassNLLCriterion()
          lossf:type(ttype)
 
-         sys.tic()
+         -- force allocs
+         model:zeroGradParameters()
+         local yhat = model:forward(x[1])
+         local loss = lossf:forward(yhat, y[1])
+         local dloss_dyhat = lossf:backward(yhat, y[1])
+         model:backward(x[1], dloss_dyhat)
+
+         tic()
          for i = 1,x:size(1) do
             model:zeroGradParameters()
             local yhat = model:forward(x[i])
@@ -151,7 +188,7 @@ local tests = {
             local dloss_dyhat = lossf:backward(yhat, y[i])
             model:backward(x[i], dloss_dyhat)
          end
-         tnn = sys.toc()
+         tnn = toc()
       end
 
       do
@@ -174,11 +211,14 @@ local tests = {
             b2 = tensor(10):zero(),
          }
 
-         sys.tic()
+         -- force allocs
+         local grads = d(f)(params, x[1], yOneHot[1])
+
+         tic()
          for i = 1,x:size(1) do
             local grads = d(f)(params, x[i], yOneHot[i])
          end
-         tag = sys.toc()
+         tag = toc()
       end
 
       return tnn, tag
@@ -187,7 +227,7 @@ local tests = {
    mlpForward = function()
       local tnn, tag
       local x = tensor(1000,100):normal()
-      local y = tensor(1000):random(1,10)
+      local y = tensor(1000):uniform(1.5,10.5):floor()
       local yOneHot = d.util.oneHot(y,10)
 
       do
@@ -200,7 +240,12 @@ local tests = {
          local lossf = nn.ClassNLLCriterion()
          lossf:type(ttype)
 
-         sys.tic()
+         -- force allocs
+         model:zeroGradParameters()
+         local yhat = model:forward(x[1])
+         local loss = lossf:forward(yhat, y[1])
+
+         tic()
          for k = 1,10 do
             for i = 1,x:size(1) do
                model:zeroGradParameters()
@@ -208,7 +253,7 @@ local tests = {
                local loss = lossf:forward(yhat, y[i])
             end
          end
-         tnn = sys.toc()
+         tnn = toc()
       end
 
       do
@@ -225,13 +270,16 @@ local tests = {
             b2 = tensor(10):zero(),
          }
 
-         sys.tic()
+         -- force allocs
+         local grads = f(params, x[1], yOneHot[1])
+
+         tic()
          for k = 1,10 do
             for i = 1,x:size(1) do
                local grads = f(params, x[i], yOneHot[i])
             end
          end
-         tag = sys.toc()
+         tag = toc()
       end
 
       return tnn, tag
@@ -240,7 +288,7 @@ local tests = {
    mlpBatched = function()
       local tnn, tag
       local x = tensor(32,100):normal()
-      local y = tensor(32):random(1,10)
+      local y = tensor(32):uniform(1.5,10.5):floor()
       local yOneHot = d.util.oneHot(y,10)
 
       do
@@ -259,7 +307,7 @@ local tests = {
          local dloss_dyhat = lossf:backward(yhat, y)
          model:backward(x, dloss_dyhat)
 
-         sys.tic()
+         tic()
          for i = 1,100 do
             model:zeroGradParameters()
             local yhat = model:forward(x)
@@ -267,7 +315,7 @@ local tests = {
             local dloss_dyhat = lossf:backward(yhat, y)
             model:backward(x, dloss_dyhat)
          end
-         tnn = sys.toc()
+         tnn = toc()
       end
 
       do
@@ -285,11 +333,14 @@ local tests = {
             b2 = tensor(1, 10):zero(),
          }
 
-         sys.tic()
+         -- force allocs
+         local grads = d(f)(params, x, yOneHot)
+
+         tic()
          for i = 1,100 do
             local grads = d(f)(params, x, yOneHot)
          end
-         tag = sys.toc()
+         tag = toc()
       end
 
       return tnn, tag
@@ -298,7 +349,7 @@ local tests = {
    mlpHybridBatched = function()
       local tnn, tag
       local x = tensor(32,100):normal()
-      local y = tensor(32):random(1,10)
+      local y = tensor(32):uniform(1.5,10.5):floor()
       local yOneHot = d.util.oneHot(y,10)
 
       do
@@ -311,7 +362,14 @@ local tests = {
          local lossf = nn.ClassNLLCriterion()
          lossf:type(ttype)
 
-         sys.tic()
+         -- force allocs
+         model:zeroGradParameters()
+         local yhat = model:forward(x)
+         local loss = lossf:forward(yhat, y)
+         local dloss_dyhat = lossf:backward(yhat, y)
+         model:backward(x, dloss_dyhat)
+
+         tic()
          for i = 1,100 do
             model:zeroGradParameters()
             local yhat = model:forward(x)
@@ -319,7 +377,7 @@ local tests = {
             local dloss_dyhat = lossf:backward(yhat, y)
             model:backward(x, dloss_dyhat)
          end
-         tnn = sys.toc()
+         tnn = toc()
       end
 
       do
@@ -342,11 +400,14 @@ local tests = {
             b2 = tensor(10):zero(),
          }
 
-         sys.tic()
+         -- force allocs
+         local grads = d(f)(params, x, yOneHot)
+
+         tic()
          for i = 1,100 do
             local grads = d(f)(params, x, yOneHot)
          end
-         tag = sys.toc()
+         tag = toc()
       end
 
       return tnn, tag
@@ -355,7 +416,7 @@ local tests = {
    cnnHybridBatched = function()
       local tnn, tag
       local x = tensor(32,3,64,64):normal()
-      local y = tensor(32):random(1,10)
+      local y = tensor(32):uniform(1.5,10.5):floor()
       local yOneHot = d.util.oneHot(y,10)
 
       do
@@ -373,7 +434,14 @@ local tests = {
          local lossf = nn.ClassNLLCriterion()
          lossf:type(ttype)
 
-         sys.tic()
+         -- force allocs
+         model:zeroGradParameters()
+         local yhat = model:forward(x)
+         local loss = lossf:forward(yhat, y)
+         local dloss_dyhat = lossf:backward(yhat, y)
+         model:backward(x, dloss_dyhat)
+
+         tic()
          for i = 1,10 do
             model:zeroGradParameters()
             local yhat = model:forward(x)
@@ -381,7 +449,7 @@ local tests = {
             local dloss_dyhat = lossf:backward(yhat, y)
             model:backward(x, dloss_dyhat)
          end
-         tnn = sys.toc()
+         tnn = toc()
       end
 
       do
@@ -412,11 +480,14 @@ local tests = {
             b3 = tensor(10):zero(),
          }
 
-         sys.tic()
+         -- force allocs
+         local grads = d(f)(params, x, yOneHot)
+
+         tic()
          for i = 1,10 do
             local grads = d(f)(params, x, yOneHot)
          end
-         tag = sys.toc()
+         tag = toc()
       end
 
       return tnn, tag
