@@ -13,16 +13,7 @@ local op = {
 }
 
 -- Make a node class, which will capture computation as they're used
-local noop = function() end
--- Define the node
-local Node = {
-   value=0,
-   fun=nil,
-   args={},
-   tape={},
-   outgrad=0,
-   name=""
-}
+local Node = { }
 
 -- Niceties
 function Node:__tostring()
@@ -85,52 +76,43 @@ end
 -- that we unpack the value in those nodes, apply the function
 -- to the underlying value, and then wrap the value in a node
 nodeApply = function(fun, ...)
-   local _nodeApply
-   _nodeApply = function(fun, ...)
-      local arg = {...}
-      local parent = nil
-      local values = { }
-      for k = 1, #arg do
-         local v = arg[k]
-         if getmetatable(v) == Node then
-            parent = v
-            values[#values + 1] = v.value
-         else
-            values[#values + 1] = v
-         end
-      end
-      local value = fun(unpack(values))
-      if parent ~= nil then
-         return Node:new(value, fun, arg, values, parent.tape)
+   local arg = {...}
+   local parent = nil
+   local values = { }
+   for k = 1, #arg do
+      local v = arg[k]
+      if getmetatable(v) == Node then
+         parent = v
+         values[#values + 1] = v.value
       else
-         return value
+         values[#values + 1] = v
       end
    end
-   return _nodeApply(fun, ...)
+   local value = fun(unpack(values))
+   if parent ~= nil then
+      return Node:new(value, fun, arg, values, parent.tape)
+   else
+      return value
+   end
 end
 
 -- If we passed in just a tensor, return the outgrad.
 -- If we passed in a table, return all the outgrads.
 getOutgrad = function(arg)
-   local _getOutgrad
-   _getOutgrad = function(arg)
+   local val = getValue(arg)
 
-      local val = getValue(arg)
+   -- If we have a tensor, we just have one out gradient
+   if torch.isTensor(val) then
+      return arg.outgrad
 
-      -- If we have a tensor, we just have one out gradient
-      if torch.isTensor(val) then
-         return arg.outgrad
-
-         -- If we have a table, then we can recurse the table and spit out the gradient
-      elseif type(val) == "table" and not isNode(val) then
-         local out = {}
-         for k,v in pairs(arg) do
-            out[k] = _getOutgrad(v)
-         end
-         return out
+      -- If we have a table, then we can recurse the table and spit out the gradient
+   elseif type(val) == "table" and not isNode(val) then
+      local out = {}
+      for k,v in pairs(arg) do
+         out[k] = getOutgrad(v)
       end
+      return out
    end
-   return _getOutgrad(arg)
 end
 
 -- local newStartNode

@@ -1,7 +1,6 @@
 -- Register all nnfunc grads into autograd
 local autograd = require 'autograd.main'
 local node = require 'autograd.node'
-local nnfunc = require 'nnfunc'
 
 local loaded = {}
 
@@ -13,59 +12,159 @@ local function functionalize(pkg)
       return loaded[pkg]
    end
 
-   -- get package from nnfunc:
-   nnfunc.functionalize(pkg)
+   local mod = require(pkg)
+   local map = { }
 
-   -- rebundle package:
-   local p = {}
-   for name,Class in pairs(nnfunc[pkg]) do
-      p[name] = function(...)
-         -- instantiate nnfunc module:
-         local eval = Class(...)
+   for k,v in pairs(mod) do
+      local mt = getmetatable(v)
+      if mt then
+         local mmt = getmetatable(mt)
+         if mmt then
+            map[k] = function(...)
+               -- Construct object:
+               local nnObject = v(...)
+               local lastType = ""
 
-         -- return autograd evaluator:
-         return function(x, W, b)
-            local forward, backward
-            local grads = {}
+               local function forward(x, W, b)
+                  local dataType = x:type()
+                  if lastType ~= dataType then
+                     lastType = dataType
+                     nnObject:type(dataType)
+                  end
 
-            function forward(x,W,b)
-               local res = eval({input=x, weight=W, bias=b})
-               return res.output
-            end
+                  nnObject.weight = W
+                  nnObject.bias = b
 
-            function backward(arg,g,x,W,b)
-               if not grads[arg] then
-                  local res = eval({
-                     input=x,
-                     weight=W, bias=b,
-                     gradOutput = g,
-                  })
-                  grads['x'] = res.gradInput
-                  grads['W'] = res.gradWeight
-                  grads['b'] = res.gradBias
+                  return nnObject:forward(x)
                end
-               return grads[arg]
-            end
 
-            autograd.gradfuns[forward] = {
-               "Linear",
-               function(g,ans,x,W,b)
-                  return backward('x',g,x,W,b)
-               end,
-               function(g,ans,x,W,b)
-                  return backward('W',g,x,W,b)
-               end,
-               function(g,ans,x,W,b)
-                  return backward('b',g,x,W,b)
+               local function backward(g, x, W, b)
+                  nnObject.weight = W
+                  nnObject.bias = b
+
+                  if nnObject.gradWeight then
+                     nnObject.gradWeight:zero()
+                  end
+                  if nnObject.gradBias then
+                     nnObject.gradBias:zero()
+                  end
+
+                  local gradInput = nnObject:backward(x, g)
+
+                  return {
+                     gradInput,
+                     nnObject.gradWeight,
+                     nnObject.gradBias,
+                  }
                end
-            }
 
-            return node.nodeApply(forward, x, W, b)
+               return function(x, W, b)
+                  local grads = nil
+                  local n = node.nodeApply(forward, x, W, b)
+                  if node.isNode(n) then
+                     n.gradfun = {
+                        "Linear",
+                        function(g,ans,x,W,b)
+                           if grads == nil then
+                              grads = backward(g, x, W, b)
+                           end
+                           return grads[1]
+                        end,
+                        function(g,ans,x,W,b)
+                           if grads == nil then
+                              grads = backward(g, x, W, b)
+                           end
+                           return grads[2]
+                        end,
+                        function(g,ans,x,W,b)
+                           if grads == nil then
+                              grads = backward(g, x, W, b)
+                           end
+                           return grads[3]
+                        end
+                     }
+                  end
+                  return n
+               end
+            end
          end
       end
    end
-   loaded[pkg] = p
-   return p
+
+   loaded[pkg] = map
+   return map
 end
+
+--[[
+-- What? This file provides a functionalize utility that
+-- turns every nn Module into a simple function.
+
+-- Package
+local nnfunc = {}
+
+-- Grads lookup
+nnfunc.gradsOf = {}
+local gradsOf = nnfunc.gradsOf
+
+-- Functionalize any nn-like package:
+function nnfunc.functionalize(mod)
+   -- mod is the package name:
+   assert(type(mod) == 'string', 'mod should be a string (e.g. nn, ...')
+
+   -- populate hash of methods:
+   nnfunc[mod] = {}
+   local map = nnfunc[mod]
+
+   -- lookup every module in source package:
+   mod = require(mod)
+   for k,v in pairs(mod) do
+      local mt = getmetatable(v)
+      if mt then
+         local mmt = getmetatable(mt)
+         if mmt then
+            map[k] = function(...)
+               -- Construct object:
+               local o = v(...)
+               local lastType = ""
+
+               -- Gradients:
+               local g = function(data)
+
+
+               end
+
+               -- Fprop:
+               local f = function(data)
+                  if data.gradOutput then
+                     -- compute gradients
+                     return g(data)
+                  else
+
+                  end
+               end
+
+               -- Register:
+               gradsOf[f] = g
+
+               -- Return both:
+               return f,g
+            end
+         end
+      end
+   end
+end
+
+-- Functinoalize nn by default:
+nnfunc.functionalize 'nn'
+
+-- Tests
+nnfunc.test = function()
+   require('./test')
+end
+
+-- Return package:
+return nnfunc
+
+--]]
 
 return functionalize

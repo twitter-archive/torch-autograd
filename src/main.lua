@@ -73,9 +73,7 @@ local function unbroadcast(g,ans,x)
    else
       return g
    end
-
 end
-
 
 -- Step through the computation graph and find the gradient
 local function grad(fun, argnum, returnTape)
@@ -110,13 +108,12 @@ local function grad(fun, argnum, returnTape)
          for iarg=1,#node.args do
             local thisArg = node.args[iarg]
             if isNode(thisArg) then
-               local gradfun = gradfuns[node.fun][iarg+1]
+               local gradfun = (node.gradfun or gradfuns[node.fun])[iarg+1]
                local gradUpdate = gradfun(node.outgrad, node.value, unpack(node.argValues))
-               thisArg.outgrad = thisArg.outgrad + gradUpdate
-               if thisArg.fun then
-                  thisArg.name = gradfuns[thisArg.fun][1]
+               if thisArg.outgrad == 0 then
+                  thisArg.outgrad = gradUpdate
                else
-                  thisArg.name = "data"
+                  thisArg.outgrad = thisArg.outgrad + gradUpdate
                end
             end
          end
