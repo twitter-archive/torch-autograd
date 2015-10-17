@@ -111,7 +111,11 @@ local function grad(fun, argnum, returnTape)
                local gradfun = (node.gradfun or gradfuns[node.fun])[iarg+1]
                local gradUpdate = gradfun(node.outgrad, node.value, unpack(node.argValues))
                if thisArg.outgrad == 0 then
-                  thisArg.outgrad = gradUpdate
+                  if type(gradUpdate) ~= 'number' then
+                     thisArg.outgrad = gradUpdate:contiguous()
+                  else
+                     thisArg.outgrad = gradUpdate
+                  end
                else
                   thisArg.outgrad = thisArg.outgrad + gradUpdate
                end
