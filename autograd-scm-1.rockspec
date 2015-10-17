@@ -18,7 +18,6 @@ dependencies = {
    "trepl",
    "moses",
    "penlight",
-   "nnfunc",
    "totem",
 }
 
@@ -34,6 +33,6 @@ build = {
       ['autograd.loss'] = 'src/loss.lua',
       ['autograd.test'] = 'test/test.lua',
       ['autograd.gradcheck'] = 'src/gradcheck.lua',
-      ['autograd.nnfuncwrapper'] = 'src/nnfuncwrapper.lua',
+      ['autograd.nnwrapper'] = 'src/nnwrapper.lua',
    },
 }

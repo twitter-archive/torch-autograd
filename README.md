@@ -50,7 +50,7 @@ Autograd is work in progress. Current list of things to be developed includes:
       called to be used in a subsequent function, but we don't need the gradients wrt x,
       we should still be able to call it)
   (i.e. auto-generate code that's similar to what nn does for modules)
-* Helpers for building nnfunc modules (tedious to write out convolution parameters)
+* Helpers for building nn modules (tedious to write out convolution parameters)
   - [x] Basic helper logic for NN, CNN
   - [ ] Improve cascading, and parameter grouping when cascading functions
 * Add more useful examples of models

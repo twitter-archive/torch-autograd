@@ -6,8 +6,8 @@ autograd.VERSION = '0.1'
 autograd.LICENSE = 'MIT'
 
 -- Sub packages:
-autograd.functionalize = require 'autograd.nnfuncwrapper'
-autograd.nn = require('autograd.nnfuncwrapper')('nn')
+autograd.functionalize = require 'autograd.nnwrapper'
+autograd.nn = require('autograd.nnwrapper')('nn')
 autograd.model = require 'autograd.model'
 autograd.loss = require 'autograd.loss'
 autograd.util = require 'autograd.util'
