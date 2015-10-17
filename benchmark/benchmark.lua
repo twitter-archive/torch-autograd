@@ -18,7 +18,7 @@ local toc = sys.toc
 if opt.type == 'cuda' then
    toc = function()
       cutorch.synchronize()
-      sys.toc()
+      return sys.toc()
    end
 end
 
