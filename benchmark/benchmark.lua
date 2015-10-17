@@ -1,24 +1,44 @@
+-- Options
+local opt = lapp [[
+Run benchmarks.
+
+Options:
+   --type    (default float)    can be: double | float | cuda
+]]
+
 -- benchmark of common models
 local d = require 'autograd'
 local nn = require 'nn'
 local c = require 'trepl.colorize'
 local getValue = require 'autograd.node'.getValue
 
+-- type
+local tensor = torch.FloatTensor
+local ttype = 'torch.FloatTensor'
+if opt.type == 'cuda' then
+   require 'cunn'
+   tensor = torch.CudaTensor
+   ttype = 'torch.CudaTensor'
+elseif opt.type == 'double' then
+   tensor = torch.DoubleTensor
+   ttype = 'torch.DoubleTensor'
+end
+
 -- Test 1: logistic regression
 local tests = {
    logistic = function()
       local tnn, tag
-      local x = torch.FloatTensor(1000,100):normal()
-      local y = torch.FloatTensor(1000):random(1,10)
+      local x = tensor(1000,100):normal()
+      local y = tensor(1000):random(1,10)
       local yOneHot = d.util.oneHot(y,10)
 
       do
          local model = nn.Sequential()
          model:add(nn.Linear(100,10))
          model:add(nn.LogSoftMax())
-         model:float()
+         model:type(ttype)
          local lossf = nn.ClassNLLCriterion()
-         lossf:float()
+         lossf:type(ttype)
 
          sys.tic()
          for k = 1,10 do
@@ -40,8 +60,8 @@ local tests = {
             return loss
          end
          local params = {
-            W = torch.FloatTensor(10, 100):normal(.01),
-            b = torch.FloatTensor(10):zero(),
+            W = tensor(10, 100):normal(.01),
+            b = tensor(10):zero(),
          }
 
          sys.tic()
@@ -58,8 +78,8 @@ local tests = {
 
    mlp = function()
       local tnn, tag
-      local x = torch.FloatTensor(1000,100):normal()
-      local y = torch.FloatTensor(1000):random(1,10)
+      local x = tensor(1000,100):normal()
+      local y = tensor(1000):random(1,10)
       local yOneHot = d.util.oneHot(y,10)
 
       do
@@ -68,9 +88,9 @@ local tests = {
          model:add(nn.Tanh())
          model:add(nn.Linear(1000,10))
          model:add(nn.LogSoftMax())
-         model:float()
+         model:type(ttype)
          local lossf = nn.ClassNLLCriterion()
-         lossf:float()
+         lossf:type(ttype)
 
          sys.tic()
          for i = 1,x:size(1) do
@@ -91,10 +111,10 @@ local tests = {
             return loss
          end
          local params = {
-            W1 = torch.FloatTensor(1000, 100):normal(.01),
-            b1 = torch.FloatTensor(1000):zero(),
-            W2 = torch.FloatTensor(10, 1000):normal(.01),
-            b2 = torch.FloatTensor(10):zero(),
+            W1 = tensor(1000, 100):normal(.01),
+            b1 = tensor(1000):zero(),
+            W2 = tensor(10, 1000):normal(.01),
+            b2 = tensor(10):zero(),
          }
 
          sys.tic()
@@ -109,8 +129,8 @@ local tests = {
 
    mlpHybrid = function()
       local tnn, tag
-      local x = torch.FloatTensor(1000,100):normal()
-      local y = torch.FloatTensor(1000):random(1,10)
+      local x = tensor(1000,100):normal()
+      local y = tensor(1000):random(1,10)
       local yOneHot = d.util.oneHot(y,10)
 
       do
@@ -119,9 +139,9 @@ local tests = {
          model:add(nn.Tanh())
          model:add(nn.Linear(1000,10))
          model:add(nn.LogSoftMax())
-         model:float()
+         model:type(ttype)
          local lossf = nn.ClassNLLCriterion()
-         lossf:float()
+         lossf:type(ttype)
 
          sys.tic()
          for i = 1,x:size(1) do
@@ -148,10 +168,10 @@ local tests = {
             return loss
          end
          local params = {
-            W1 = torch.FloatTensor(1000, 100):normal(.01),
-            b1 = torch.FloatTensor(1000):zero(),
-            W2 = torch.FloatTensor(10, 1000):normal(.01),
-            b2 = torch.FloatTensor(10):zero(),
+            W1 = tensor(1000, 100):normal(.01),
+            b1 = tensor(1000):zero(),
+            W2 = tensor(10, 1000):normal(.01),
+            b2 = tensor(10):zero(),
          }
 
          sys.tic()
@@ -166,8 +186,8 @@ local tests = {
 
    mlpForward = function()
       local tnn, tag
-      local x = torch.FloatTensor(1000,100):normal()
-      local y = torch.FloatTensor(1000):random(1,10)
+      local x = tensor(1000,100):normal()
+      local y = tensor(1000):random(1,10)
       local yOneHot = d.util.oneHot(y,10)
 
       do
@@ -176,9 +196,9 @@ local tests = {
          model:add(nn.Tanh())
          model:add(nn.Linear(1000,10))
          model:add(nn.LogSoftMax())
-         model:float()
+         model:type(ttype)
          local lossf = nn.ClassNLLCriterion()
-         lossf:float()
+         lossf:type(ttype)
 
          sys.tic()
          for k = 1,10 do
@@ -199,10 +219,10 @@ local tests = {
             return loss
          end
          local params = {
-            W1 = torch.FloatTensor(1000, 100):normal(.01),
-            b1 = torch.FloatTensor(1000):zero(),
-            W2 = torch.FloatTensor(10, 1000):normal(.01),
-            b2 = torch.FloatTensor(10):zero(),
+            W1 = tensor(1000, 100):normal(.01),
+            b1 = tensor(1000):zero(),
+            W2 = tensor(10, 1000):normal(.01),
+            b2 = tensor(10):zero(),
          }
 
          sys.tic()
@@ -219,8 +239,8 @@ local tests = {
 
    mlpBatched = function()
       local tnn, tag
-      local x = torch.FloatTensor(32,100):normal()
-      local y = torch.FloatTensor(32):random(1,10)
+      local x = tensor(32,100):normal()
+      local y = tensor(32):random(1,10)
       local yOneHot = d.util.oneHot(y,10)
 
       do
@@ -229,9 +249,9 @@ local tests = {
          model:add(nn.Tanh())
          model:add(nn.Linear(1000,10))
          model:add(nn.LogSoftMax())
-         model:float()
+         model:type(ttype)
          local lossf = nn.ClassNLLCriterion()
-         lossf:float()
+         lossf:type(ttype)
 
          -- force allocs
          local yhat = model:forward(x)
@@ -259,10 +279,10 @@ local tests = {
             return loss
          end
          local params = {
-            W1 = torch.FloatTensor(1000, 100):normal(.01):t(),
-            b1 = torch.FloatTensor(1, 1000):zero(),
-            W2 = torch.FloatTensor(10, 1000):normal(.01):t(),
-            b2 = torch.FloatTensor(1, 10):zero(),
+            W1 = tensor(1000, 100):normal(.01):t(),
+            b1 = tensor(1, 1000):zero(),
+            W2 = tensor(10, 1000):normal(.01):t(),
+            b2 = tensor(1, 10):zero(),
          }
 
          sys.tic()
@@ -277,8 +297,8 @@ local tests = {
 
    mlpHybridBatched = function()
       local tnn, tag
-      local x = torch.FloatTensor(32,100):normal()
-      local y = torch.FloatTensor(32):random(1,10)
+      local x = tensor(32,100):normal()
+      local y = tensor(32):random(1,10)
       local yOneHot = d.util.oneHot(y,10)
 
       do
@@ -287,9 +307,9 @@ local tests = {
          model:add(nn.Tanh())
          model:add(nn.Linear(1000,10))
          model:add(nn.LogSoftMax())
-         model:float()
+         model:type(ttype)
          local lossf = nn.ClassNLLCriterion()
-         lossf:float()
+         lossf:type(ttype)
 
          sys.tic()
          for i = 1,100 do
@@ -316,10 +336,10 @@ local tests = {
             return loss
          end
          local params = {
-            W1 = torch.FloatTensor(1000, 100):normal(.01),
-            b1 = torch.FloatTensor(1000):zero(),
-            W2 = torch.FloatTensor(10, 1000):normal(.01),
-            b2 = torch.FloatTensor(10):zero(),
+            W1 = tensor(1000, 100):normal(.01),
+            b1 = tensor(1000):zero(),
+            W2 = tensor(10, 1000):normal(.01),
+            b2 = tensor(10):zero(),
          }
 
          sys.tic()
@@ -334,8 +354,8 @@ local tests = {
 
    cnnHybridBatched = function()
       local tnn, tag
-      local x = torch.FloatTensor(32,3,64,64):normal()
-      local y = torch.FloatTensor(32):random(1,10)
+      local x = tensor(32,3,64,64):normal()
+      local y = tensor(32):random(1,10)
       local yOneHot = d.util.oneHot(y,10)
 
       do
@@ -349,9 +369,9 @@ local tests = {
          model:add(nn.Reshape(13*13*32))
          model:add(nn.Linear(13*13*32,10))
          model:add(nn.LogSoftMax())
-         model:float()
+         model:type(ttype)
          local lossf = nn.ClassNLLCriterion()
-         lossf:float()
+         lossf:type(ttype)
 
          sys.tic()
          for i = 1,10 do
@@ -384,12 +404,12 @@ local tests = {
             return loss
          end
          local params = {
-            W1 = torch.FloatTensor(16, 3*5*5):normal(.01),
-            b1 = torch.FloatTensor(16):zero(),
-            W2 = torch.FloatTensor(32, 16*5*5):normal(.01),
-            b2 = torch.FloatTensor(32):zero(),
-            W3 = torch.FloatTensor(10, 32*13*13):normal(.01),
-            b3 = torch.FloatTensor(10):zero(),
+            W1 = tensor(16, 3*5*5):normal(.01),
+            b1 = tensor(16):zero(),
+            W2 = tensor(32, 16*5*5):normal(.01),
+            b2 = tensor(32):zero(),
+            W3 = tensor(10, 32*13*13):normal(.01),
+            b3 = tensor(10):zero(),
          }
 
          sys.tic()

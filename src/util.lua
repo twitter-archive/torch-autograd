@@ -10,7 +10,7 @@ function util.oneHot(labels, n)
    ]]
    local n = n or labels:max()
    local nLabels = labels:size(1)
-   local out = torch.FloatTensor(nLabels, n):fill(0)
+   local out = labels.new(nLabels, n):fill(0)
    for i=1,nLabels do
       out[i][labels[i]] = 1.0
    end
