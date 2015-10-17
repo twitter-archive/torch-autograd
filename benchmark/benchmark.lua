@@ -16,6 +16,10 @@ local getValue = require 'autograd.node'.getValue
 local tic = sys.tic
 local toc = sys.toc
 if opt.type == 'cuda' then
+   tic = function()
+      cutorch.synchronize()
+      sys.tic()
+   end
    toc = function()
       cutorch.synchronize()
       return sys.toc()
