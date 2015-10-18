@@ -42,10 +42,10 @@ Autograd is work in progress. Current list of things to be developed includes:
 
 - [ ] Gradients of gradients (Hessian)
 - [ ] Helpers for building weights
-- [ ] Debugging facilities (profile speed & gradient magnitude of each computation. Should just require nodeApply wrapper.)
+- [x] Debugging facilities (basic debugging in place, nothing amazing) (profile speed & gradient magnitude of each computation. Should just require nodeApply wrapper.)
 - [ ] Add support for sparse gradients
 - [ ] Implement auto-buffering so that native torch functions can re-use memory
-- [ ] Implement missing gradients for `torch.max`, `torch.min`, ... more generally,
+- [x] Implement missing gradients for `torch.max`, `torch.min`, ... more generally,
       allow operators on input data if no gradients will be computed on them (if x:max() is
       called to be used in a subsequent function, but we don't need the gradients wrt x,
       we should still be able to call it)
@@ -57,8 +57,8 @@ Autograd is work in progress. Current list of things to be developed includes:
   - [x] MNIST logistic regression
   - [x] MNIST MLP
   - [x] MNIST CNN
-  - [ ] RNN (Penn?)
-  - [ ] LSTM
+  - [x] RNN (Penn?)
+  - [x] LSTM
 - [x] Missing gradients for functions like `torch.sum(data,index)` if index is provided;
       these are critical to implement mini-batch support! (for now batches cannot be used)
 - [x] make the process of returning different intermediate outputs easier: right
