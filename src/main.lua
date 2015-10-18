@@ -18,8 +18,21 @@ require 'pl'
 require 'trepl'
 
 
+-- For debugging
+local function printSize(a)
+   if type(a) == "number" then
+      print("1x1")
+   elseif torch.isTensor(a) then
+      print(torch.totable(a:size()))
+   else
+      print("???")
+   end
+end
+
+
 -- Some local declarations ahead of time
 local gradfuns = {}
+local debugFns = {}
 
 -- Define the tensor types for which we'll allow automatic differentiation
 local tensorTypes = {
@@ -53,21 +66,33 @@ local function unbroadcast(g,ans,x)
    if torch.isTensor(x) then
       local size = torch.totable(x:size())
       local ndim = x:nDimension()
-      local out = g -- check that we do a copy!
-      -- NOTE: I DO NOT KNOW HOW TO DO THIS IN ONE SHOT
-      -- Get the overall dimensionality the same
-      while g:nDimension() > ndim do
-         out = torch.sum(out,1)
+      local grad = g
+
+      if grad:nElement() == x:nElement() then
+         return torch.viewAs(grad,x)
       end
-      -- Now trim the gradient to match the singleton
-      -- dimensions in the input
-      for i=1,#size do
-         if size[i] == 1 then
-            out = torch.sum(out,i)
+
+      while grad:nDimension() > ndim do
+         grad = torch.view(torch.sum(grad,1), thisSize)
+      end
+
+      -- If we're now the same size, then awesome
+      if grad:nElement() == x:nElement() then
+         return torch.viewAs(grad,x)
+
+      -- Otherwise, we might have to sum across
+      -- dimensions that are singleton for x,
+      -- but not yet for the gradient
+      else
+         for i=1,#size do
+            thisSize = torch.totable(grad:size())
+            if size[i] == 1 then
+               thisSize[i] = 1
+               grad = torch.view(torch.sum(grad,i),unpack(thisSize))
+            end
          end
+         return grad
       end
-      out = torch.viewAs(out,x)
-      return out
    elseif torch.isTensor(ans) then
       return torch.sum(g)
    else
@@ -107,6 +132,9 @@ local function grad(fun, argnum, returnTape)
 
       for i=#ans.tape,1,-1 do
          local node = ans.tape[i]
+         if debugFns.preGradFn then
+            debugFns.preGradFn(node)
+         end
          for iarg=1,#node.args do
             local thisArg = node.args[iarg]
             if isNode(thisArg) then
@@ -120,6 +148,10 @@ local function grad(fun, argnum, returnTape)
                end
             end
          end
+         if debugFns.postGradFn then
+            debugFns.postGradFn(node)
+         end
+
       end
 
       -- Now spit out the grads, along with any answers returned along the way
@@ -374,11 +406,11 @@ gradfuns[torch.viewAs] = {
       return g.new(template:size()):zero()
    end
 }
+
+
 gradfuns[torch.select] = {
    "select",
    function(g, ans, x,dim,index)
-      -- TODO: sparse tensors
-      -- TODO: copy necessary here?
       local out = g.new(x:size()):zero()
       local slice = out:select(dim,index)
       slice:copy(g)
@@ -527,6 +559,7 @@ end
 local autograd = {
    grad = grad,
    gradfuns = gradfuns,
+   debugFns = debugFns,
 }
 
 -- Shortcut:

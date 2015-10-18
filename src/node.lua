@@ -60,7 +60,13 @@ function Node:new(value, fun, args, values, tape, name)
    o.tape[#o.tape+1] = o
    o.value = value
    o.fun = fun
-   o.outgrad = 0.0
+   if torch.isTensor(value) then
+      o.outgrad = value.new(value:size()):zero()
+   elseif type(value) == "number" then
+      o.outgrad = 0.0
+   else
+      error("Invalid value. Only numbers and tensors supported")
+   end
    o.args = args or {}
    o.argValues = values or {}
    o.name = "" or name
