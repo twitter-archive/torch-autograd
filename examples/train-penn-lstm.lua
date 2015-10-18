@@ -16,7 +16,7 @@ print('loaded data: ', {
 -- Define LSTM layers:
 local lstm1,params1 = grad.model.RecurrentLSTMNetwork({
    inputFeatures = 100,
-   hiddenFeatures = 10,
+   hiddenFeatures = 100,
    outputType = 'last',
 })
 
@@ -34,6 +34,14 @@ local f = function(inputs, y)
    local yhat = grad.util.logSoftMax(pred)
    local loss = - torch.sum( torch.narrow(yhat, 1, y, 1) )
    return loss,yhat
+end
+
+-- Cast all to float:
+for k,param in pairs(params1[1]) do
+   params1[1][k] = param:float()
+end
+for k,param in pairs(params2[1]) do
+   params2[1][k] = param:float()
 end
 
 -- Reset params:
@@ -56,6 +64,8 @@ local words = torch.FloatTensor(nTokens, wordVecSize):normal(0,0.01)
 
 -- Train it
 local lr = 1
+local aloss = 0
+local reportEvery = 100
 for epoch = 1,10 do
    print('Training Epoch #'..epoch)
    for i = 1,trainData:size(1)-maxLength-1,maxLength do
@@ -81,6 +91,14 @@ for epoch = 1,10 do
       -- Update vectors:
       for i = 1,x:size(1) do
          words[i]:add(-lr, grads.x[i])
+      end
+
+      -- Loss:
+      aloss = aloss + loss
+      if ((i-1)/maxLength+1) % reportEvery == 0 then
+         aloss = aloss / reportEvery
+         print('average loss = ' .. aloss)
+         aloss = 0
       end
    end
 end
