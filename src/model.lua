@@ -332,7 +332,7 @@ function model.RecurrentLSTMNetwork(opt, params)
       end
 
       -- save state
-      local newState = {h=hs[#hs]:clone(), c=cs[#cs]:clone()}
+      local newState = {h=hs[#hs], c=cs[#cs]}
 
       -- output:
       if outputType == 'last' then

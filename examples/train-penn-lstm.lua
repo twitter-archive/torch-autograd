@@ -86,6 +86,7 @@ for epoch = 1,10 do
       local grads,loss,newLstmState = df(vars, y, lstmState)
 
       -- Preserve state for next iteration
+      -- TODO: fix this bug, autograd creates a circular thing without this
       lstmState = {
          c = getValue(newLstmState.c),
          h = getValue(newLstmState.h),
