@@ -16,18 +16,25 @@ local tests = {
       local x = torch.Tensor(1,25):normal()
 
       -- Function:
-      local selectFn = function(inputs)
-         return torch.sum(torch.select(inputs.W,1,1) + inputs.x)
-      end
-      local selectFn2 = function(inputs)
-         local a = torch.select(torch.viewAs(torch.select(inputs.W,1,1), inputs.x), 2, 1)
-         local b = torch.select(inputs.x, 2, 1)
-         return torch.sum(a + b)
+      local selectFn1 = function(inputs)
+         local a = torch.select(inputs.W,1,1)
+         local b = a + inputs.x
+         local out = torch.sum(a)
+         return out
       end
 
+      -- Function:
+      -- inconsistent tensor size
+      local selectFn2 = function(inputs)
+         local a = torch.select(inputs.W,1,1)
+         local b = a + inputs.x
+         local out = torch.sum(b)
+         return out
+      end
+      
       -- Check grads:
       for iparam,param in pairs({"x", "W"}) do
-         tester:assert(gradcheck(selectFn, {W=W,x=x}, param), "Incorrect gradient")
+         tester:assert(gradcheck(selectFn1, {W=W,x=x}, param), "Incorrect gradient")
          tester:assert(gradcheck(selectFn2, {W=W,x=x}, param), "Incorrect gradient")
       end
    end,
