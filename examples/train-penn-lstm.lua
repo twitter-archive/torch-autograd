@@ -71,6 +71,7 @@ local lr = 1
 local aloss = 0
 local reportEvery = 100
 for epoch = 1,10 do
+   -- Train:
    print('Training Epoch #'..epoch)
    local lstmState -- clear LSTM state at each new epoch
    for i = 1,trainData:size(1)-maxLength-1,maxLength do
@@ -86,16 +87,12 @@ for epoch = 1,10 do
       local grads,loss,newLstmState = df(vars, y, lstmState)
 
       -- Preserve state for next iteration
-      -- TODO: fix this bug, autograd creates a circular thing without this
-      lstmState = {
-         c = getValue(newLstmState.c),
-         h = getValue(newLstmState.h),
-      }
+      lstmState = newLstmState
 
       -- Update params:
       for i,params in ipairs(params) do
-         for k,param in ipairs(params) do
-            param:add(-lr, grads[i][k])
+         for k,param in pairs(params) do
+            param:add(-lr, grads.params[i][k])
          end
       end
 

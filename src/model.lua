@@ -332,7 +332,9 @@ function model.RecurrentLSTMNetwork(opt, params)
       end
 
       -- save state
-      local newState = {h=hs[#hs], c=cs[#cs]}
+      -- TODO: we need getValue here to cut tensors from the tape - would be best
+      -- if hidden from the user
+      local newState = {h=getValue(hs[#hs]), c=getValue(cs[#cs])}
 
       -- output:
       if outputType == 'last' then
