@@ -86,7 +86,10 @@ for epoch = 1,10 do
       local grads,loss,newLstmState = df(vars, y, lstmState)
 
       -- Preserve state for next iteration
-      lstmState = newLstmState
+      lstmState = {
+         c = getValue(newLstmState.c),
+         h = getValue(newLstmState.h),
+      }
 
       -- Update params:
       for i,params in ipairs(params) do
