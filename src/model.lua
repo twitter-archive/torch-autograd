@@ -285,7 +285,7 @@ function model.RecurrentLSTMNetwork(opt, params)
    table.insert(params, p)
 
    -- function:
-   local f = function(params, x)
+   local f = function(params, x, prevState)
       -- dims:
       local p = params[1] or params
       local steps = getValue(x):size(1)
@@ -301,6 +301,8 @@ function model.RecurrentLSTMNetwork(opt, params)
          local hh
          if t > 1 then
             hh = p.Wh * hs[t-1] + p.bh
+         elseif prevState then
+            hh = p.Wh * prevState.h + p.bh
          else
             hh = p.bh
          end
@@ -319,6 +321,8 @@ function model.RecurrentLSTMNetwork(opt, params)
          -- partial gatings:
          if t > 1 then
             cs[t] = torch.cmul(forgetGate, cs[t-1]) + torch.cmul(inputGate, inputValue)
+         elseif prevState then
+            cs[t] = torch.cmul(forgetGate, prevState.c) + torch.cmul(inputGate, inputValue)
          else
             cs[t] = torch.cmul(inputGate, inputValue)
          end
@@ -327,13 +331,16 @@ function model.RecurrentLSTMNetwork(opt, params)
          hs[t] = torch.cmul(outputGate, torch.tanh(cs[t]))
       end
 
+      -- save state
+      local newState = {h=hs[#hs]:clone(), c=cs[#cs]:clone()}
+
       -- output:
       if outputType == 'last' then
          -- return last hidden code:
-         return hs[#hs]
+         return hs[#hs], newState
       else
          -- return all:
-         return hs
+         return hs, newState
       end
    end
 
