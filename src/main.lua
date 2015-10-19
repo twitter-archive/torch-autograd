@@ -66,13 +66,17 @@ end
 -- Could also be called sumToMatchShape
 local function unbroadcast(g,ans,x)
    if torch.isTensor(x) then
+      if x:isSameSizeAs(g) then
+         return g
+      end
+
+      if g:nElement() == x:nElement() then
+         return torch.viewAs(g,x)
+      end
+
       local size = torch.totable(x:size())
       local ndim = x:nDimension()
       local grad = g
-
-      if grad:nElement() == x:nElement() then
-         return torch.viewAs(grad,x)
-      end
 
       while grad:nDimension() > ndim do
          grad = torch.view(torch.sum(grad,1), thisSize)

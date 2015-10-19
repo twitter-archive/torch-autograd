@@ -41,7 +41,7 @@ end
 
 local nodeTimes = { }
 
-if opt.nodes then
+if opt.nodes ~= 'false' then
    local preTime;
    d.debugFns.preGradFn = function(node)
       preTime = sys.clock()
@@ -610,7 +610,7 @@ for name,test in pairs(tests) do
    local tnn,tag = test()
    print(c.blue(stringx.rjust('['..name..']', 20))
       .. ' nn: ' .. fmt(tnn,'yellow') .. 's, autograd: ' .. fmt(tag,'red') .. 's, ratio: ' .. fmt(tag/tnn,'green') .. 'x')
-   if opt.nodes then
+   if opt.nodes ~= 'false' then
       local sortedKeys = keysSortedByValue(nodeTimes)
       for i, v in pairs(sortedKeys) do
          print(stringx.rjust(v, 41) .. ': ' .. fmt(nodeTimes[v],'red') .. 's')
