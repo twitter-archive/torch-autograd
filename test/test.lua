@@ -30,7 +30,7 @@ local tests = {
          local out = torch.sum(b)
          return out
       end
-      
+
       -- Check grads:
       for iparam,param in pairs({"x", "W"}) do
          tester:assert(gradcheck(selectFn1, {W=W,x=x}, param), "Incorrect gradient")
@@ -826,7 +826,8 @@ local tests = {
 
       -- Loss
       local loss = function(params, input)
-         return torch.sum(f(params, input))
+         local state = f(params, input)
+         return torch.sum(state)
       end
 
       -- Test on sequence data:
