@@ -60,10 +60,9 @@ local function functionalize(pkg)
 
                return function(x, W, b)
                   local grads = nil
-                  local n = node.nodeApply(forward, x, W, b)
-                  if node.isNode(n) then
-                     n.gradfun = {
-                        "Linear",
+                  local gradFn = nil
+                     gradFn = {
+                        k,
                         function(g,ans,x,W,b)
                            if grads == nil then
                               grads = backward(g, x, W, b)
@@ -83,8 +82,15 @@ local function functionalize(pkg)
                            return grads[3]
                         end
                      }
+                  local debugObj = nil
+                  if autograd.debugFns.preFwdFn ~= nil then
+                     debugObj = autograd.debugFns.preFwdFn(k, debugObj)
                   end
-                  return n
+                  local value = node.nodeApply(forward, gradFn, x, W, b)
+                  if autograd.debugFns.postFwdFn ~= nil then
+                     autograd.debugFns.postFwdFn(k, debugObj)
+                  end
+                  return value
                end
             end
          end

@@ -15,25 +15,18 @@ local tests = {
       local x = torch.Tensor(1,25):normal()
 
       -- Function:
-      local selectFn1 = function(inputs)
-         local a = torch.select(inputs.W,1,1)
-         local b = a + inputs.x
-         local out = torch.sum(a)
-         return out
+      local selectFn = function(inputs)
+         return torch.sum(torch.select(inputs.W,1,1) + inputs.x)
       end
-
-      -- Function:
-      -- inconsistent tensor size
       local selectFn2 = function(inputs)
-         local a = torch.select(inputs.W,1,1)
-         local b = a + inputs.x
-         local out = torch.sum(b)
-         return out
+         local a = torch.select(torch.viewAs(torch.select(inputs.W,1,1), inputs.x), 2, 1)
+         local b = torch.select(inputs.x, 2, 1)
+         return torch.sum(a + b)
       end
 
       -- Check grads:
       for iparam,param in pairs({"x", "W"}) do
-         tester:assert(gradcheck(selectFn1, {W=W,x=x}, param), "Incorrect gradient")
+         tester:assert(gradcheck(selectFn, {W=W,x=x}, param), "Incorrect gradient")
          tester:assert(gradcheck(selectFn2, {W=W,x=x}, param), "Incorrect gradient")
       end
    end,
@@ -437,8 +430,8 @@ local tests = {
 
    NodeClass = function()
       -- Build nodes
-      local n = Node:new(3, nil, nil, {})
-      local m = Node:new(torch.ones(10), nil, nil, {})
+      local n = Node:new(3, nil, nil, nil, {})
+      local m = Node:new(torch.ones(10), nil, nil, nil, {})
 
       -- Test we can identify nodes
       tester:asserteq(isNode(n), true, "Did not detect class properly")
@@ -772,7 +765,8 @@ local tests = {
 
       -- Loss
       local loss = function(params, input)
-         return torch.sum(f(params, input))
+         local v = f(params, input)
+         return torch.sum(v)
       end
 
       -- Test on sequence data:
@@ -826,8 +820,8 @@ local tests = {
 
       -- Loss
       local loss = function(params, input)
-         local state = f(params, input)
-         return torch.sum(state)
+         local v = f(params, input)
+         return torch.sum(v)
       end
 
       -- Test on sequence data:

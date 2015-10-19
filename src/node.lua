@@ -1,15 +1,5 @@
 local nodeApply, getOutgrad, newStartNode, node
 
--- Declare the ops we'd like to override directly
-local op = {
-   add = function(a,b) return a+b end,
-   sub = function(a,b) return a-b end,
-   mul = function(a,b) return a*b end,
-   div = function(a,b) return a/b end,
-   pow = function(a,b) return a^b end,
-   unm = function(a) return -1*a end -- TODO: more efficient way across numbers and torch?
-}
-
 -- Make a node class, which will capture computation as they're used
 local Node = { }
 
@@ -21,27 +11,8 @@ function Node:__tostring()
       return tostring(self.value)
    end
 end
-function Node.__add(l,r)
-   return nodeApply(op.add, l, r)
-end
-function Node.__sub(l,r)
-   return nodeApply(op.sub, l, r)
-end
-function Node.__mul(l,r)
-   return nodeApply(op.mul, l, r)
-end
-function Node.__div(l,r)
-   return nodeApply(op.div, l, r)
-end
-function Node.__pow(l,r)
-   return nodeApply(op.pow, l, r)
-end
-function Node.__unm(l)
-   return nodeApply(op.unm, l)
-end
 
-
-function Node:new(value, fun, args, values, tape, name)
+function Node:new(value, fun, gradFun, args, values, tape, name)
    local o = {}
    setmetatable(o, self)
 
@@ -49,13 +20,8 @@ function Node:new(value, fun, args, values, tape, name)
    o.tape[#o.tape+1] = o
    o.value = value
    o.fun = fun
-   if torch.isTensor(value) then
-      o.outgrad = value.new(value:size()):zero()
-   elseif type(value) == "number" then
-      o.outgrad = 0.0
-   else
-      error("Invalid value. Only numbers and tensors supported")
-   end
+   o.gradFun = gradFun
+   o.outgrad = nil
    o.args = args or {}
    o.argValues = values or {}
    o.name = "" or name
@@ -79,7 +45,7 @@ end
 -- we'd like to make sure that if we're passing nodes in,
 -- that we unpack the value in those nodes, apply the function
 -- to the underlying value, and then wrap the value in a node
-nodeApply = function(fun, ...)
+nodeApply = function(fun, gradFun, ...)
    local arg = {...}
    local parent = nil
    local values = { }
@@ -94,7 +60,7 @@ nodeApply = function(fun, ...)
    end
    local value = fun(unpack(values))
    if parent ~= nil then
-      return Node:new(value, fun, arg, values, parent.tape)
+      return Node:new(value, fun, gradFun, arg, values, parent.tape)
    else
       return value
    end
@@ -123,7 +89,7 @@ end
 newStartNode = function(val, tape)
    -- If our argument is a tensor, just nodify it straight-up
    if torch.isTensor(val) then
-      return Node:new(val, nil, nil, nil, tape)
+      return Node:new(val, nil, nil, nil, nil, tape)
       -- If our target argument is a table, we'll need to walk its members and node-ify them.
    elseif type(val) == "table" then
       for k,v in pairs(val) do

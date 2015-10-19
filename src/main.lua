@@ -6,16 +6,16 @@
 local haveCutorch,cutorch = pcall(require,'cutorch')
 local debug = require 'debug'
 local node = require 'autograd.node'
+local Node = node.Node
 local nodeApply = node.nodeApply
 local getOutgrad = node.getOutgrad
 local newStartNode = node.newStartNode
 local isNode = node.isNode
 local getValue = node.getValue
-local op = node.op
+
 require 'autograd.number'
 require 'pl'
 require 'trepl'
-
 
 -- For debugging
 local function printSize(a)
@@ -28,10 +28,13 @@ local function printSize(a)
    end
 end
 
-
 -- Some local declarations ahead of time
 local gradfuns = {}
+
 local debugFns = {}
+local tapeRecordingDepth = 0
+local beginTapeRecording
+local endTapeRecording
 
 -- Define the tensor types for which we'll allow automatic differentiation
 local tensorTypes = {
@@ -83,9 +86,9 @@ local function unbroadcast(g,ans,x)
       -- dimensions that are singleton for x,
       -- but not yet for the gradient
       else
-         for i=1,#size do
+      for i=1,#size do
             thisSize = torch.totable(grad:size())
-            if size[i] == 1 then
+         if size[i] == 1 then
                thisSize[i] = 1
                grad = torch.view(torch.sum(grad,i),unpack(thisSize))
             end
@@ -127,6 +130,7 @@ local function grad(fun, argnum, returnTape)
 
       ans.outgrad = 1.0
 
+      endTapeRecording()
       for i=#ans.tape,1,-1 do
          local node = ans.tape[i]
          if debugFns.preGradFn then
@@ -135,14 +139,16 @@ local function grad(fun, argnum, returnTape)
          for iarg=1,#node.args do
             local thisArg = node.args[iarg]
             if isNode(thisArg) then
-               local gradfun = (node.gradfun or gradfuns[node.fun])[iarg+1]
-               local gradUpdate = gradfun(node.outgrad, node.value, unpack(node.argValues))
-               if thisArg.outgrad == 0 then
-                  if type(gradUpdate) ~= 'number' then
-                     thisArg.outgrad = gradUpdate:contiguous()
-                  else
-                     thisArg.outgrad = gradUpdate
+               if node.outgrad == nil then
+                  if torch.isTensor(node.value) then
+                     node.outgrad = node.value.new(node.value:size()):zero()
+                  elseif type(node.value) == "number" then
+                     node.outgrad = 0.0
                   end
+               end
+               local gradUpdate = (node.gradFun[iarg+1])(node.outgrad, node.value, unpack(node.argValues))
+               if thisArg.outgrad == nil or thisArg.outgrad == 0 then
+                  thisArg.outgrad = gradUpdate
                else
                   thisArg.outgrad = thisArg.outgrad + gradUpdate
                end
@@ -151,8 +157,8 @@ local function grad(fun, argnum, returnTape)
          if debugFns.postGradFn then
             debugFns.postGradFn(node)
          end
-
       end
+      beginTapeRecording()
 
       -- Now spit out the grads, along with any answers returned along the way
       local out = {}
@@ -187,13 +193,15 @@ local function elemwiseDiv(a,b)
    end
 end
 
-local gradMt = {}
-gradMt.__index = function(table, key)
-   print("")
-   print(debug.getinfo(key))
-   error("No adjoint found for function " .. tostring(key) .. ". Debug info above.")
-end
-setmetatable(gradfuns, gradMt)
+-- Declare the ops we'd like to override directly
+local op = {
+   add = function(a,b) return a+b end,
+   sub = function(a,b) return a-b end,
+   mul = function(a,b) return a*b end,
+   div = function(a,b) return a/b end,
+   pow = function(a,b) return a^b end,
+   unm = function(a) return -a end
+}
 
 gradfuns[op.add] = {
    "add",
@@ -298,7 +306,11 @@ gradfuns[torch.exp] = {
 }
 gradfuns[torch.tanh] = {
    "tanh",
-   function(g, ans, x) return elemwiseDiv(g,torch.pow(torch.cosh(x), 2.0)) end
+   function(g, ans, x)
+      local xx = torch.cosh(x)
+      xx:cmul(xx)
+      return elemwiseDiv(g, xx)
+   end
 }
 gradfuns[torch.abs] = {
    "abs",
@@ -499,7 +511,6 @@ gradfuns[torch.max] = {
    end
 }
 
-
 local override = {
    "__add", "add",
    "__mul", "mul", "cmul",
@@ -513,15 +524,48 @@ local override = {
    "select", "narrow", "min", "max", "cat",
 }
 
--- First, override all the Torch functions
-for ifn,fnName in pairs(override) do
-   local old = torch[fnName]
-   local newFn = function(...)
-      -- print("Running new " .. fnName)
-      return nodeApply(old, ...)
+local function nodeOperator(name)
+   local gradFun = gradfuns[name]
+   return function(l, r)
+      if tapeRecordingDepth == 0 then
+         return name(l, r)
+      end
+      local debugObj = nil
+      if debugFns.preFwdFn ~= nil then
+         debugObj = debugFns.preFwdFn(gradFun[1], debugObj)
+      end
+      local value = nodeApply(name, gradFun, l, r)
+      if debugFns.postFwdFn ~= nil then
+         debugFns.postFwdFn(gradFun[1], debugObj)
+      end
+      return value
    end
-   torch[fnName] = newFn
 end
+
+local function nodeUnaryOperator(name)
+   local gradFun = gradfuns[name]
+   return function(l)
+      if tapeRecordingDepth == 0 then
+         return old(l)
+      end
+      local debugObj = nil
+      if debugFns.preFwdFn ~= nil then
+         debugObj = debugFns.preFwdFn(gradFun[1], debugObj)
+      end
+      local value = nodeApply(name, gradFun, l)
+      if debugFns.postFwdFn ~= nil then
+         debugFns.postFwdFn(gradFun[1], debugObj)
+      end
+      return value
+   end
+end
+
+Node.__add = nodeOperator(op.add)
+Node.__sub = nodeOperator(op.sub)
+Node.__mul = nodeOperator(op.mul)
+Node.__div = nodeOperator(op.div)
+Node.__pow = nodeOperator(op.pow)
+Node.__unm = nodeUnaryOperator(op.unm)
 
 -- Now override class methods and metamethods on tensors
 -- Override metamethods like __mul and __add
@@ -532,6 +576,35 @@ local elemOpOverride = {
    __add = op.add,
    __unm = op.unm,
 }
+
+local shimTorch = { }
+local origTorch = { }
+local shimTorchClasses = { }
+local origTorchClasses = { }
+
+-- First, override all the Torch functions
+for ifn,fnName in pairs(override) do
+   local old = torch[fnName]
+   local gradFn = gradfuns[old]
+   if old ~= nil then
+      local newFn = function(...)
+         if tapeRecordingDepth == 0 then
+            return old(...)
+         end
+         local debugObj = nil
+         if debugFns.preFwdFn ~= nil then
+            debugObj = debugFns.preFwdFn(fnName, debugObj)
+         end
+         local value = nodeApply(old, gradFn, ...)
+         if debugFns.postFwdFn ~= nil then
+            debugFns.postFwdFn(fnName, debugObj)
+         end
+         return value
+      end
+      shimTorch[fnName] = newFn
+      origTorch[fnName] = old
+   end
+end
 
 for _,tensorType in pairs(tensorTypes) do
    local mt = torch.getmetatable('torch.' .. tensorType)
@@ -545,15 +618,68 @@ end
 -- (so that we capture evaluations of torch.sum() and also myTensor:sum())
 for _,tensorType in pairs(tensorTypes) do
    local mt = torch.getmetatable('torch.' .. tensorType)
+   shimTorchClasses[tensorType] = { }
+   origTorchClasses[tensorType] = { }
    for ifn,fnName in pairs(override) do
       local old = mt[fnName]
-      local newFn = function(...)
-         -- print("Running metamethod " .. fnName)
-         return nodeApply(old, ...)
+      local gradFn = gradfuns[old]
+      if old ~= nil then
+         local newFn = function(...)
+            if tapeRecordingDepth == 0 then
+               return old(...)
+            end
+            local debugObj = nil
+            if debugFns.preFwdFn ~= nil then
+               debugObj = debugFns.preFwdFn(fnName, debugObj)
+            end
+            local value = nodeApply(old, gradFn, ...)
+            if debugFns.postFwdFn ~= nil then
+               debugFns.postFwdFn(fnName, debugObj)
+            end
+            return value
+         end
+         shimTorchClasses[tensorType][fnName] = newFn
+         origTorchClasses[tensorType][fnName]  = old
       end
-      rawset(mt, fnName, newFn)
    end
 end
+
+local function installShim()
+   for fnName,ifn in pairs(shimTorch) do
+      torch[fnName] = ifn
+   end
+   for _,tensorType in pairs(tensorTypes) do
+      local mt = torch.getmetatable('torch.' .. tensorType)
+      local fns = shimTorchClasses[tensorType]
+      for fnName,ifn in pairs(fns) do
+         rawset(mt, fnName, ifn)
+      end
+   end
+end
+
+local function uninstallShim()
+   for fnName,ifn in pairs(origTorch) do
+      torch[fnName] = ifn
+   end
+   for _,tensorType in pairs(tensorTypes) do
+      local mt = torch.getmetatable('torch.' .. tensorType)
+      local fns = origTorchClasses[tensorType]
+      for fnName,ifn in pairs(fns) do
+         rawset(mt, fnName, ifn)
+      end
+   end
+end
+
+beginTapeRecording = function()
+   tapeRecordingDepth = tapeRecordingDepth + 1
+end
+
+endTapeRecording = function()
+   tapeRecordingDepth = tapeRecordingDepth - 1
+end
+
+installShim()
+beginTapeRecording()
 
 -- Main functions:
 local autograd = {

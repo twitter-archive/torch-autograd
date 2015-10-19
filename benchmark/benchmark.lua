@@ -4,6 +4,7 @@ Run benchmarks.
 
 Options:
    --type    (default float)    can be: double | float | cuda
+   --nodes   (default false)
 ]]
 
 -- benchmark of common models
@@ -36,6 +37,29 @@ if opt.type == 'cuda' then
 elseif opt.type == 'double' then
    tensor = torch.DoubleTensor
    ttype = 'torch.DoubleTensor'
+end
+
+local nodeTimes = { }
+
+if opt.nodes then
+   local preTime;
+   d.debugFns.preGradFn = function(node)
+      preTime = sys.clock()
+   end
+   d.debugFns.postGradFn = function(node)
+      if node.gradFun ~= nil then
+         local idx = 'grad ' .. node.gradFun[1]
+         nodeTimes[idx] = (nodeTimes[idx] or 0) + (sys.clock() - preTime)
+      end
+   end
+   local preTime;
+   d.debugFns.preFwdFn = function(fn)
+      return sys.clock()
+   end
+   d.debugFns.postFwdFn = function(fn, o)
+      local idx = 'forward ' .. fn
+      nodeTimes[idx] = (nodeTimes[idx] or 0) + (sys.clock() - o)
+   end
 end
 
 -- Test 1: logistic regression
@@ -569,9 +593,28 @@ local fmt = function(nb,color)
    return c[color](nb)
 end
 
+function keysSortedByValue(tbl, sortFunction)
+  local keys = {}
+  for key in pairs(tbl) do
+    table.insert(keys, key)
+  end
+  table.sort(keys, function(a, b)
+    return tbl[a] > tbl[b]
+  end)
+  return keys
+end
+
 print('Benchmarks:')
 for name,test in pairs(tests) do
+   nodeTimes = { }
    local tnn,tag = test()
    print(c.blue(stringx.rjust('['..name..']', 20))
       .. ' nn: ' .. fmt(tnn,'yellow') .. 's, autograd: ' .. fmt(tag,'red') .. 's, ratio: ' .. fmt(tag/tnn,'green') .. 'x')
+   if opt.nodes then
+      local sortedKeys = keysSortedByValue(nodeTimes)
+      for i, v in pairs(sortedKeys) do
+         print(stringx.rjust(v, 41) .. ': ' .. fmt(nodeTimes[v],'red') .. 's')
+      end
+      print('')
+   end
 end

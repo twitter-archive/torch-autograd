@@ -16,7 +16,7 @@ local function jacobianFromAutograd(func, input, var)
    local grads = autograd(func)(input)
 
    -- Return grads:
-   return grads[var]:view(-1):clone()
+   return grads[var]:contiguous():view(-1):clone()
 end
 
 -- Compute grads from finite differences
