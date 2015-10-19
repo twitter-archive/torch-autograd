@@ -5,7 +5,6 @@
 -- Deps
 local haveCutorch,cutorch = pcall(require,'cutorch')
 local debug = require 'debug'
-local _ = require 'moses'
 local node = require 'autograd.node'
 local nodeApply = node.nodeApply
 local getOutgrad = node.getOutgrad

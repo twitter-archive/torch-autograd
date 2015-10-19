@@ -1,5 +1,4 @@
 -- Tester:
-local _ = require 'moses'
 local totem = require 'totem'
 local autograd = require 'autograd'
 local node = require 'autograd.node'

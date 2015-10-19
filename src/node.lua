@@ -1,5 +1,3 @@
-local _ = require 'moses'
-
 local nodeApply, getOutgrad, newStartNode, node
 
 -- Declare the ops we'd like to override directly
