@@ -5,6 +5,7 @@ Run benchmarks.
 Options:
    --type    (default float)    can be: double | float | cuda
    --nodes   (default false)
+   --profile (default false)
 ]]
 
 -- benchmark of common models
@@ -12,6 +13,7 @@ local d = require 'autograd'
 local nn = require 'nn'
 local c = require 'trepl.colorize'
 local getValue = require 'autograd.node'.getValue
+local profi = require 'ProFi'
 
 -- tic/toc
 local tic = sys.tic
@@ -610,7 +612,13 @@ end
 print('Benchmarks:')
 for name,test in pairs(tests) do
    nodeTimes = { }
+   if opt.profile ~= 'false' then profi:start() end
    local tnn,tag = test()
+   if opt.profile ~= 'false' then
+      profi:stop()
+      profi:writeReport(string.format("%s.txt",name))
+      profi:reset()
+   end
    print(c.blue(stringx.rjust('['..name..']', 20))
       .. ' nn: ' .. fmt(tnn,'yellow') .. 's, autograd: ' .. fmt(tag,'red') .. 's, ratio: ' .. fmt(tag/tnn,'green') .. 'x')
    if opt.nodes ~= 'false' then
@@ -621,3 +629,4 @@ for name,test in pairs(tests) do
       print('')
    end
 end
+
