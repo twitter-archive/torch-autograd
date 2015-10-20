@@ -58,8 +58,8 @@ nodeApply = function(fun, gradFun, ...)
          values[#values + 1] = v
       end
    end
-   local value = fun(unpack(values))
    if parent ~= nil then
+      local value = fun(unpack(values))
       local node = nil
       local tape = parent.tape
       local o = tape[tape.nextIndex]
@@ -76,7 +76,7 @@ nodeApply = function(fun, gradFun, ...)
       end
       return Node:new(value, fun, gradFun, arg, values, tape)
    else
-      return value
+      return fun(unpack(values))
    end
 end
 
