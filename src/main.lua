@@ -52,6 +52,7 @@ local lastTape = { }
 local function grad(fun, argnum, returnTape)
    argnum = argnum or 1
    local doGrad = function(...)
+      local arg = {...}
       local tape = lastTape
       tape.nextIndex = 1
 
