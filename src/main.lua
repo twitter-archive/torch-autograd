@@ -132,6 +132,7 @@ overload.beginRecording()
 local autograd = {
    grad = grad,
    debugFns = debugFns,
+   defineGradient = overload.defineGradient
 }
 
 -- Shortcut:

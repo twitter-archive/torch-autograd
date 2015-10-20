@@ -230,6 +230,24 @@ local function uninstall()
    end
 end
 
+local function defineGradient(obj, fnName, gradFn)
+   local old = obj[fnName]
+   obj[fnName] = function(...)
+      if tapeRecordingDepth == 0 then
+         return old(...)
+      end
+      local debugObj = nil
+      if debugFns.preFwdFn ~= nil then
+         debugObj = debugFns.preFwdFn(fnName, debugObj)
+      end
+      local value = nodeApply(old, gradFn, ...)
+      if debugFns.postFwdFn ~= nil then
+         debugFns.postFwdFn(fnName, debugObj)
+      end
+      return value
+   end
+end
+
 local function beginRecording()
    tapeRecordingDepth = tapeRecordingDepth + 1
 end
@@ -246,7 +264,8 @@ local overload = {
    beginRecording = beginRecording,
    endRecording = endRecording,
    tensorTypes = tensorTypes,
-   isTensor = isTensor
+   isTensor = isTensor,
+   defineGradient = defineGradient
 }
 
 -- Return package
