@@ -7,6 +7,7 @@ local haveCutorch,cutorch = pcall(require,'cutorch')
 local debug = require 'debug'
 local node = require 'autograd.node'
 local overload = require 'autograd.overload'
+local isTensor = require 'autograd.util'.isTensor
 local Node = node.Node
 local nodeApply = node.nodeApply
 local getOutgrad = node.getOutgrad
@@ -22,7 +23,7 @@ require 'trepl'
 local function printSize(a)
    if type(a) == "number" then
       print("1x1")
-   elseif torch.isTensor(a) then
+   elseif isTensor(a) then
       print(torch.totable(a:size()))
    else
       print("???")
@@ -31,7 +32,7 @@ end
 
 -- Make sure we've got the right thing going on
 local function checkInput(arg)
-   if torch.isTensor(arg) then
+   if isTensor(arg) then
       local isValidType = false
       for _,tensorType in pairs(overload.tensorTypes) do
          isValidType = isValidType or 'torch.' .. tensorType == torch.typename(arg)
@@ -85,9 +86,9 @@ local function grad(fun, argnum, returnTape)
          end
          for iarg=1,#node.args do
             local thisArg = node.args[iarg]
-            if isNode(thisArg) then
+            if getmetatable(thisArg) == Node then
                if node.outgrad == nil then
-                  if torch.isTensor(node.value) then
+                  if isTensor(node.value) then
                      node.outgrad = node.value.new(node.value:size()):zero()
                   elseif type(node.value) == "number" then
                      node.outgrad = 0.0

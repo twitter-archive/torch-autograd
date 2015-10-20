@@ -1,5 +1,6 @@
 local gradfuns = require 'autograd.gradfuns'
 local node = require 'autograd.node'
+local isTensor = require 'autograd.util'.isTensor
 local Node = node.Node
 local nodeApply = node.nodeApply
 local getOutgrad = node.getOutgrad
@@ -11,6 +12,7 @@ local tapeRecordingDepth = 0
 local debugFns = { }
 
 -- Define the tensor types for which we'll allow automatic differentiation
+-- util.isTensor must also be updated
 local tensorTypes = {
    'FloatTensor',
    'DoubleTensor'
@@ -99,28 +101,28 @@ local elemOpOverride = {
 -- Override operations for number types
 local numberMetatable = {
    __add = function(a,b)
-      if torch.type(a) == "number" and torch.isTensor(b) then
+      if type(a) == "number" and isTensor(b) then
          return nodeApply(op.add, gradfuns["op.add"], b, a)
       else
          return nodeApply(op.add, gradfuns["op.add"], a, b)
       end
    end,
    __sub = function(a,b)
-      if torch.type(a) == "number" and torch.isTensor(b) then
+      if type(a) == "number" and isTensor(b) then
          return nodeApply(op.sub, gradfuns["op.sub"], -b, a)
       else
          return nodeApply(op.sub, gradfuns["op.sub"], a, -b) -- TODO subtraction
       end
    end,
    __mul = function(a,b)
-      if torch.type(a) == "number" and torch.isTensor(b) then
+      if type(a) == "number" and isTensor(b) then
          return nodeApply(op.mul, gradfuns["op.mul"], b, a)
       else
          return nodeApply(op.mul, gradfuns["op.mul"], a, b)
       end
    end,
    __div = function(a,b)
-      if torch.type(a) == "number" and torch.isTensor(b) then
+      if type(a) == "number" and isTensor(b) then
          -- THIS IS INSANE
          c = torch.ones(b:size())
          return nodeApply(op.mul, gradfuns["op.mul"], torch.cdiv(c,b), a)
@@ -243,7 +245,8 @@ local overload = {
    uninstall = uninstall,
    beginRecording = beginRecording,
    endRecording = endRecording,
-   tensorTypes = tensorTypes
+   tensorTypes = tensorTypes,
+   isTensor = isTensor
 }
 
 -- Return package

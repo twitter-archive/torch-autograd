@@ -1,3 +1,4 @@
+local isTensor = require 'autograd.util'.isTensor
 local nodeApply, getOutgrad, newStartNode, node
 
 -- Make a node class, which will capture computation as they're used
@@ -31,7 +32,7 @@ local function isNode(n)
 end
 
 local function getValue(v)
-      if isNode(v) then
+      if (getmetatable(v) == Node) then
          return v.value
       else
          return v
@@ -85,11 +86,11 @@ getOutgrad = function(arg)
    local val = getValue(arg)
 
    -- If we have a tensor, we just have one out gradient
-   if torch.isTensor(val) then
+   if isTensor(val) then
       return arg.outgrad
 
       -- If we have a table, then we can recurse the table and spit out the gradient
-   elseif type(val) == "table" and not isNode(val) then
+   elseif type(val) == "table" and not (getmetatable(val) == Node) then
       local out = {}
       for k,v in pairs(arg) do
          out[k] = getOutgrad(v)
@@ -101,7 +102,7 @@ end
 -- local newStartNode
 newStartNode = function(val, tape)
    -- If our argument is a tensor, just nodify it straight-up
-   if torch.isTensor(val) then
+   if isTensor(val) then
       return Node:new(val, nil, nil, { }, { }, tape)
       -- If our target argument is a table, we'll need to walk its members and node-ify them.
    elseif type(val) == "table" then

@@ -1,9 +1,11 @@
+local isTensor = require 'autograd.util'.isTensor
+
 local gradfuns = { }
 
 -- Helps with resizing gradients
 -- Could also be called sumToMatchShape
 local function unbroadcast(g,ans,x)
-   if torch.isTensor(x) then
+   if isTensor(x) then
       if x:isSameSizeAs(g) then
          return g
       end
@@ -37,7 +39,7 @@ local function unbroadcast(g,ans,x)
          end
          return grad
       end
-   elseif torch.isTensor(ans) then
+   elseif isTensor(ans) then
       return torch.sum(g)
    else
       return g
@@ -45,7 +47,7 @@ local function unbroadcast(g,ans,x)
 end
 
 local function elemwiseMul(a,b)
-   if torch.isTensor(a) and torch.isTensor(b) then
+   if isTensor(a) and isTensor(b) then
       return torch.cmul(a,b)
    else
       return a*b
@@ -53,7 +55,7 @@ local function elemwiseMul(a,b)
 end
 
 local function elemwiseDiv(a,b)
-   if torch.isTensor(a) and torch.isTensor(b) then
+   if isTensor(a) and isTensor(b) then
       return torch.cdiv(a,b)
    else
       return a/b
@@ -61,7 +63,7 @@ local function elemwiseDiv(a,b)
 end
 
 local function _sum(x)
-   if torch.isTensor(x) then
+   if isTensor(x) then
       return torch.sum(x)
    else
       return x
@@ -71,7 +73,7 @@ end
 local function repeatToMatchShape(x,axis)
    -- Special sum function to deal with numbers or tensors
 
-   if not torch.isTensor(x) then
+   if not isTensor(x) then
       return function(x) return x end, 1
    end
 
@@ -94,7 +96,7 @@ gradfuns["op.add"] = {
 gradfuns["op.mul"] = {
    "mult/dot",
    function(g, ans, A, B)
-      if torch.isTensor(A) and torch.isTensor(B) then
+      if isTensor(A) and isTensor(B) then
          if B:nDimension() == 2 then
             return g*B:t()
          elseif A:nDimension() == 2 then
@@ -107,7 +109,7 @@ gradfuns["op.mul"] = {
       end
    end,
    function(g, ans, A, B)
-      if torch.isTensor(A) and torch.isTensor(B) then
+      if isTensor(A) and isTensor(B) then
          if A:nDimension() == 2 then
             return A:t()*g
          elseif B:nDimension() == 2 then
@@ -198,7 +200,7 @@ gradfuns[torch.tanh] = {
 gradfuns[torch.abs] = {
    "abs",
    function(g, ans, x)
-      if torch.isTensor(x) then
+      if isTensor(x) then
          return elemwiseMul(g,torch.sign(x))
       else
          sign = x>0 and 1 or x<0 and -1 or 0

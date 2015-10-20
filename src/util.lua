@@ -39,4 +39,12 @@ function util.sigmoid(array,p)
    return torch.pow(torch.exp(-array) + 1, -1) * (1-p*2) + p
 end
 
+local fmt = getmetatable(torch.FloatTensor)
+local dmt = getmetatable(torch.DoubleTensor)
+local cmt = getmetatable(torch.CudaTensor) or fmt
+function util.isTensor(t)
+   local qmt = getmetatable(t)
+   return qmt == fmt or qmt == dmt or qmt == cmt
+end
+
 return util
