@@ -612,11 +612,13 @@ end
 print('Benchmarks:')
 for name,test in pairs(tests) do
    nodeTimes = { }
-   if opt.profile ~= 'false' and haveProfi then profi:start() end
+   if opt.profile ~= 'false' and haveProfi then 
+      profi:start() 
+   end
    local tnn,tag = test()
    if opt.profile ~= 'false' and haveProfi then
       profi:stop()
-      profi:writeReport(string.format("%s.txt",name))
+      profi:writeReport(string.format("%s.profile.txt",name))
       profi:reset()
    end
    print(c.blue(stringx.rjust('['..name..']', 20))
