@@ -106,12 +106,15 @@ local function unbroadcast(g,ans,x)
    end
 end
 
+local lastTape = { }
+
 -- Step through the computation graph and find the gradient
 local function grad(fun, argnum, returnTape)
    argnum = argnum or 1
    local doGrad = function(...)
       local arg = tablex.deepcopy({...})
-      local tape = {}
+      local tape = lastTape
+      tape.nextIndex = 1
 
       -- Check the argument, to make sure it's alright.
       checkInput(arg[argnum])
@@ -135,8 +138,8 @@ local function grad(fun, argnum, returnTape)
       ans.outgrad = 1.0
 
       endTapeRecording()
-      for i=#ans.tape,1,-1 do
-         local node = ans.tape[i]
+      for i=tape.nextIndex-1,1,-1 do
+         local node = tape[i]
          if debugFns.preGradFn then
             debugFns.preGradFn(node)
          end

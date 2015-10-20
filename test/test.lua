@@ -430,8 +430,8 @@ local tests = {
 
    NodeClass = function()
       -- Build nodes
-      local n = Node:new(3, nil, nil, nil, {})
-      local m = Node:new(torch.ones(10), nil, nil, nil, {})
+      local n = Node:new(3, nil, nil, nil, nil, { nextIndex = 1 })
+      local m = Node:new(torch.ones(10), nil, nil, nil, nil, { nextIndex = 1 })
 
       -- Test we can identify nodes
       tester:asserteq(isNode(n), true, "Did not detect class properly")

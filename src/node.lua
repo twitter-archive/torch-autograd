@@ -12,19 +12,17 @@ function Node:__tostring()
    end
 end
 
-function Node:new(value, fun, gradFun, args, values, tape, name)
+function Node:new(value, fun, gradFun, args, values, tape)
    local o = {}
    setmetatable(o, self)
-
-   o.tape = tape or {}
-   o.tape[#o.tape+1] = o
+   o.tape = tape
+   tape[tape.nextIndex] = o
+   tape.nextIndex = tape.nextIndex + 1
    o.value = value
    o.fun = fun
    o.gradFun = gradFun
-   o.outgrad = nil
-   o.args = args or {}
-   o.argValues = values or {}
-   o.name = "" or name
+   o.args = args
+   o.argValues = values
    return o
 end
 
@@ -46,10 +44,10 @@ end
 -- that we unpack the value in those nodes, apply the function
 -- to the underlying value, and then wrap the value in a node
 nodeApply = function(fun, gradFun, ...)
-   local arg = {...}
    local parent = nil
    local values = { }
-   for k = 1, #arg do
+   local ln = #arg
+   for k = 1, ln do
       local v = arg[k]
       if getmetatable(v) == Node then
          parent = v
@@ -60,7 +58,21 @@ nodeApply = function(fun, gradFun, ...)
    end
    local value = fun(unpack(values))
    if parent ~= nil then
-      return Node:new(value, fun, gradFun, arg, values, parent.tape)
+      local node = nil
+      local tape = parent.tape
+      local o = tape[tape.nextIndex]
+      if o ~= nil then
+         o.tape = tape
+         o.value = value
+         o.fun = fun
+         o.gradFun = gradFun
+         o.args = arg
+         o.outgrad = nil
+         o.argValues = values
+         tape.nextIndex = tape.nextIndex + 1
+         return o
+      end
+      return Node:new(value, fun, gradFun, arg, values, tape)
    else
       return value
    end
@@ -89,7 +101,7 @@ end
 newStartNode = function(val, tape)
    -- If our argument is a tensor, just nodify it straight-up
    if torch.isTensor(val) then
-      return Node:new(val, nil, nil, nil, nil, tape)
+      return Node:new(val, nil, nil, { }, { }, tape)
       -- If our target argument is a table, we'll need to walk its members and node-ify them.
    elseif type(val) == "table" then
       for k,v in pairs(val) do

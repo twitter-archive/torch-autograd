@@ -58,7 +58,9 @@ if opt.nodes ~= 'false' then
    end
    d.debugFns.postFwdFn = function(fn, o)
       local idx = 'forward ' .. fn
-      nodeTimes[idx] = (nodeTimes[idx] or 0) + (sys.clock() - o)
+      local tm = (sys.clock() - o)
+      nodeTimes['forward (inclusive)'] = (nodeTimes['forward (inclusive)'] or 0) + tm
+      nodeTimes[idx] = (nodeTimes[idx] or 0) + tm
    end
 end
 
@@ -586,6 +588,7 @@ local tests = {
 
       return tnn, tag
    end,
+
 }
 
 local fmt = function(nb,color)
