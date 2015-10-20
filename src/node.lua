@@ -104,10 +104,11 @@ newStartNode = function(val, tape)
       return Node:new(val, nil, nil, { }, { }, tape)
       -- If our target argument is a table, we'll need to walk its members and node-ify them.
    elseif type(val) == "table" then
+      local valCopy = { }
       for k,v in pairs(val) do
-         val[k] = newStartNode(v, tape)
+         valCopy[k] = newStartNode(v, tape)
       end
-      return val
+      return valCopy
    end
 end
 

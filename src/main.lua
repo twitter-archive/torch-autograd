@@ -52,7 +52,6 @@ local lastTape = { }
 local function grad(fun, argnum, returnTape)
    argnum = argnum or 1
    local doGrad = function(...)
-      local arg = tablex.deepcopy({...})
       local tape = lastTape
       tape.nextIndex = 1
 
