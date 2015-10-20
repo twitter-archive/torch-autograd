@@ -50,15 +50,7 @@ local function nodeOperator(name)
       if tapeRecordingDepth == 0 then
          return fun(l, r)
       end
-      local debugObj = nil
-      if debugFns.preFwdFn ~= nil then
-         debugObj = debugFns.preFwdFn(gradFun[1], debugObj)
-      end
-      local value = nodeApply(fun, gradFun, l, r)
-      if debugFns.postFwdFn ~= nil then
-         debugFns.postFwdFn(gradFun[1], debugObj)
-      end
-      return value
+      return nodeApply(fun, gradFun, l, r)
    end
 end
 
@@ -69,15 +61,7 @@ local function nodeUnaryOperator(name)
       if tapeRecordingDepth == 0 then
          return fun(l)
       end
-      local debugObj = nil
-      if debugFns.preFwdFn ~= nil then
-         debugObj = debugFns.preFwdFn(gradFun[1], debugObj)
-      end
-      local value = nodeApply(fun, gradFun, l)
-      if debugFns.postFwdFn ~= nil then
-         debugFns.postFwdFn(gradFun[1], debugObj)
-      end
-      return value
+      return nodeApply(fun, gradFun, l)
    end
 end
 
@@ -149,15 +133,7 @@ for ifn,fnName in pairs(override) do
          if tapeRecordingDepth == 0 then
             return old(...)
          end
-         local debugObj = nil
-         if debugFns.preFwdFn ~= nil then
-            debugObj = debugFns.preFwdFn(fnName, debugObj)
-         end
-         local value = nodeApply(old, gradFn, ...)
-         if debugFns.postFwdFn ~= nil then
-            debugFns.postFwdFn(fnName, debugObj)
-         end
-         return value
+         return nodeApply(old, gradFn, ...)
       end
       shimTorch[fnName] = newFn
       origTorch[fnName] = old
@@ -186,15 +162,7 @@ for _,tensorType in pairs(tensorTypes) do
             if tapeRecordingDepth == 0 then
                return old(...)
             end
-            local debugObj = nil
-            if debugFns.preFwdFn ~= nil then
-               debugObj = debugFns.preFwdFn(fnName, debugObj)
-            end
-            local value = nodeApply(old, gradFn, ...)
-            if debugFns.postFwdFn ~= nil then
-               debugFns.postFwdFn(fnName, debugObj)
-            end
-            return value
+            return nodeApply(old, gradFn, ...)
          end
          shimTorchClasses[tensorType][fnName] = newFn
          origTorchClasses[tensorType][fnName]  = old
@@ -236,15 +204,7 @@ local function defineGradient(obj, fnName, gradFn)
       if tapeRecordingDepth == 0 then
          return old(...)
       end
-      local debugObj = nil
-      if debugFns.preFwdFn ~= nil then
-         debugObj = debugFns.preFwdFn(fnName, debugObj)
-      end
-      local value = nodeApply(old, gradFn, ...)
-      if debugFns.postFwdFn ~= nil then
-         debugFns.postFwdFn(fnName, debugObj)
-      end
-      return value
+      return nodeApply(old, gradFn, ...)
    end
 end
 

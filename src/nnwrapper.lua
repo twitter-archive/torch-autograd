@@ -60,37 +60,28 @@ local function functionalize(pkg)
 
                return function(x, W, b)
                   local grads = nil
-                  local gradFn = nil
-                     gradFn = {
-                        k,
-                        function(g,ans,x,W,b)
-                           if grads == nil then
-                              grads = backward(g, x, W, b)
-                           end
-                           return grads[1]
-                        end,
-                        function(g,ans,x,W,b)
-                           if grads == nil then
-                              grads = backward(g, x, W, b)
-                           end
-                           return grads[2]
-                        end,
-                        function(g,ans,x,W,b)
-                           if grads == nil then
-                              grads = backward(g, x, W, b)
-                           end
-                           return grads[3]
+                  local gradFn = {
+                     k,
+                     function(g,ans,x,W,b)
+                        if grads == nil then
+                           grads = backward(g, x, W, b)
                         end
-                     }
-                  local debugObj = nil
-                  if autograd.debugFns.preFwdFn ~= nil then
-                     debugObj = autograd.debugFns.preFwdFn(k, debugObj)
-                  end
-                  local value = node.nodeApply(forward, gradFn, x, W, b)
-                  if autograd.debugFns.postFwdFn ~= nil then
-                     autograd.debugFns.postFwdFn(k, debugObj)
-                  end
-                  return value
+                        return grads[1]
+                     end,
+                     function(g,ans,x,W,b)
+                        if grads == nil then
+                           grads = backward(g, x, W, b)
+                        end
+                        return grads[2]
+                     end,
+                     function(g,ans,x,W,b)
+                        if grads == nil then
+                           grads = backward(g, x, W, b)
+                        end
+                        return grads[3]
+                     end
+                  }
+                  return node.nodeApply(forward, gradFn, x, W, b)
                end
             end
          end
