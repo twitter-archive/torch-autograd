@@ -13,7 +13,6 @@ local newStartNode = node.newStartNode
 local isNode = node.isNode
 local getValue = node.getValue
 
-require 'autograd.number'
 require 'pl'
 require 'trepl'
 
@@ -584,6 +583,43 @@ local elemOpOverride = {
    __unm = op.unm,
 }
 
+-- Override operations for number types
+local numberMetatable = {
+   __add = function(a,b)
+      if torch.type(a) == "number" and torch.isTensor(b) then
+         return nodeApply(op.add, gradfuns[op.add], b, a)
+      else
+         return nodeApply(op.add, gradfuns[op.add], a, b)
+      end
+   end,
+   __sub = function(a,b)
+      if torch.type(a) == "number" and torch.isTensor(b) then
+         return nodeApply(op.sub, gradfuns[op.sub], -b, a)
+      else
+         return nodeApply(op.sub, gradfuns[op.sub], a, -b) -- TODO subtraction
+      end
+   end,
+   __mul = function(a,b)
+      if torch.type(a) == "number" and torch.isTensor(b) then
+         return nodeApply(op.mul, gradfuns[op.mul], b, a)
+      else
+         return nodeApply(op.mul, gradfuns[op.mul], a, b)
+      end
+   end,
+   __div = function(a,b)
+      if torch.type(a) == "number" and torch.isTensor(b) then
+         -- THIS IS INSANE
+         c = torch.ones(b:size())
+         return nodeApply(op.mul, gradfuns[op.mul], torch.cdiv(c,b), a)
+      else
+         return nodeApply(op.div,  gradfuns[op.div], a, b)
+      end
+   end,
+   __unm = function(a,b)
+      error("UNDEFINED")
+   end
+}
+
 local shimTorch = { }
 local origTorch = { }
 local shimTorchClasses = { }
@@ -652,6 +688,7 @@ for _,tensorType in pairs(tensorTypes) do
 end
 
 local function installShim()
+   debug.setmetatable(1.0, numberMetatable)
    for fnName,ifn in pairs(shimTorch) do
       torch[fnName] = ifn
    end
@@ -665,6 +702,7 @@ local function installShim()
 end
 
 local function uninstallShim()
+   debug.setmetatable(1.0, nil)
    for fnName,ifn in pairs(origTorch) do
       torch[fnName] = ifn
    end

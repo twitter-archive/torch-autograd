@@ -26,7 +26,6 @@ build = {
       ['autograd.main'] = 'src/main.lua',
       ['autograd.util'] = 'src/util.lua',
       ['autograd.node'] = 'src/node.lua',
-      ['autograd.number'] = 'src/number.lua',
       ['autograd.model'] = 'src/model.lua',
       ['autograd.loss'] = 'src/loss.lua',
       ['autograd.test'] = 'test/test.lua',
