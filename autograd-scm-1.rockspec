@@ -17,7 +17,6 @@ dependencies = {
    "trepl",
    "penlight",
    "totem",
-   "profi",
 }
 
 build = {

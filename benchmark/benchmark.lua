@@ -5,7 +5,7 @@ Run benchmarks.
 Options:
    --type    (default float)    can be: double | float | cuda
    --nodes   (default false)
-   --profile (default false)
+   --profile (default false)    requires profi to be installed (luarocks install profi)
 ]]
 
 -- benchmark of common models
@@ -13,7 +13,7 @@ local d = require 'autograd'
 local nn = require 'nn'
 local c = require 'trepl.colorize'
 local getValue = require 'autograd.node'.getValue
-local profi = require 'ProFi'
+local haveProfi,profi = pcall(require,'ProFi')
 
 -- tic/toc
 local tic = sys.tic
@@ -612,9 +612,9 @@ end
 print('Benchmarks:')
 for name,test in pairs(tests) do
    nodeTimes = { }
-   if opt.profile ~= 'false' then profi:start() end
+   if opt.profile ~= 'false' and haveProfi then profi:start() end
    local tnn,tag = test()
-   if opt.profile ~= 'false' then
+   if opt.profile ~= 'false' and haveProfi then
       profi:stop()
       profi:writeReport(string.format("%s.txt",name))
       profi:reset()
