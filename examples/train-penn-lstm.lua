@@ -1,3 +1,17 @@
+-- Options
+local opt = lapp [[
+Train an LSTM to fit the Penn Treebank dataset.
+
+Options:
+   --nEpochs        (default 5)    nb of epochs
+   --bpropLength    (default 20)   max backprop steps
+   --wordDim        (default 200)  word vector dimensionality
+   --hiddens        (default 200)  nb of hidden units
+   --capEpoch       (default -1)   cap epoch to given number of steps (for debugging)
+   --reportEvery    (default 100)  report training accuracy every N steps
+   --learningRate   (default 1)    learning rate
+]]
+
 -- Libs
 local grad = require 'autograd'
 local util = require 'autograd.util'
@@ -8,7 +22,7 @@ local trainData, valData, testData, dict = require('./get-penn.lua')()
 local nTokens = #dict.id2word
 
 -- Max input length to train on
-local maxLength = 20
+local maxLength = opt.bpropLength
 
 print('loaded data: ', {
    train = trainData,
@@ -19,8 +33,8 @@ print('loaded data: ', {
 
 -- Define LSTM layers:
 local lstm,params = grad.model.RecurrentLSTMNetwork({
-   inputFeatures = 200,
-   hiddenFeatures = 200,
+   inputFeatures = opt.wordDim,
+   hiddenFeatures = opt.hiddens,
    outputType = 'all',
 })
 
@@ -55,7 +69,7 @@ params[1].bh:normal(0,0.01)
 
 -- Linear classifier params:
 params[2] = {
-   W = torch.FloatTensor(#dict.id2word, 200):normal(0,.01),
+   W = torch.FloatTensor(#dict.id2word, opt.hiddens):normal(0,.01),
    b = torch.FloatTensor(#dict.id2word):normal(0,.01),
 }
 
@@ -63,18 +77,25 @@ params[2] = {
 local df = grad(f)
 
 -- Word dictionary to train:
-local wordVecSize = 200
-local words = torch.FloatTensor(nTokens, wordVecSize):normal(0,0.01)
+local words = torch.FloatTensor(nTokens, opt.wordDim):normal(0,0.01)
+
+-- Epoch length
+local epochLength = trainData:size(1)
+if tonumber(opt.capEpoch) > 0 then
+   epochLength = opt.capEpoch
+end
 
 -- Train it
-local lr = 1
-local aloss = 0
-local reportEvery = 100
-for epoch = 1,10 do
+local lr = opt.learningRate
+local reportEvery = opt.reportEvery
+for epoch = 1,opt.nEpochs do
    -- Train:
-   print('Training Epoch #'..epoch)
+   print('\nTraining Epoch #'..epoch)
+   local aloss = 0
    local lstmState -- clear LSTM state at each new epoch
-   for i = 1,trainData:size(1)-maxLength-1,maxLength do
+   for i = 1,epochLength-maxLength,maxLength do
+      xlua.progress(i,trainData:size(1))
+
       -- Next sequence:
       local x = trainData:narrow(1,i,maxLength)
       local y = trainData:narrow(1,i+1,maxLength)
@@ -83,8 +104,7 @@ for epoch = 1,10 do
       local xv = words:index(1, x:long())
 
       -- Grads:
-      local vars = {params=params, x=xv}
-      local grads,loss,newLstmState = df(vars, y, lstmState)
+      local grads,loss,newLstmState = df({params=params, x=xv}, y, lstmState)
 
       -- Preserve state for next iteration
       lstmState = newLstmState
@@ -106,8 +126,65 @@ for epoch = 1,10 do
       if ((i-1)/maxLength+1) % reportEvery == 0 then
          aloss = aloss / reportEvery
          local perplexity = math.exp(aloss)
-         print('average training perplexity = ' .. perplexity)
+         print('\nAverage training perplexity = ' .. perplexity)
          aloss = 0
       end
    end
+
+   -- Validate:
+   print('Validation #'..epoch)
+   local aloss = 0
+   local lstmState -- clear LSTM state at each new epoch
+   for i = 1,valData:size(1)-maxLength,maxLength do
+      -- Progress:
+      xlua.progress(i,valData:size(1))
+
+      -- Next sequence:
+      local x = valData:narrow(1,i,maxLength)
+      local y = valData:narrow(1,i+1,maxLength)
+
+      -- Select word vectors
+      local xv = words:index(1, x:long())
+
+      -- Estimate loss:
+      local loss,newLstmState = f({params=params, x=xv}, y, lstmState)
+
+      -- Preserve state for next iteration
+      lstmState = newLstmState
+
+      -- Loss: exponentiate nll gives perplexity
+      aloss = aloss + loss
+   end
+   aloss = aloss / valData:size(1)
+   local perplexity = math.exp(aloss)
+   print('\nValidation perplexity = ' .. perplexity)
+   if true then break end
 end
+
+-- Test:
+print('\n\nTest set performance...:')
+local aloss = 0
+local lstmState -- clear LSTM state at each new epoch
+for i = 1,testData:size(1)-maxLength,maxLength do
+   -- Progress:
+   xlua.progress(i,testData:size(1))
+
+   -- Next sequence:
+   local x = testData:narrow(1,i,maxLength)
+   local y = testData:narrow(1,i+1,maxLength)
+
+   -- Select word vectors
+   local xv = words:index(1, x:long())
+
+   -- Estimate loss:
+   local loss,newLstmState = f({params=params, x=xv}, y, lstmState)
+
+   -- Preserve state for next iteration
+   lstmState = newLstmState
+
+   -- Loss: exponentiate nll gives perplexity
+   aloss = aloss + loss
+end
+aloss = aloss / testData:size(1)
+local perplexity = math.exp(aloss)
+print('\nTest set perplexity = ' .. perplexity)
