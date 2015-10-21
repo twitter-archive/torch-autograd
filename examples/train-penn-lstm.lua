@@ -12,12 +12,18 @@ Options:
    --learningRate   (default 1)    learning rate
    --clipGrads      (default 5)    clip gradients
    --paramRange     (default .1)   initial parameter range
+   --cuda                          run on CUDA device
 ]]
 
 -- Libs
 local grad = require 'autograd'
 local util = require 'autograd.util'
 local getValue = require 'autograd.node'.getValue
+
+-- CUDA?
+if opt.cuda then
+   require 'cutorch'
+end
 
 -- Load in PENN Treebank dataset
 local trainData, valData, testData, dict = require('./get-penn.lua')()
@@ -60,14 +66,18 @@ end
 
 -- Linear classifier params:
 params[2] = {
-   W = torch.FloatTensor(#dict.id2word, opt.hiddens),
-   b = torch.FloatTensor(#dict.id2word),
+   W = torch.Tensor(#dict.id2word, opt.hiddens),
+   b = torch.Tensor(#dict.id2word),
 }
 
 -- Init weights + cast:
 for i,weights in ipairs(params) do
    for k,weight in pairs(weights) do
-      weights[k] = weights[k]:float()
+      if opt.cuda then
+         weights[k] = weights[k]:cuda()
+      else
+         weights[k] = weights[k]:float()
+      end
       weights[k]:uniform(-opt.paramRange, opt.paramRange)
    end
 end
@@ -76,7 +86,12 @@ end
 local df = grad(f)
 
 -- Word dictionary to train:
-local words = torch.FloatTensor(nTokens, opt.wordDim):uniform(-opt.paramRange, opt.paramRange)
+local words
+if opt.cuda then
+   words = torch.CudaTensor(nTokens, opt.wordDim):uniform(-opt.paramRange, opt.paramRange)
+else
+   words = torch.FloatTensor(nTokens, opt.wordDim):uniform(-opt.paramRange, opt.paramRange)
+end
 
 -- Epoch length
 local epochLength = trainData:size(1)
@@ -112,6 +127,12 @@ for epoch = 1,opt.nEpochs do
       -- Select word vectors
       local xv = words:index(1, x:long())
 
+      -- CUDA?
+      if opt.cuda then
+         xv = xv:cuda()
+         y = y:cuda()
+      end
+
       -- Grads:
       local grads,loss,newLstmState = df({params=params, x=xv}, y, lstmState)
 
@@ -129,7 +150,8 @@ for epoch = 1,opt.nEpochs do
 
       -- Update vectors:
       for i = 1,x:size(1) do
-         words[i]:add(-lr, grads.x[i])
+         local g = grads.x[i]
+         words[i]:add(-lr, g)
       end
 
       -- Loss: exponentiate nll gives perplexity
@@ -160,6 +182,12 @@ for epoch = 1,opt.nEpochs do
 
       -- Select word vectors
       local xv = words:index(1, x:long())
+
+      -- CUDA?
+      if opt.cuda then
+         xv = xv:cuda()
+         y = y:cuda()
+      end
 
       -- Estimate loss:
       local loss,newLstmState = f({params=params, x=xv}, y, lstmState)
@@ -201,6 +229,12 @@ for i = 1,testData:size(1)-maxLength,maxLength do
 
    -- Select word vectors
    local xv = words:index(1, x:long())
+
+   -- CUDA?
+   if opt.cuda then
+      xv = xv:cuda()
+      y = y:cuda()
+   end
 
    -- Estimate loss:
    local loss,newLstmState = f({params=params, x=xv}, y, lstmState)
