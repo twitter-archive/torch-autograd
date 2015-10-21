@@ -24,7 +24,7 @@ local nTokens = #dict.id2word
 -- Max input length to train on
 local maxLength = opt.bpropLength
 
-print('loaded data: ', {
+print('Loaded datasets: ', {
    train = trainData,
    validation = valData,
    test = testData,
@@ -134,6 +134,7 @@ for epoch = 1,opt.nEpochs do
    -- Validate:
    print('Validation #'..epoch)
    local aloss = 0
+   local steps = 0
    local lstmState -- clear LSTM state at each new epoch
    for i = 1,valData:size(1)-maxLength,maxLength do
       -- Progress:
@@ -154,16 +155,17 @@ for epoch = 1,opt.nEpochs do
 
       -- Loss: exponentiate nll gives perplexity
       aloss = aloss + loss
+      steps = steps + 1
    end
-   aloss = aloss / valData:size(1)
+   aloss = aloss / steps
    local perplexity = math.exp(aloss)
    print('\nValidation perplexity = ' .. perplexity)
-   if true then break end
 end
 
 -- Test:
 print('\n\nTest set performance...:')
 local aloss = 0
+local steps = 0
 local lstmState -- clear LSTM state at each new epoch
 for i = 1,testData:size(1)-maxLength,maxLength do
    -- Progress:
@@ -184,7 +186,8 @@ for i = 1,testData:size(1)-maxLength,maxLength do
 
    -- Loss: exponentiate nll gives perplexity
    aloss = aloss + loss
+   steps = steps + 1
 end
-aloss = aloss / testData:size(1)
+aloss = aloss / steps
 local perplexity = math.exp(aloss)
 print('\nTest set perplexity = ' .. perplexity)
