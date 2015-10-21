@@ -129,6 +129,9 @@ for epoch = 1,opt.nEpochs do
          print('\nAverage training perplexity = ' .. perplexity)
          aloss = 0
       end
+
+      -- TODO: get rid of this once autograd allocates less
+      collectgarbage()
    end
 
    -- Validate:
