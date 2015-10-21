@@ -10,6 +10,8 @@ Options:
    --capEpoch       (default -1)   cap epoch to given number of steps (for debugging)
    --reportEvery    (default 100)  report training accuracy every N steps
    --learningRate   (default 1)    learning rate
+   --clipGrads      (default 5)    clip gradients
+   --paramRange     (default .1)   initial parameter range
 ]]
 
 -- Libs
@@ -56,28 +58,25 @@ local f = function(inputs, y, prevState)
    return loss / maxLength, newState
 end
 
--- Cast all to float:
-for k,param in pairs(params[1]) do
-   params[1][k] = param:float()
-end
-
--- Reset params:
-params[1].Wx:normal(0,0.01)
-params[1].bx:normal(0,0.01)
-params[1].Wh:normal(0,0.01)
-params[1].bh:normal(0,0.01)
-
 -- Linear classifier params:
 params[2] = {
-   W = torch.FloatTensor(#dict.id2word, opt.hiddens):normal(0,.01),
-   b = torch.FloatTensor(#dict.id2word):normal(0,.01),
+   W = torch.FloatTensor(#dict.id2word, opt.hiddens),
+   b = torch.FloatTensor(#dict.id2word),
 }
+
+-- Init weights + cast:
+for i,weights in ipairs(params) do
+   for k,weight in pairs(weights) do
+      weights[k] = weights[k]:float()
+      weights[k]:uniform(-opt.paramRange, opt.paramRange)
+   end
+end
 
 -- Get the gradients closure magically:
 local df = grad(f)
 
 -- Word dictionary to train:
-local words = torch.FloatTensor(nTokens, opt.wordDim):normal(0,0.01)
+local words = torch.FloatTensor(nTokens, opt.wordDim):uniform(-opt.paramRange, opt.paramRange)
 
 -- Epoch length
 local epochLength = trainData:size(1)
@@ -89,10 +88,19 @@ end
 local lr = opt.learningRate
 local reportEvery = opt.reportEvery
 local valPerplexity = math.huge
+local istart = 1
 for epoch = 1,opt.nEpochs do
+   -- For debugging mostly - if epoch size is smaller than
+   -- training data size, then start from random offset
+   if epochLength < trainData:size(1) then
+      istart = torch.random(1,trainData:size(1)-epochLength+1)
+      print('\nSetting epoch size to ' .. epochLength .. ', starting at offset = ' .. istart)
+   end
+
    -- Train:
    print('\nTraining Epoch #'..epoch)
    local aloss = 0
+   local maxGrad = 0
    local lstmState -- clear LSTM state at each new epoch
    for i = 1,epochLength-maxLength,maxLength do
       xlua.progress(i,epochLength)
@@ -113,7 +121,9 @@ for epoch = 1,opt.nEpochs do
       -- Update params:
       for i,params in ipairs(params) do
          for k,param in pairs(params) do
-            param:add(-lr, grads.params[i][k])
+            local g = grads.params[i][k]
+            g:clamp(-opt.clipGrads, opt.clipGrads)
+            param:add(-lr, g)
          end
       end
 
@@ -136,7 +146,7 @@ for epoch = 1,opt.nEpochs do
    end
 
    -- Validate:
-   print('Validation #'..epoch)
+   print('\nValidation #'..epoch)
    local aloss = 0
    local steps = 0
    local lstmState -- clear LSTM state at each new epoch

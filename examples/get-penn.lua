@@ -28,7 +28,7 @@ end
 -- Get/create dataset
 local function setupData()
    -- Fetch from Amazon
-   if not path.exists('penn') then
+   if not path.exists(sys.fpath()..'/penn') then
       os.execute[[
       curl https://s3.amazonaws.com/torch.data/penn.tgz -o penn.tgz
       tar xvf penn.tgz
@@ -39,9 +39,9 @@ local function setupData()
    -- Each dataset is a 1D tensor of ids, the 4th arg
    -- is the dictionary, with 2-way indexes
    return
-      loadDataset('penn/train.txt'),
-      loadDataset('penn/valid.txt'),
-      loadDataset('penn/test.txt'),
+      loadDataset(sys.fpath()..'/penn/train.txt'),
+      loadDataset(sys.fpath()..'/penn/valid.txt'),
+      loadDataset(sys.fpath()..'/penn/test.txt'),
       {word2id = word2id, id2word = id2word}
 end
 
