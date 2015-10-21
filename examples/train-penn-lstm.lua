@@ -88,13 +88,14 @@ end
 -- Train it
 local lr = opt.learningRate
 local reportEvery = opt.reportEvery
+local valPerplexity = math.huge
 for epoch = 1,opt.nEpochs do
    -- Train:
    print('\nTraining Epoch #'..epoch)
    local aloss = 0
    local lstmState -- clear LSTM state at each new epoch
    for i = 1,epochLength-maxLength,maxLength do
-      xlua.progress(i,trainData:size(1))
+      xlua.progress(i,epochLength)
 
       -- Next sequence:
       local x = trainData:narrow(1,i,maxLength)
@@ -163,6 +164,16 @@ for epoch = 1,opt.nEpochs do
    aloss = aloss / steps
    local perplexity = math.exp(aloss)
    print('\nValidation perplexity = ' .. perplexity)
+
+   -- Learning rate scheme:
+   if perplexity < valPerplexity then
+      -- Progress made!
+      valPerplexity = perplexity
+   else
+      -- No progress made, decrease learning rate
+      lr = lr / 2
+      print('Validation perplexity regressed, decreasing learning rate to: ' .. lr)
+   end
 end
 
 -- Test:
