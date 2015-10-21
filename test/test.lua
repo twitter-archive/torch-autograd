@@ -94,6 +94,7 @@ local tests = {
    end,
 
    Cat = function()
+      -- Concat along 1st dim:
       local x1 = torch.Tensor(3,5):normal()
       local x2 = torch.Tensor(7,5):normal()
 
@@ -119,6 +120,22 @@ local tests = {
       -- Check grads:
       for iparam,param in pairs({"x1", "x2"}) do
          tester:assert(gradcheck(fn, {x1=x1, x2=x2}, param), "Incorrect gradient")
+      end
+
+      -- Bypass table test for now...
+      if true then return end
+
+      -- Tables of tensors
+      local xs = {torch.Tensor(10):normal(), torch.Tensor(10):normal(), torch.Tensor(10):normal()}
+
+      -- Function:
+      local fn = function(inputs)
+         return torch.sum(torch.cat(inputs, 2))
+      end
+
+      -- Check grads:
+      for iparam,param in pairs({1,2,3}) do
+         tester:assert(gradcheck(fn, xs, param), "Incorrect gradient")
       end
    end,
 
