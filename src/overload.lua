@@ -66,6 +66,64 @@ local function nodeUnaryOperator(name)
    end
 end
 
+
+
+local nodeTableApply = function(fun, gradFun, ...)
+   local arg = {...}
+   local parent = nil
+   local values = { }
+   local ln = #arg
+   for k = 1, ln do
+      local v = arg[k]
+      if getmetatable(v) == Node then
+         parent = v
+         values[#values + 1] = v.value
+      elseif type(v) == "table" then
+         print("TIGHT")
+         local tableValue = {}
+         -- Assumes all members of table are nodes
+         for j,element in pairs(v) do
+            parent = element
+            tableValue[j] = element.value
+         end
+         values[#values + 1] = tableValue
+      else
+         values[#values + 1] = v
+      end
+   end
+   if parent ~= nil then
+      local value = fun(unpack(values))
+      local node = nil
+      local tape = parent.tape
+      local o = tape[tape.nextIndex]
+      if o ~= nil then
+         o.tape = tape
+         o.value = value
+         o.fun = fun
+         o.gradFun = gradFun
+         o.args = arg
+         o.outgrad = nil
+         o.argValues = values
+         tape.nextIndex = tape.nextIndex + 1
+         return o
+      end
+      return Node:new(value, fun, gradFun, arg, values, tape)
+   else
+      return fun(unpack(values))
+   end
+end
+
+local function nodeTableFn(name)
+   local fun = torch[name]
+   local gradfun = gradfuns["torch."..name]
+   return function(l)
+      if tapeRecordingDepth == 0 then
+         return fun(l)
+      end
+      return PISSASSSHIT(fun, gradFun, l)
+   end
+end
+
 Node.__add = nodeOperator("add")
 Node.__sub = nodeOperator("sub")
 Node.__mul = nodeOperator("mul")

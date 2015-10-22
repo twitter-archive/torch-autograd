@@ -228,7 +228,7 @@ gradfuns[torch.cat] = {
       dim = dim or x:nDimension()
       return torch.narrow(g, dim, 1, x:size(dim))
    end,
-   function(g, ans, x,y,dim)
+   function(g,ans,x,y,dim)
       dim = dim or x:nDimension()
       return torch.narrow(g, dim, x:size(dim)+1, y:size(dim))
    end
@@ -315,18 +315,23 @@ gradfuns[torch.mean] = {
       return repeater(g)/nrepeats
    end
 }
-
+gradfuns[torch.norm] = {
+   "norm",
+   function(g,ans,x,p,dim)
+      error("NOT IMPLEMENTED")
+   end,
+}
 gradfuns[torch.var] = {
    "var",
    function(g,ans,x,axis)
-      error("NOT IMPLEMENTED, requires complex conjugate")
+      error("NOT IMPLEMENTED")
       local repeater,nrepeats = repeatToMatchShape(x,axis)
    end
 }
 gradfuns[torch.std] = {
    "std",
    function(g,ans,x,axis)
-      error("NOT IMPLEMENTED, requires complex conjugate")
+      error("NOT IMPLEMENTED")
       local repeater,nrepeats = repeatToMatchShape(x,axis)
    end
 }
