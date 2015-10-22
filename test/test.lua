@@ -181,6 +181,43 @@ local tests = {
       tester:assert(gradcheck(func, {W=W, x=x}, 'W'), 'incorrect gradients on W')
    end,
 
+   Inverse = function()
+      -- Parameters:
+      local x = torch.Tensor(20):fill(.5)
+      local K = torch.eye(20) + torch.ger(x,x)
+
+      -- Function:
+      local func = function(inputs)
+         return torch.sum(torch.inverse(inputs.K))
+      end
+
+      -- Grads:
+      local dFunc = autograd(func)
+
+      -- Compute func and grads:
+      local pred = func({K=K})
+      local grads = dFunc({K=K})
+
+      -- Tests:
+      tester:asserteq(type(pred), 'number', 'incorrect prediction')
+      tester:asserteq(pred, torch.sum(torch.inverse(K)), 'incorrect prediction')
+      tester:asserteq(grads.K:dim(), 2, 'incorrect dims for gradients')
+   end,
+
+   GradCheck_Inverse = function()
+      -- Parameters:
+      local x = torch.Tensor(20):normal()
+      local K = torch.eye(20) + torch.ger(x,x)
+
+      -- Function:
+      local func = function(inputs)
+         return torch.sum(torch.inverse(inputs.K))
+      end
+
+      -- Check grads:
+      tester:assert(gradcheck(func, {K=K}, 'K'), 'incorrect gradients on K')
+   end,
+
    Scale = function()
       -- Parameters:
       local W = torch.Tensor(32,100):fill(.5)

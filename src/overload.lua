@@ -26,6 +26,7 @@ local override = {
    "__mul", "mul", "cmul",
    "__unm", "__sub",
    "__div","div","cdiv",
+   "inverse",
    "pow", "__pow",
    "mean", "var", "std",
    "exp", 'tanh',

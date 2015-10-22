@@ -185,6 +185,11 @@ gradfuns[torch.pow] = {
    end
 }
 
+gradfuns[torch.inverse] = {
+   "inverse",
+   function(g, ans, x) return -((ans:t() * g) * ans:t()) end,
+}
+
 gradfuns[torch.exp] = {
    "exp",
    function(g, ans, x) return elemwiseMul(ans, g) end,
