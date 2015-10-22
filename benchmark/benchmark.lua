@@ -591,6 +591,87 @@ local tests = {
       return tnn, tag
    end,
 
+   lstm = function()
+      -- Depends on CXNN reference implementation
+      local ok,cxnn = pcall(require, 'cxnn')
+      if not ok then
+         return
+      end
+
+      -- Data
+      local tnn, tag
+      local x = tensor(33,100):normal()
+      local y = math.floor(torch.uniform(1.5,10.5))
+
+      do
+         local model = nn.Sequential()
+         model:add(cxnn.RecurrentLSTMNetwork({
+            inputSize = 100,
+            hiddenFeatures = {200,200},
+            outputType = 'last',
+         }))
+         model:add(nn.LogSoftMax())
+         model:type(ttype)
+         local lossf = nn.ClassNLLCriterion()
+         lossf:type(ttype)
+
+         -- force allocs
+         model:zeroGradParameters()
+         local yhat = model:forward(x)
+         local loss = lossf:forward(yhat, y)
+         local dloss_dyhat = lossf:backward(yhat, y)
+         model:backward(x, dloss_dyhat)
+
+         tic()
+         for i = 1,50 do
+            model:zeroGradParameters()
+            local yhat = model:forward(x)
+            local loss = lossf:forward(yhat, y)
+            local dloss_dyhat = lossf:backward(yhat, y)
+            model:backward(x, dloss_dyhat)
+         end
+         tnn = toc()
+      end
+
+      do
+         local lstm1,params = d.model.RecurrentLSTMNetwork({
+            inputFeatures = 100,
+            hiddenFeatures = 200,
+            outputType = 'all',
+         })
+         local lstm2 = d.model.RecurrentLSTMNetwork({
+            inputFeatures = 200,
+            hiddenFeatures = 200,
+            outputType = 'last',
+         }, params)
+         local lsm = d.nn.LogSoftMax()
+
+         local f = function(params, x, y)
+            local h1 = lstm1(params[1], x)
+            local h2 = lstm2(params[2], h1)
+            local yhat = lsm(h2)
+            local loss = - torch.sum( torch.narrow(yhat, 1, y, 1) )
+            return loss
+         end
+
+         for i in ipairs(params) do
+            for k in pairs(params[i]) do
+               params[i][k] = params[i][k]:type(ttype):normal()
+            end
+         end
+
+         -- force allocs
+         local grads = d(f)(params, x, y)
+
+         tic()
+         for i = 1,50 do
+            local grads = d(f)(params, x, y)
+         end
+         tag = toc()
+      end
+
+      return tnn, tag
+   end
 }
 
 local fmt = function(nb,color)
@@ -612,8 +693,8 @@ end
 print('Benchmarks:')
 for name,test in pairs(tests) do
    nodeTimes = { }
-   if opt.profile ~= 'false' and haveProfi then 
-      profi:start() 
+   if opt.profile ~= 'false' and haveProfi then
+      profi:start()
    end
    local tnn,tag = test()
    if opt.profile ~= 'false' and haveProfi then
