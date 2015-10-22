@@ -225,8 +225,22 @@ end
 gradfuns[torch.cat] = {
    "cat",
    function(g, ans, x,y,dim)
-      dim = dim or x:nDimension()
-      return torch.narrow(g, dim, 1, x:size(dim))
+      if isTensor(x) then
+         dim = dim or x:nDimension()
+         return torch.narrow(g, dim, 1, x:size(dim))
+      else
+         -- Second argument is dimension if table is passed in
+         dim = y or x[1]:nDimension()
+         local ln=#x
+         out = {}
+         local currentIndex = 1
+         for i=1,ln do
+            local thisSize = x[i]:size(dim)
+            out[i] = torch.narrow(g,dim,currentIndex,thisSize)
+            currentIndex = currentIndex + thisSize
+         end
+         return out
+      end
    end,
    function(g,ans,x,y,dim)
       dim = dim or x:nDimension()

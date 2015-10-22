@@ -95,52 +95,45 @@ local tests = {
 
    Cat = function()
       -- Concat along 1st dim:
-      -- local x1 = torch.Tensor(3,5):normal()
-      -- local x2 = torch.Tensor(7,5):normal()
+      local x1 = torch.Tensor(3,5):normal()
+      local x2 = torch.Tensor(7,5):normal()
 
-      -- -- Function:
-      -- local fn = function(inputs)
-      --    return torch.sum(torch.cat(inputs.x1, inputs.x2, 1))
-      -- end
+      -- Function:
+      local fn = function(inputs)
+         return torch.sum(torch.cat(inputs.x1, inputs.x2, 1))
+      end
 
-      -- -- Check grads:
-      -- for iparam,param in pairs({"x1", "x2"}) do
-      --    tester:assert(gradcheck(fn, {x1=x1, x2=x2}, param), "Incorrect gradient")
-      -- end
+      -- Check grads:
+      for iparam,param in pairs({"x1", "x2"}) do
+         tester:assert(gradcheck(fn, {x1=x1, x2=x2}, param), "Incorrect gradient")
+      end
 
-      -- -- Transpose, and cat along the last dim
-      -- local x1 = x1:t():contiguous()
-      -- local x2 = x2:t():contiguous()
+      -- Transpose, and cat along the last dim
+      local x1 = x1:t():contiguous()
+      local x2 = x2:t():contiguous()
 
-      -- -- Function:
-      -- local fn = function(inputs)
-      --    return torch.sum(torch.cat(inputs.x1, inputs.x2))
-      -- end
+      -- Function:
+      local fn = function(inputs)
+         return torch.sum(torch.cat(inputs.x1, inputs.x2))
+      end
 
-      -- -- Check grads:
-      -- for iparam,param in pairs({"x1", "x2"}) do
-      --    tester:assert(gradcheck(fn, {x1=x1, x2=x2}, param), "Incorrect gradient")
-      -- end
-
-      -- Bypass table test for now...
-      -- if true then return end
+      -- Check grads:
+      for iparam,param in pairs({"x1", "x2"}) do
+         tester:assert(gradcheck(fn, {x1=x1, x2=x2}, param), "Incorrect gradient")
+      end
 
       -- Tables of tensors
       local xs = {torch.Tensor(10):normal(), torch.Tensor(10):normal(), torch.Tensor(10):normal()}
 
       -- Function:
       local fn = function(inputs)
-         return torch.sum(torch.cat(inputs, 2))
+         return torch.sum(torch.cat(inputs,1))
       end
 
-      -- g = autograd(fn)
-      print(fn(xs))
-      -- print(g(xs))
-
       -- Check grads:
-      -- for iparam,param in pairs({1,2,3}) do
-      --    tester:assert(gradcheck(fn, xs, param), "Incorrect gradient")
-      -- end
+      for iparam,param in pairs({1,2,3}) do
+         tester:assert(gradcheck(fn, xs, param), "Incorrect gradient")
+      end
    end,
 
    Dot = function()

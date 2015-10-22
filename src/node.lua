@@ -91,15 +91,14 @@ nodeApply = function(fun, gradFun, ...)
       elseif type(v) == "table" then
          local tableValue = {}
          for j,element in pairs(v) do
-            parent = element
             if getmetatable(element) == Node then
+               parent = element
                tableValue[j] = element.value
             else
                tableValue[j] = element
             end
          end
          values[#values + 1] = tableValue
-         print(values)
       else
          values[#values + 1] = v
       end
