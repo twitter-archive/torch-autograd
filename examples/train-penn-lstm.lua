@@ -195,12 +195,6 @@ for epoch = 1,opt.nEpochs do
       -- Select word vectors
       local xv = words:index(1, x:long())
 
-      -- CUDA?
-      if opt.cuda then
-         xv = xv:cuda()
-         y = y:cuda()
-      end
-
       -- Estimate loss:
       loss,lstmState = f({params=params, x=xv}, y, lstmState)
 
@@ -239,12 +233,6 @@ for i = 1,testData:size(1)-maxLength,maxLength do
 
    -- Select word vectors
    local xv = words:index(1, x:long())
-
-   -- CUDA?
-   if opt.cuda then
-      xv = xv:cuda()
-      y = y:cuda()
-   end
 
    -- Estimate loss:
    loss,lstmState = f({params=params, x=xv}, y, lstmState)
