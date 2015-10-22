@@ -16,8 +16,9 @@ Options:
 ]]
 
 -- Libs
-local grad = require 'autograd'
+local d = require 'autograd'
 local util = require 'autograd.util'
+local model = require 'autograd.model'
 local _ = require 'moses'
 
 -- CUDA?
@@ -47,12 +48,12 @@ print('Loaded datasets: ', {
 })
 
 -- Define LSTM layers:
-local lstm1,params = grad.model.RecurrentLSTMNetwork({
+local lstm1,params = model.RecurrentLSTMNetwork({
    inputFeatures = opt.wordDim,
    hiddenFeatures = opt.hiddens,
    outputType = 'all',
 })
-local lstm2 = grad.model.RecurrentLSTMNetwork({
+local lstm2 = model.RecurrentLSTMNetwork({
    inputFeatures = opt.hiddens,
    hiddenFeatures = opt.hiddens,
    outputType = 'all',
@@ -69,7 +70,7 @@ local f = function(inputs, y, prevState)
    for i = 1,maxLength do
       -- Classify:
       local h3 = inputs.params[3].W * h2[i] + inputs.params[3].b
-      local yhat = grad.util.logSoftMax(h3)
+      local yhat = util.logSoftMax(h3)
       loss = loss - torch.sum( torch.narrow(yhat, 1, y[i], 1) )
    end
 
@@ -94,9 +95,6 @@ for i,weights in ipairs(params) do
       weights[k]:uniform(-opt.paramRange, opt.paramRange)
    end
 end
-
--- Get the gradients closure magically:
-local df = grad(f)
 
 -- Word dictionary to train:
 local words
@@ -142,7 +140,7 @@ for epoch = 1,opt.nEpochs do
       local xv = words:index(1, x:long())
 
       -- Grads:
-      grads,loss,lstmState = df({params=params, x=xv}, y, lstmState)
+      grads,loss,lstmState = d(f)({params=params, x=xv}, y, lstmState)
 
       -- Cap gradient norms:
       for i,grad in ipairs(_.flatten(grads)) do
