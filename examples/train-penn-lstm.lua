@@ -47,35 +47,41 @@ print('Loaded datasets: ', {
 })
 
 -- Define LSTM layers:
-local lstm,params = grad.model.RecurrentLSTMNetwork({
+local lstm1,params = grad.model.RecurrentLSTMNetwork({
    inputFeatures = opt.wordDim,
    hiddenFeatures = opt.hiddens,
    outputType = 'all',
 })
+local lstm2 = grad.model.RecurrentLSTMNetwork({
+   inputFeatures = opt.hiddens,
+   hiddenFeatures = opt.hiddens,
+   outputType = 'all',
+}, params)
 
 -- Complete trainable function:
 local f = function(inputs, y, prevState)
    -- Encode all inputs through LSTM:
-   local h1,newState = lstm(inputs.params[1], inputs.x, prevState)
+   local h1,newState1 = lstm1(inputs.params[1], inputs.x, prevState[1])
+   local h2,newState2 = lstm2(inputs.params[2], h1, prevState[2])
 
    -- Loss:
    local loss = 0
    for i = 1,maxLength do
       -- Classify:
-      local h2 = inputs.params[2].W * h1[i] + inputs.params[2].b
-      local yhat = grad.util.logSoftMax(h2)
+      local h3 = inputs.params[3].W * h2[i] + inputs.params[3].b
+      local yhat = grad.util.logSoftMax(h3)
       loss = loss - torch.sum( torch.narrow(yhat, 1, y[i], 1) )
    end
 
    -- Return avergage loss
-   return loss / maxLength, newState
+   return loss / maxLength, {newState1, newState2}
 end
 
 -- Linear classifier params:
-params[2] = {
+table.insert(params, {
    W = torch.Tensor(#dict.id2word, opt.hiddens),
    b = torch.Tensor(#dict.id2word),
-}
+})
 
 -- Init weights + cast:
 for i,weights in ipairs(params) do
@@ -123,7 +129,8 @@ for epoch = 1,opt.nEpochs do
    print('\nTraining Epoch #'..epoch)
    local aloss = 0
    local maxGrad = 0
-   local lstmState -- clear LSTM state at each new epoch
+   local lstmState = {} -- clear LSTM state at each new epoch
+   local grads,loss
    for i = 1,epochLength-maxLength,maxLength do
       xlua.progress(i,epochLength)
 
@@ -135,10 +142,7 @@ for epoch = 1,opt.nEpochs do
       local xv = words:index(1, x:long())
 
       -- Grads:
-      local grads,loss,newLstmState = df({params=params, x=xv}, y, lstmState)
-
-      -- Preserve state for next iteration
-      lstmState = newLstmState
+      grads,loss,lstmState = df({params=params, x=xv}, y, lstmState)
 
       -- Cap gradient norms:
       for i,grad in ipairs(_.flatten(grads)) do
@@ -180,7 +184,8 @@ for epoch = 1,opt.nEpochs do
    print('\nValidation #'..epoch)
    local aloss = 0
    local steps = 0
-   local lstmState -- clear LSTM state at each new epoch
+   local lstmState = {}
+   local loss
    for i = 1,valData:size(1)-maxLength,maxLength do
       -- Progress:
       xlua.progress(i,valData:size(1))
@@ -199,10 +204,7 @@ for epoch = 1,opt.nEpochs do
       end
 
       -- Estimate loss:
-      local loss,newLstmState = f({params=params, x=xv}, y, lstmState)
-
-      -- Preserve state for next iteration
-      lstmState = newLstmState
+      loss,lstmState = f({params=params, x=xv}, y, lstmState)
 
       -- Loss: exponentiate nll gives perplexity
       aloss = aloss + loss
@@ -227,7 +229,8 @@ end
 print('\n\nTest set performance...:')
 local aloss = 0
 local steps = 0
-local lstmState -- clear LSTM state at each new epoch
+local lstmState
+local loss
 for i = 1,testData:size(1)-maxLength,maxLength do
    -- Progress:
    xlua.progress(i,testData:size(1))
@@ -246,10 +249,7 @@ for i = 1,testData:size(1)-maxLength,maxLength do
    end
 
    -- Estimate loss:
-   local loss,newLstmState = f({params=params, x=xv}, y, lstmState)
-
-   -- Preserve state for next iteration
-   lstmState = newLstmState
+   loss,lstmState = f({params=params, x=xv}, y, lstmState)
 
    -- Loss: exponentiate nll gives perplexity
    aloss = aloss + loss
