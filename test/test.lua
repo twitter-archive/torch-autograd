@@ -122,15 +122,12 @@ local tests = {
          tester:assert(gradcheck(fn, {x1=x1, x2=x2}, param), "Incorrect gradient")
       end
 
-      -- Bypass table test for now...
-      if true then return end
-
       -- Tables of tensors
       local xs = {torch.Tensor(10):normal(), torch.Tensor(10):normal(), torch.Tensor(10):normal()}
 
       -- Function:
       local fn = function(inputs)
-         return torch.sum(torch.cat(inputs, 2))
+         return torch.sum(torch.cat(inputs,1))
       end
 
       -- Check grads:

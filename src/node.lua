@@ -54,6 +54,17 @@ nodeApply = function(fun, gradFun, ...)
       if getmetatable(v) == Node then
          parent = v
          values[#values + 1] = v.value
+      elseif type(v) == "table" then
+         local tableValue = {}
+         for j,element in pairs(v) do
+            if getmetatable(element) == Node then
+               parent = element
+               tableValue[j] = element.value
+            else
+               tableValue[j] = element
+            end
+         end
+         values[#values + 1] = tableValue
       else
          values[#values + 1] = v
       end
@@ -79,6 +90,7 @@ nodeApply = function(fun, gradFun, ...)
       return fun(unpack(values))
    end
 end
+
 
 -- If we passed in just a tensor, return the outgrad.
 -- If we passed in a table, return all the outgrads.
