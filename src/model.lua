@@ -288,7 +288,17 @@ function model.RecurrentLSTMNetwork(opt, params)
    local f = function(params, x, prevState)
       -- dims:
       local p = params[1] or params
-      local steps = getValue(x):size(1)
+
+      -- number of steps:
+      -- TODO: we need to support tables for now, because of missing
+      -- support for torch.cat and/or torch.copy - will eventually only
+      -- support tensors
+      local steps
+      if type(getValue(x)) == 'table' then
+         steps = #x
+      else
+         steps = getValue(x):size(1)
+      end
 
       -- hiddens:
       local hs = {}
@@ -296,8 +306,16 @@ function model.RecurrentLSTMNetwork(opt, params)
 
       -- go over time:
       for t = 1,steps do
+         -- xt
+         local xt
+         if type(getValue(x)) == 'table' then
+            xt = x[t]
+         else
+            xt = torch.select(x,1,t)
+         end
+
          -- pack all dot products:
-         local hx = p.Wx * torch.select(x,1,t) + p.bx
+         local hx = p.Wx * xt + p.bx
          local hh
          if t > 1 then
             hh = p.Wh * hs[t-1] + p.bh
