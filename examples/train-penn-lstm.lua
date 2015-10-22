@@ -29,6 +29,13 @@ end
 local trainData, valData, testData, dict = require('./get-penn.lua')()
 local nTokens = #dict.id2word
 
+-- Move data to CUDA
+if opt.cuda then
+   trainData = trainData:cuda()
+   testData = testData:cuda()
+   valData = valData:cuda()
+end
+
 -- Max input length to train on
 local maxLength = opt.bpropLength
 
@@ -127,12 +134,6 @@ for epoch = 1,opt.nEpochs do
       -- Select word vectors
       local xv = words:index(1, x:long())
 
-      -- CUDA?
-      if opt.cuda then
-         xv = xv:cuda()
-         y = y:cuda()
-      end
-
       -- Grads:
       local grads,loss,newLstmState = df({params=params, x=xv}, y, lstmState)
 
@@ -143,7 +144,7 @@ for epoch = 1,opt.nEpochs do
       for i,grad in ipairs(_.flatten(grads)) do
          local norm = grad:norm()
          if norm > opt.maxGradNorm then
-            print('capping gradient norm from ' .. norm .. ' to ' .. opt.maxGradNorm)
+            print('\n[capping gradient norm from ' .. norm .. ' to ' .. opt.maxGradNorm .. ']')
             grad:mul( opt.maxGradNorm / norm )
          end
       end
