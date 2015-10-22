@@ -607,9 +607,10 @@ local tests = {
          local model = nn.Sequential()
          model:add(cxnn.RecurrentLSTMNetwork({
             inputSize = 100,
-            hiddenFeatures = {200,200},
+            hiddenFeatures = {200},
             outputType = 'last',
          }))
+         model:add(nn.Linear(200,10))
          model:add(nn.LogSoftMax())
          model:type(ttype)
          local lossf = nn.ClassNLLCriterion()
@@ -623,7 +624,7 @@ local tests = {
          model:backward(x, dloss_dyhat)
 
          tic()
-         for i = 1,50 do
+         for i = 1,10 do
             model:zeroGradParameters()
             local yhat = model:forward(x)
             local loss = lossf:forward(yhat, y)
@@ -637,18 +638,19 @@ local tests = {
          local lstm1,params = d.model.RecurrentLSTMNetwork({
             inputFeatures = 100,
             hiddenFeatures = 200,
-            outputType = 'all',
-         })
-         local lstm2 = d.model.RecurrentLSTMNetwork({
-            inputFeatures = 200,
-            hiddenFeatures = 200,
             outputType = 'last',
-         }, params)
+         })
+         local lin2 = d.nn.Linear(200,10)
          local lsm = d.nn.LogSoftMax()
+
+         table.insert(params, {
+            W = tensor(10,200),
+            b = tensor(10),
+         })
 
          local f = function(params, x, y)
             local h1 = lstm1(params[1], x)
-            local h2 = lstm2(params[2], h1)
+            local h2 = lin2(h1, params[2].W, params[2].b)
             local yhat = lsm(h2)
             local loss = - torch.sum( torch.narrow(yhat, 1, y, 1) )
             return loss
@@ -664,7 +666,7 @@ local tests = {
          local grads = d(f)(params, x, y)
 
          tic()
-         for i = 1,50 do
+         for i = 1,10 do
             local grads = d(f)(params, x, y)
          end
          tag = toc()
