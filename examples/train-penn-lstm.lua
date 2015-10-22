@@ -3,17 +3,17 @@ local opt = lapp [[
 Train an LSTM to fit the Penn Treebank dataset.
 
 Options:
-   --nEpochs        (default 5)    nb of epochs
-   --bpropLength    (default 20)   max backprop steps
-   --wordDim        (default 200)  word vector dimensionality
-   --hiddens        (default 200)  nb of hidden units
-   --capEpoch       (default -1)   cap epoch to given number of steps (for debugging)
-   --reportEvery    (default 100)  report training accuracy every N steps
-   --learningRate   (default 1)    learning rate
-   --maxGradNorm    (default 3)    cap gradient norm
-   --paramRange     (default .1)   initial parameter range
-   --dropout        (default 0)    dropout probability on hidden states
-   --cuda                          run on CUDA device
+   --nEpochs        (default 5)       nb of epochs
+   --bpropLength    (default 20)      max backprop steps
+   --wordDim        (default 200)     word vector dimensionality
+   --hiddens        (default 200)     nb of hidden units
+   --capEpoch       (default -1)      cap epoch to given number of steps (for debugging)
+   --reportEvery    (default 100)     report training accuracy every N steps
+   --learningRate   (default 1)       learning rate
+   --maxGradNorm    (default 3)       cap gradient norm
+   --paramRange     (default .1)      initial parameter range
+   --dropout        (default 0)       dropout probability on hidden states
+   --type           (default float)   tensor type: cuda | float | double
 ]]
 
 -- Libs
@@ -24,7 +24,7 @@ local model = require 'autograd.model'
 local _ = require 'moses'
 
 -- CUDA?
-if opt.cuda then
+if opt.type == 'cuda' then
    require 'cutorch'
 end
 
@@ -33,10 +33,14 @@ local trainData, valData, testData, dict = require('./get-penn.lua')()
 local nTokens = #dict.id2word
 
 -- Move data to CUDA
-if opt.cuda then
+if opt.type == 'cuda' then
    trainData = trainData:cuda()
    testData = testData:cuda()
    valData = valData:cuda()
+elseif opt.type == 'double' then
+   trainData = trainData:double()
+   testData = testData:double()
+   valData = valData:double()
 end
 
 -- Max input length to train on
@@ -66,16 +70,8 @@ local dropout = function(state)
    local keep = 1 - opt.dropout
    if keep == 1 then return state end
    local sv = getValue(state)
-   if type(sv) == 'table' then
-      return _.map(sv, function(i,state)
-         local sv = getValue(state)
-         local keep = sv.new(sv:size()):bernoulli(keep):mul(1/keep)
-         return torch.cmul(state, keep)
-      end)
-   else
-      local keep = sv.new(sv:size()):bernoulli(keep):mul(1/keep)
-      return torch.cmul(state, keep)
-   end
+   local keep = sv.new(sv:size()):bernoulli(keep):mul(1/keep)
+   return torch.cmul(state, keep)
 end
 
 -- Complete trainable function:
@@ -88,7 +84,8 @@ local f = function(inputs, y, prevState)
    local loss = 0
    for i = 1,maxLength do
       -- Classify:
-      local h3 = inputs.params[3].W * dropout(h2[i]) + inputs.params[3].b
+      local h2i = torch.select(h2,1,i)
+      local h3 = inputs.params[3].W * dropout(h2i) + inputs.params[3].b
       local yhat = util.logSoftMax(h3)
       loss = loss - torch.sum( torch.narrow(yhat, 1, y[i], 1) )
    end
@@ -125,8 +122,10 @@ table.insert(params, {
 -- Init weights + cast:
 for i,weights in ipairs(params) do
    for k,weight in pairs(weights) do
-      if opt.cuda then
+      if opt.type == 'cuda' then
          weights[k] = weights[k]:cuda()
+      elseif opt.type == 'double' then
+         weights[k] = weights[k]:double()
       else
          weights[k] = weights[k]:float()
       end
@@ -136,8 +135,10 @@ end
 
 -- Word dictionary to train:
 local words
-if opt.cuda then
+if opt.type == 'cuda' then
    words = torch.CudaTensor(nTokens, opt.wordDim):uniform(-opt.paramRange, opt.paramRange)
+elseif opt.type == 'double' then
+   words = torch.DoubleTensor(nTokens, opt.wordDim):uniform(-opt.paramRange, opt.paramRange)
 else
    words = torch.FloatTensor(nTokens, opt.wordDim):uniform(-opt.paramRange, opt.paramRange)
 end
