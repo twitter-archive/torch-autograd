@@ -10,7 +10,7 @@ Options:
    --capEpoch       (default -1)   cap epoch to given number of steps (for debugging)
    --reportEvery    (default 100)  report training accuracy every N steps
    --learningRate   (default 1)    learning rate
-   --clipGrads      (default 5)    clip gradients
+   --maxGradNorm    (default 3)    cap gradient norm
    --paramRange     (default .1)   initial parameter range
    --cuda                          run on CUDA device
 ]]
@@ -18,7 +18,7 @@ Options:
 -- Libs
 local grad = require 'autograd'
 local util = require 'autograd.util'
-local getValue = require 'autograd.node'.getValue
+local _ = require 'moses'
 
 -- CUDA?
 if opt.cuda then
@@ -139,11 +139,19 @@ for epoch = 1,opt.nEpochs do
       -- Preserve state for next iteration
       lstmState = newLstmState
 
+      -- Cap gradient norms:
+      for i,grad in ipairs(_.flatten(grads)) do
+         local norm = grad:norm()
+         if norm > opt.maxGradNorm then
+            print('capping gradient norm from ' .. norm .. ' to ' .. opt.maxGradNorm)
+            grad:mul( opt.maxGradNorm / norm )
+         end
+      end
+
       -- Update params:
       for i,params in ipairs(params) do
          for k,param in pairs(params) do
             local g = grads.params[i][k]
-            g:clamp(-opt.clipGrads, opt.clipGrads)
             param:add(-lr, g)
          end
       end
