@@ -45,40 +45,6 @@ end
 -- that we unpack the value in those nodes, apply the function
 -- to the underlying value, and then wrap the value in a node
 nodeApply = function(fun, gradFun, ...)
---    local arg = {...}
---    local parent = nil
---    local values = { }
---    local ln = #arg
---    for k = 1, ln do
---       local v = arg[k]
---       if getmetatable(v) == Node then
---          parent = v
---          values[#values + 1] = v.value
---       else
---          values[#values + 1] = v
---       end
---    end
---    if parent ~= nil then
---       local value = fun(unpack(values))
---       local node = nil
---       local tape = parent.tape
---       local o = tape[tape.nextIndex]
---       if o ~= nil then
---          o.tape = tape
---          o.value = value
---          o.fun = fun
---          o.gradFun = gradFun
---          o.args = arg
---          o.outgrad = nil
---          o.argValues = values
---          tape.nextIndex = tape.nextIndex + 1
---          return o
---       end
---       return Node:new(value, fun, gradFun, arg, values, tape)
---    else
---       return fun(unpack(values))
---    end
--- end
    local arg = {...}
    local parent = nil
    local values = { }
