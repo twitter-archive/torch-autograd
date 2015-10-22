@@ -12,12 +12,14 @@ Options:
    --learningRate   (default 1)    learning rate
    --maxGradNorm    (default 3)    cap gradient norm
    --paramRange     (default .1)   initial parameter range
+   --dropout        (default 0)    dropout probability on hidden states
    --cuda                          run on CUDA device
 ]]
 
 -- Libs
 local d = require 'autograd'
 local util = require 'autograd.util'
+local getValue = require 'autograd.node'.getValue
 local model = require 'autograd.model'
 local _ = require 'moses'
 
@@ -59,8 +61,44 @@ local lstm2 = model.RecurrentLSTMNetwork({
    outputType = 'all',
 }, params)
 
+-- Dropout
+local dropout = function(state)
+   local keep = 1 - opt.dropout
+   if keep == 1 then return state end
+   local sv = getValue(state)
+   if type(sv) == 'table' then
+      return _.map(sv, function(i,state)
+         local sv = getValue(state)
+         local keep = sv.new(sv:size()):bernoulli(keep):mul(1/keep)
+         return torch.cmul(state, keep)
+      end)
+   else
+      local keep = sv.new(sv:size()):bernoulli(keep):mul(1/keep)
+      return torch.cmul(state, keep)
+   end
+end
+
 -- Complete trainable function:
 local f = function(inputs, y, prevState)
+   -- Encode all inputs through LSTM:
+   local h1,newState1 = lstm1(inputs.params[1], dropout(inputs.x), prevState[1])
+   local h2,newState2 = lstm2(inputs.params[2], dropout(h1), prevState[2])
+
+   -- Loss:
+   local loss = 0
+   for i = 1,maxLength do
+      -- Classify:
+      local h3 = inputs.params[3].W * dropout(h2[i]) + inputs.params[3].b
+      local yhat = util.logSoftMax(h3)
+      loss = loss - torch.sum( torch.narrow(yhat, 1, y[i], 1) )
+   end
+
+   -- Return avergage loss
+   return loss / maxLength, {newState1, newState2}
+end
+
+-- Complete eval function (no dropout):
+local eval = function(inputs, y, prevState)
    -- Encode all inputs through LSTM:
    local h1,newState1 = lstm1(inputs.params[1], inputs.x, prevState[1])
    local h2,newState2 = lstm2(inputs.params[2], h1, prevState[2])
@@ -146,7 +184,6 @@ for epoch = 1,opt.nEpochs do
       for i,grad in ipairs(_.flatten(grads)) do
          local norm = grad:norm()
          if norm > opt.maxGradNorm then
-            print('\n[capping gradient norm from ' .. norm .. ' to ' .. opt.maxGradNorm .. ']')
             grad:mul( opt.maxGradNorm / norm )
          end
       end
@@ -196,7 +233,7 @@ for epoch = 1,opt.nEpochs do
       local xv = words:index(1, x:long())
 
       -- Estimate loss:
-      loss,lstmState = f({params=params, x=xv}, y, lstmState)
+      loss,lstmState = eval({params=params, x=xv}, y, lstmState)
 
       -- Loss: exponentiate nll gives perplexity
       aloss = aloss + loss
@@ -221,7 +258,7 @@ end
 print('\n\nTest set performance...:')
 local aloss = 0
 local steps = 0
-local lstmState
+local lstmState = {}
 local loss
 for i = 1,testData:size(1)-maxLength,maxLength do
    -- Progress:
@@ -235,7 +272,7 @@ for i = 1,testData:size(1)-maxLength,maxLength do
    local xv = words:index(1, x:long())
 
    -- Estimate loss:
-   loss,lstmState = f({params=params, x=xv}, y, lstmState)
+   loss,lstmState = eval({params=params, x=xv}, y, lstmState)
 
    -- Loss: exponentiate nll gives perplexity
    aloss = aloss + loss
