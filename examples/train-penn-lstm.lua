@@ -5,6 +5,7 @@ Train an LSTM to fit the Penn Treebank dataset.
 Options:
    --nEpochs        (default 5)       nb of epochs
    --bpropLength    (default 20)      max backprop steps
+   --batchSize      (default 1)       batch size
    --wordDim        (default 200)     word vector dimensionality
    --hiddens        (default 200)     nb of hidden units
    --capEpoch       (default -1)      cap epoch to given number of steps (for debugging)
@@ -13,7 +14,7 @@ Options:
    --maxGradNorm    (default 3)       cap gradient norm
    --paramRange     (default .1)      initial parameter range
    --dropout        (default 0)       dropout probability on hidden states
-   --type           (default float)   tensor type: cuda | float | double
+   --type           (default double)  tensor type: cuda | float | double
 ]]
 
 -- Libs
@@ -43,9 +44,6 @@ elseif opt.type == 'double' then
    valData = valData:double()
 end
 
--- Max input length to train on
-local maxLength = opt.bpropLength
-
 print('Loaded datasets: ', {
    train = trainData,
    validation = valData,
@@ -73,50 +71,55 @@ local dropout = function(state)
    local keep = sv.new(sv:size()):bernoulli(keep):mul(1/keep)
    return torch.cmul(state, keep)
 end
+local bypass = function(state) return state end
+local regularize = dropout
+
+-- Shortcuts
+local nElements = opt.batchSize*opt.bpropLength
+local nClasses = #dict.id2word
 
 -- Complete trainable function:
 local f = function(inputs, y, prevState)
-   -- Encode all inputs through LSTM:
-   local h1,newState1 = lstm1(inputs.params[1], dropout(inputs.x), prevState[1])
-   local h2,newState2 = lstm2(inputs.params[2], dropout(h1), prevState[2])
+   -- Encode all inputs through LSTM layers:
+   local h1,newState1 = lstm1(inputs.params[1], regularize(inputs.x), prevState[1])
+   local h2,newState2 = lstm2(inputs.params[2], regularize(h1), prevState[2])
+
+   -- Flatten batch + temporal
+   local h2f = torch.view(h2, nElements, opt.hiddens)
+   local yf = torch.view(y, nElements)
+
+   -- Linear classifier:
+   local h3 = regularize(h2f) * inputs.params[3].W + torch.expand(inputs.params[3].b, nElements, nClasses)
 
    -- Loss:
    local loss = 0
-   for i = 1,maxLength do
+   for i = 1,nElements do
       -- Classify:
-      local h2i = torch.select(h2,1,i)
-      local h3 = inputs.params[3].W * dropout(h2i) + inputs.params[3].b
-      local yhat = util.logSoftMax(h3)
-      loss = loss - torch.sum( torch.narrow(yhat, 1, y[i], 1) )
+      local h3i = torch.select(h3,1,i)
+      local yhat = util.logSoftMax(h3i)
+      loss = loss - torch.sum( torch.narrow(yhat, 1, yf[i], 1) )
    end
 
    -- Return avergage loss
-   return loss / maxLength, {newState1, newState2}
+   return loss / nElements, {newState1, newState2}
 end
 
--- Complete eval function (no dropout):
-local eval = function(inputs, y, prevState)
-   -- Encode all inputs through LSTM:
-   local h1,newState1 = lstm1(inputs.params[1], inputs.x, prevState[1])
-   local h2,newState2 = lstm2(inputs.params[2], h1, prevState[2])
+-- Training eval
+local trainf = function(...)
+   regularize = dropout
+   return f(...)
+end
 
-   -- Loss:
-   local loss = 0
-   for i = 1,maxLength do
-      -- Classify:
-      local h3 = inputs.params[3].W * h2[i] + inputs.params[3].b
-      local yhat = util.logSoftMax(h3)
-      loss = loss - torch.sum( torch.narrow(yhat, 1, y[i], 1) )
-   end
-
-   -- Return avergage loss
-   return loss / maxLength, {newState1, newState2}
+-- Test eval
+local testf = function(...)
+   regularize = bypass
+   return f(...)
 end
 
 -- Linear classifier params:
 table.insert(params, {
-   W = torch.Tensor(#dict.id2word, opt.hiddens),
-   b = torch.Tensor(#dict.id2word),
+   W = torch.Tensor(opt.hiddens, #dict.id2word),
+   b = torch.Tensor(1, #dict.id2word),
 })
 
 -- Init weights + cast:
@@ -153,33 +156,29 @@ end
 local lr = opt.learningRate
 local reportEvery = opt.reportEvery
 local valPerplexity = math.huge
-local istart = 1
 for epoch = 1,opt.nEpochs do
-   -- For debugging mostly - if epoch size is smaller than
-   -- training data size, then start from random offset
-   if epochLength < trainData:size(1) then
-      istart = torch.random(1,trainData:size(1)-epochLength+1)
-      print('\nSetting epoch size to ' .. epochLength .. ', starting at offset = ' .. istart)
-   end
-
    -- Train:
    print('\nTraining Epoch #'..epoch)
    local aloss = 0
    local maxGrad = 0
    local lstmState = {} -- clear LSTM state at each new epoch
    local grads,loss
-   for i = 1,epochLength-maxLength,maxLength do
+   for i = 1,epochLength-opt.bpropLength,opt.bpropLength do
       xlua.progress(i,epochLength)
 
       -- Next sequence:
-      local x = trainData:narrow(1,i,maxLength)
-      local y = trainData:narrow(1,i+1,maxLength)
+      local x = trainData:narrow(1,i,opt.bpropLength)
+      local y = trainData:narrow(1,i+1,opt.bpropLength)
 
       -- Select word vectors
       local xv = words:index(1, x:long())
 
+      -- Reshape to batch of 1
+      xv = xv:view(1,opt.bpropLength,opt.wordDim)
+      y = y:view(1,opt.bpropLength)
+
       -- Grads:
-      grads,loss,lstmState = d(f)({params=params, x=xv}, y, lstmState)
+      grads,loss,lstmState = d(trainf)({params=params, x=xv}, y, lstmState)
 
       -- Cap gradient norms:
       for i,grad in ipairs(_.flatten(grads)) do
@@ -198,14 +197,14 @@ for epoch = 1,opt.nEpochs do
       end
 
       -- Update vectors:
-      for i = 1,x:size(1) do
-         local g = grads.x[i]
-         words[i]:add(-lr, g)
+      local gradx = grads.x:view(nElements, opt.wordDim)
+      for i = 1,nElements do
+         words[i]:add(-lr, gradx[i])
       end
 
       -- Loss: exponentiate nll gives perplexity
       aloss = aloss + loss
-      if ((i-1)/maxLength+1) % reportEvery == 0 then
+      if ((i-1)/opt.bpropLength+1) % reportEvery == 0 then
          aloss = aloss / reportEvery
          local perplexity = math.exp(aloss)
          print('\nAverage training perplexity = ' .. perplexity)
@@ -222,19 +221,23 @@ for epoch = 1,opt.nEpochs do
    local steps = 0
    local lstmState = {}
    local loss
-   for i = 1,valData:size(1)-maxLength,maxLength do
+   for i = 1,valData:size(1)-opt.bpropLength,opt.bpropLength do
       -- Progress:
       xlua.progress(i,valData:size(1))
 
       -- Next sequence:
-      local x = valData:narrow(1,i,maxLength)
-      local y = valData:narrow(1,i+1,maxLength)
+      local x = valData:narrow(1,i,opt.bpropLength)
+      local y = valData:narrow(1,i+1,opt.bpropLength)
 
       -- Select word vectors
       local xv = words:index(1, x:long())
 
+      -- Reshape to batch of 1
+      xv = xv:view(1,opt.bpropLength,opt.wordDim)
+      y = y:view(1,opt.bpropLength)
+
       -- Estimate loss:
-      loss,lstmState = eval({params=params, x=xv}, y, lstmState)
+      loss,lstmState = testf({params=params, x=xv}, y, lstmState)
 
       -- Loss: exponentiate nll gives perplexity
       aloss = aloss + loss
@@ -261,19 +264,23 @@ local aloss = 0
 local steps = 0
 local lstmState = {}
 local loss
-for i = 1,testData:size(1)-maxLength,maxLength do
+for i = 1,testData:size(1)-opt.bpropLength,opt.bpropLength do
    -- Progress:
    xlua.progress(i,testData:size(1))
 
    -- Next sequence:
-   local x = testData:narrow(1,i,maxLength)
-   local y = testData:narrow(1,i+1,maxLength)
+   local x = testData:narrow(1,i,opt.bpropLength)
+   local y = testData:narrow(1,i+1,opt.bpropLength)
 
    -- Select word vectors
    local xv = words:index(1, x:long())
 
+   -- Reshape to batch of 1
+   xv = xv:view(1,opt.bpropLength,opt.wordDim)
+   y = y:view(1,opt.bpropLength)
+
    -- Estimate loss:
-   loss,lstmState = eval({params=params, x=xv}, y, lstmState)
+   loss,lstmState = testf({params=params, x=xv}, y, lstmState)
 
    -- Loss: exponentiate nll gives perplexity
    aloss = aloss + loss
