@@ -83,6 +83,9 @@ local lsm = d.nn.LogSoftMax()
 
 -- Complete trainable function:
 local f = function(inputs, y, prevState)
+   -- N elements:
+   local nElements = getValue(inputs.x):size(1) * getValue(inputs.x):size(2)
+
    -- Encode all inputs through LSTM layers:
    local h1,newState1 = lstm1(inputs.params[1], regularize(inputs.x), prevState[1])
    local h2,newState2 = lstm2(inputs.params[2], regularize(h1), prevState[2])
