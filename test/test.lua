@@ -31,6 +31,28 @@ local tests = {
       end
    end,
 
+   Index = function()
+      local W = torch.Tensor(5,25):normal()
+      local x = torch.Tensor(100,25):normal()
+
+      -- Test with index bigger than the index param + very likely collision of indexes.
+      -- i.e. worst case scenario
+      local idx = torch.LongTensor(100)
+      for i = 1,idx:size(1) do
+         idx[i] = torch.random(1,5)
+      end
+
+      -- Function:
+      local selectFn = function(inputs)
+         return torch.sum(torch.index(inputs.W,1,idx) + inputs.x)
+      end
+
+      -- Check grads:
+      for iparam,param in pairs({"x", "W"}) do
+         tester:assert(gradcheck(selectFn, {W=W,x=x}, param), "Incorrect gradient")
+      end
+   end,
+
    Narrow = function()
       local W = torch.Tensor(5,25):normal()
       local x1 = torch.Tensor(1,25):normal()

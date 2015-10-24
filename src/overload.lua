@@ -32,7 +32,7 @@ local override = {
    "exp", 'tanh',
    "sin", "cos", "tan", "sqrt",
    "abs", "sum", "log", "viewAs", "view", "expand", "expandAs",
-   "select", "narrow", "min", "max", "cat",
+   "select", "narrow", "min", "max", "cat", "index",
 }
 
 local op = {
