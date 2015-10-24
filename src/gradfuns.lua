@@ -218,6 +218,10 @@ torch["select"] = function (A, dim, index)
    return A:select(dim, index)
 end
 
+torch["index"] = function (A, dim, index)
+   return A:index(dim, index)
+end
+
 torch["narrow"] = function(A, dim, index, size)
    return A:narrow(dim, index, size)
 end
@@ -305,6 +309,18 @@ gradfuns[torch.select] = {
       return out
    end
 }
+
+gradfuns[torch.index] = {
+   "index",
+   function(g, ans, x,dim,index)
+      local out = g.new(x:size()):zero()
+      for i=1,index:size(1) do
+         torch.select(out,dim,index[i]):add(torch.select(g,dim,i))
+      end
+      return out
+   end
+}
+
 gradfuns[torch.narrow] = {
    "narrow",
    function(g, ans, x,dim,index,size)
