@@ -5,7 +5,7 @@ Train an LSTM to fit the Penn Treebank dataset.
 Options:
    --nEpochs        (default 5)       nb of epochs
    --bpropLength    (default 20)      max backprop steps
-   --batchSize      (default 1)       batch size
+   --batchSize      (default 10)      batch size
    --wordDim        (default 200)     word vector dimensionality
    --hiddens        (default 200)     nb of hidden units
    --capEpoch       (default -1)      cap epoch to given number of steps (for debugging)
@@ -78,6 +78,9 @@ local regularize = dropout
 local nElements = opt.batchSize*opt.bpropLength
 local nClasses = #dict.id2word
 
+-- LogSoftMax
+local lsm = d.nn.LogSoftMax()
+
 -- Complete trainable function:
 local f = function(inputs, y, prevState)
    -- Encode all inputs through LSTM layers:
@@ -91,13 +94,15 @@ local f = function(inputs, y, prevState)
    -- Linear classifier:
    local h3 = regularize(h2f) * inputs.params[3].W + torch.expand(inputs.params[3].b, nElements, nClasses)
 
+   -- Lsm
+   local yhat = lsm(h3)
+
    -- Loss:
    local loss = 0
    for i = 1,nElements do
-      -- Classify:
-      local h3i = torch.select(h3,1,i)
-      local yhat = util.logSoftMax(h3i)
-      loss = loss - torch.sum( torch.narrow(yhat, 1, yf[i], 1) )
+      local yhati = torch.select(yhat,1,i)
+      local yfi = torch.select(yf,1,i)
+      loss = loss - torch.sum( torch.narrow(yhati, 1, yfi, 1) )
    end
 
    -- Return avergage loss
@@ -146,8 +151,11 @@ else
    words = torch.FloatTensor(nTokens, opt.wordDim):uniform(-opt.paramRange, opt.paramRange)
 end
 
--- Epoch length
-local epochLength = trainData:size(1)
+-- Reformat training data for batches:
+local epochLength = math.floor(trainData:size(1) / opt.batchSize)
+trainData = trainData:narrow(1,1,epochLength*opt.batchSize):view(opt.batchSize, epochLength)
+
+-- Optional cap:
 if tonumber(opt.capEpoch) > 0 then
    epochLength = opt.capEpoch
 end
@@ -167,15 +175,11 @@ for epoch = 1,opt.nEpochs do
       xlua.progress(i,epochLength)
 
       -- Next sequence:
-      local x = trainData:narrow(1,i,opt.bpropLength)
-      local y = trainData:narrow(1,i+1,opt.bpropLength)
+      local x = trainData:narrow(2,i,opt.bpropLength):contiguous()
+      local y = trainData:narrow(2,i+1,opt.bpropLength):contiguous()
 
       -- Select word vectors
-      local xv = words:index(1, x:long())
-
-      -- Reshape to batch of 1
-      xv = xv:view(1,opt.bpropLength,opt.wordDim)
-      y = y:view(1,opt.bpropLength)
+      local xv = words:index(1, x:view(-1):long()):view(opt.batchSize, opt.bpropLength, opt.wordDim)
 
       -- Grads:
       grads,loss,lstmState = d(trainf)({params=params, x=xv}, y, lstmState)

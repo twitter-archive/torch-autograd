@@ -256,7 +256,7 @@ function model.RecurrentNetwork(opt, params)
       else
          -- return all:
          for i in ipairs(hs) do
-            hs[i] = torch.view(hs[i], batch,1,-1)
+            hs[i] = torch.view(hs[i], batch,1,hiddenFeatures)
          end
          return torch.cat(hs,2)
       end
@@ -351,8 +351,9 @@ function model.RecurrentLSTMNetwork(opt, params)
       else
          -- return all:
          for i in ipairs(hs) do
-            hs[i] = torch.view(hs[i], batch,1,-1)
+            hs[i] = torch.view(hs[i], batch,1,hiddenFeatures)
          end
+         local dummy = getValue(torch.cat(hs,2)) -- TODO: wtf, this is necessary???
          return torch.cat(hs,2), newState
       end
    end
