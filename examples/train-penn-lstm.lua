@@ -3,7 +3,7 @@ local opt = lapp [[
 Train an LSTM to fit the Penn Treebank dataset.
 
 Options:
-   --nEpochs        (default 5)       nb of epochs
+   --nEpochs        (default 20)      nb of epochs
    --bpropLength    (default 20)      max backprop steps
    --batchSize      (default 20)      batch size
    --wordDim        (default 200)     word vector dimensionality

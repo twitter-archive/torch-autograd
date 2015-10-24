@@ -591,7 +591,7 @@ local tests = {
       return tnn, tag
    end,
 
-   lstm = function()
+   lstmHybrid = function()
       -- Depends on CXNN reference implementation
       local ok,cxnn = pcall(require, 'cxnn')
       if not ok then
@@ -600,8 +600,8 @@ local tests = {
 
       -- Data
       local tnn, tag
-      local x = tensor(33,100):normal()
-      local y = math.floor(torch.uniform(1.5,10.5))
+      local x = tensor(1,33,100):normal()
+      local y = tensor(1):uniform(1.5,10.5):floor()
 
       do
          local model = nn.Sequential()
@@ -652,7 +652,7 @@ local tests = {
             local h1 = lstm1(params[1], x)
             local h2 = lin2(h1, params[2].W, params[2].b)
             local yhat = lsm(h2)
-            local loss = - torch.sum( torch.narrow(yhat, 1, y, 1) )
+            local loss = - torch.sum( torch.narrow(yhat, 2, y[1], 1) )
             return loss
          end
 
@@ -667,6 +667,91 @@ local tests = {
 
          tic()
          for i = 1,10 do
+            local grads = d(f)(params, x, y)
+         end
+         tag = toc()
+      end
+
+      return tnn, tag
+   end,
+
+   lstmHybridBatched = function()
+      -- Depends on CXNN reference implementation
+      local ok,cxnn = pcall(require, 'cxnn')
+      if not ok then
+         return
+      end
+
+      -- Data
+      local tnn, tag
+      local x = tensor(32,33,100):normal()
+      local y = tensor(32):uniform(1.5,10.5):floor()
+
+      do
+         local model = nn.Sequential()
+         model:add(cxnn.RecurrentLSTMNetwork({
+            inputSize = 100,
+            hiddenFeatures = {200},
+            outputType = 'last',
+         }))
+         model:add(nn.Linear(200,10))
+         model:add(nn.LogSoftMax())
+         model:type(ttype)
+         local lossf = nn.ClassNLLCriterion()
+         lossf:type(ttype)
+
+         -- force allocs
+         model:zeroGradParameters()
+         local yhat = model:forward(x)
+         local loss = lossf:forward(yhat, y)
+         local dloss_dyhat = lossf:backward(yhat, y)
+         model:backward(x, dloss_dyhat)
+
+         tic()
+         for i = 1,4 do
+            model:zeroGradParameters()
+            local yhat = model:forward(x)
+            local loss = lossf:forward(yhat, y)
+            local dloss_dyhat = lossf:backward(yhat, y)
+            model:backward(x, dloss_dyhat)
+         end
+         tnn = toc()
+      end
+
+      do
+         local lstm1,params = d.model.RecurrentLSTMNetwork({
+            inputFeatures = 100,
+            hiddenFeatures = 200,
+            outputType = 'last',
+         })
+         local lin2 = d.nn.Linear(200,10)
+         local lsm = d.nn.LogSoftMax()
+         local lossf = d.nn.ClassNLLCriterion()
+
+         table.insert(params, {
+            W = tensor(10,200),
+            b = tensor(10),
+         })
+
+         local f = function(params, x, y)
+            local h1 = lstm1(params[1], x)
+            local h2 = lin2(h1, params[2].W, params[2].b)
+            local yhat = lsm(h2)
+            local loss = lossf(yhat, y)
+            return loss
+         end
+
+         for i in ipairs(params) do
+            for k in pairs(params[i]) do
+               params[i][k] = params[i][k]:type(ttype):normal()
+            end
+         end
+
+         -- force allocs
+         local grads = d(f)(params, x, y)
+
+         tic()
+         for i = 1,4 do
             local grads = d(f)(params, x, y)
          end
          tag = toc()
