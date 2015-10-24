@@ -5,13 +5,13 @@ Train an LSTM to fit the Penn Treebank dataset.
 Options:
    --nEpochs        (default 5)       nb of epochs
    --bpropLength    (default 20)      max backprop steps
-   --batchSize      (default 10)      batch size
+   --batchSize      (default 20)      batch size
    --wordDim        (default 200)     word vector dimensionality
    --hiddens        (default 200)     nb of hidden units
    --capEpoch       (default -1)      cap epoch to given number of steps (for debugging)
    --reportEvery    (default 100)     report training accuracy every N steps
    --learningRate   (default 1)       learning rate
-   --maxGradNorm    (default 3)       cap gradient norm
+   --maxGradNorm    (default 5)       cap gradient norm
    --paramRange     (default .1)      initial parameter range
    --dropout        (default 0)       dropout probability on hidden states
    --type           (default double)  tensor type: cuda | float | double
@@ -78,8 +78,9 @@ local regularize = dropout
 local nElements = opt.batchSize*opt.bpropLength
 local nClasses = #dict.id2word
 
--- LogSoftMax
+-- Use built-in nn modules:
 local lsm = d.nn.LogSoftMax()
+local lossf = d.nn.ClassNLLCriterion()
 
 -- Complete trainable function:
 local f = function(inputs, y, prevState)
@@ -101,15 +102,19 @@ local f = function(inputs, y, prevState)
    local yhat = lsm(h3)
 
    -- Loss:
-   local loss = 0
-   for i = 1,nElements do
-      local yhati = torch.select(yhat,1,i)
-      local yfi = torch.select(yf,1,i)
-      loss = loss - torch.sum( torch.narrow(yhati, 1, yfi, 1) )
-   end
+   local loss = lossf(yhat, yf)
+
+   -- Equivalent to this (which is way slower for now):
+   -- local loss = 0
+   -- for i = 1,nElements do
+   --    local yhati = torch.select(yhat,1,i)
+   --    local yfi = torch.select(yf,1,i)
+   --    loss = loss - torch.sum( torch.narrow(yhati, 1, yfi, 1) )
+   -- end
+   -- loss = loss / nElements
 
    -- Return avergage loss
-   return loss / nElements, {newState1, newState2}
+   return loss, {newState1, newState2}
 end
 
 -- Training eval

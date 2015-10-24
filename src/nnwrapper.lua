@@ -20,68 +20,104 @@ local function functionalize(pkg)
       if mt then
          local mmt = getmetatable(mt)
          if mmt then
-            map[k] = function(...)
-               -- Construct object:
-               local nnObject = v(...)
-               local lastType = ""
+            if mmt.__typename == 'nn.Criterion' then
+               map[k] = function(...)
+                  -- Construct object:
+                  local nnObject = v(...)
+                  local lastType = ""
 
-               local function forward(x, W, b)
-                  local dataType = x:type()
-                  if lastType ~= dataType then
-                     lastType = dataType
-                     nnObject:type(dataType)
-                  end
-
-                  nnObject.weight = W
-                  nnObject.bias = b
-
-                  return nnObject:forward(x)
-               end
-
-               local function backward(g, x, W, b)
-                  nnObject.weight = W
-                  nnObject.bias = b
-
-                  if nnObject.gradWeight then
-                     nnObject.gradWeight:zero()
-                  end
-                  if nnObject.gradBias then
-                     nnObject.gradBias:zero()
-                  end
-
-                  local gradInput = nnObject:backward(x, g)
-
-                  return {
-                     gradInput,
-                     nnObject.gradWeight,
-                     nnObject.gradBias,
-                  }
-               end
-
-               return function(x, W, b)
-                  local grads = nil
-                  local gradFn = {
-                     k,
-                     function(g,ans,x,W,b)
-                        if grads == nil then
-                           grads = backward(g, x, W, b)
-                        end
-                        return grads[1]
-                     end,
-                     function(g,ans,x,W,b)
-                        if grads == nil then
-                           grads = backward(g, x, W, b)
-                        end
-                        return grads[2]
-                     end,
-                     function(g,ans,x,W,b)
-                        if grads == nil then
-                           grads = backward(g, x, W, b)
-                        end
-                        return grads[3]
+                  local function forward(x, y)
+                     local dataType = x:type()
+                     if lastType ~= dataType then
+                        lastType = dataType
+                        nnObject:type(dataType)
                      end
-                  }
-                  return node.nodeApply(forward, gradFn, x, W, b)
+
+                     return nnObject:forward(x, y)
+                  end
+
+                  local function backward(g, x, y)
+                     return nnObject:backward(x, y)
+                  end
+
+                  return function(x, W, b)
+                     local gradFn = {
+                        k,
+                        function(g,ans,x,y)
+                           return backward(g, x, y)
+                        end,
+                        function(g,ans,x,y)
+                           print'ici'
+                           return y.new(y:size()):zero()
+                        end,
+                     }
+                     return node.nodeApply(forward, gradFn, x, W, b)
+                  end
+               end
+            else
+               map[k] = function(...)
+                  -- Construct object:
+                  local nnObject = v(...)
+                  local lastType = ""
+
+                  local function forward(x, W, b)
+                     local dataType = x:type()
+                     if lastType ~= dataType then
+                        lastType = dataType
+                        nnObject:type(dataType)
+                     end
+
+                     nnObject.weight = W
+                     nnObject.bias = b
+
+                     return nnObject:forward(x)
+                  end
+
+                  local function backward(g, x, W, b)
+                     nnObject.weight = W
+                     nnObject.bias = b
+
+                     if nnObject.gradWeight then
+                        nnObject.gradWeight:zero()
+                     end
+                     if nnObject.gradBias then
+                        nnObject.gradBias:zero()
+                     end
+
+                     local gradInput = nnObject:backward(x, g)
+
+                     return {
+                        gradInput,
+                        nnObject.gradWeight,
+                        nnObject.gradBias,
+                     }
+                  end
+
+                  return function(x, W, b)
+                     local grads = nil
+                     local gradFn = {
+                        k,
+                        function(g,ans,x,W,b)
+                           if grads == nil then
+                              grads = backward(g, x, W, b)
+                           end
+                           return grads[1]
+                        end,
+                        function(g,ans,x,W,b)
+                           if grads == nil then
+                              grads = backward(g, x, W, b)
+                           end
+                           return grads[2]
+                        end,
+                        function(g,ans,x,W,b)
+                           if grads == nil then
+                              grads = backward(g, x, W, b)
+                           end
+                           return grads[3]
+                        end
+                     }
+                     return node.nodeApply(forward, gradFn, x, W, b)
+                  end
                end
             end
          end
