@@ -13,7 +13,7 @@ Options:
    --learningRate   (default 1)       learning rate
    --maxGradNorm    (default 5)       cap gradient norm
    --paramRange     (default .1)      initial parameter range
-   --dropout        (default 0)       dropout probability on hidden states
+   --dropout        (default 0.1)     dropout probability on hidden states
    --type           (default double)  tensor type: cuda | float | double
 ]]
 
@@ -256,18 +256,16 @@ for epoch = 1,opt.nEpochs do
       steps = steps + 1
    end
    aloss = aloss / steps
-   local perplexity = math.exp(aloss)
-   print('\nValidation perplexity = ' .. perplexity)
+   local newValPerplexity = math.exp(aloss)
+   print('\nValidation perplexity = ' .. newValPerplexity)
 
    -- Learning rate scheme:
-   if perplexity < valPerplexity then
-      -- Progress made!
-      valPerplexity = perplexity
-   else
+   if newValPerplexity > valPerplexity or (valPerplexity - newValPerplexity)/valPerplexity < .1 then
       -- No progress made, decrease learning rate
       lr = lr / 2
-      print('Validation perplexity regressed, decreasing learning rate to: ' .. lr)
+      print('Validation perplexity stagnating, decreasing learning rate to: ' .. lr)
    end
+   valPerplexity = newValPerplexity
 end
 
 -- Test:
