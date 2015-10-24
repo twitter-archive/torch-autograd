@@ -226,6 +226,10 @@ torch["narrow"] = function(A, dim, index, size)
    return A:narrow(dim, index, size)
 end
 
+torch["copy"] = function(A, B)
+   return A:copy(B)
+end
+
 gradfuns[torch.cat] = {
    "cat",
    function(g, ans, x,y,dim)

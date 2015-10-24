@@ -73,6 +73,22 @@ local tests = {
       end
    end,
 
+   NarrowCopy = function()
+      local x = torch.Tensor(2,25):normal()
+
+      -- Function:
+      local f = function(inputs)
+         local res = getValue(inputs.x).new(getValue(inputs.x):size())
+         torch.copy( torch.select(res, 1,1), torch.select(x, 1, 1) * 10 )
+         return torch.sum(res)
+      end
+
+      -- Check grads:
+      for iparam,param in pairs({"x"}) do
+         tester:assert(gradcheck(f, {x=x}, param), "Incorrect gradient")
+      end
+   end,
+
    View = function()
       local W = torch.Tensor(5,5):normal()
       local x = torch.Tensor(1,25):normal()
