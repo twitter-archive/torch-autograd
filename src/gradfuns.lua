@@ -303,6 +303,15 @@ gradfuns[torch.viewAs] = {
    end
 }
 
+gradfuns[torch.copy] = {
+   "copy",
+   function(g, ans, x, y)
+      return g.new(x:size()):zero()
+   end,
+   function(g, ans, x, y)
+      return g
+   end,
+}
 
 gradfuns[torch.select] = {
    "select",
