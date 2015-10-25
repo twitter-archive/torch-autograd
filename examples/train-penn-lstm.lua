@@ -9,7 +9,7 @@ Options:
    --wordDim        (default 200)     word vector dimensionality
    --hiddens        (default 200)     nb of hidden units
    --capEpoch       (default -1)      cap epoch to given number of steps (for debugging)
-   --reportEvery    (default 100)     report training accuracy every N steps
+   --reportEvery    (default 200)     report training accuracy every N steps
    --learningRate   (default 20)      learning rate
    --maxGradNorm    (default .25)     cap gradient norm
    --paramRange     (default .1)      initial parameter range
@@ -229,15 +229,12 @@ for epoch = 1,opt.nEpochs do
    end
 
    -- Validate:
-   print('\nValidation #'..epoch)
+   print('\n\nValidation #'..epoch..'...')
    local aloss = 0
    local steps = 0
    local lstmState = {}
    local loss
    for i = 1,valData:size(1)-opt.bpropLength,opt.bpropLength do
-      -- Progress:
-      xlua.progress(i,valData:size(1))
-
       -- Next sequence:
       local x = valData:narrow(1,i,opt.bpropLength)
       local y = valData:narrow(1,i+1,opt.bpropLength)
@@ -258,45 +255,42 @@ for epoch = 1,opt.nEpochs do
    end
    aloss = aloss / steps
    local newValPerplexity = math.exp(aloss)
-   print('\nValidation perplexity = ' .. newValPerplexity)
+   print('Validation perplexity = ' .. newValPerplexity)
 
    -- Learning rate scheme:
-   if newValPerplexity > valPerplexity or (valPerplexity - newValPerplexity)/valPerplexity < .1 then
+   if newValPerplexity > valPerplexity or (valPerplexity - newValPerplexity)/valPerplexity < .03 then
       -- No progress made, decrease learning rate
       lr = lr / 2
       print('Validation perplexity stagnating, decreasing learning rate to: ' .. lr)
    end
    valPerplexity = newValPerplexity
+
+   -- Test:
+   print('\nTest set [just indicative, not used for training]...')
+   local aloss = 0
+   local steps = 0
+   local lstmState = {}
+   local loss
+   for i = 1,testData:size(1)-opt.bpropLength,opt.bpropLength do
+      -- Next sequence:
+      local x = testData:narrow(1,i,opt.bpropLength)
+      local y = testData:narrow(1,i+1,opt.bpropLength)
+
+      -- Select word vectors
+      local xv = words:index(1, x:long())
+
+      -- Reshape to batch of 1
+      xv = xv:view(1,opt.bpropLength,opt.wordDim)
+      y = y:view(1,opt.bpropLength)
+
+      -- Estimate loss:
+      loss,lstmState = testf({params=params, x=xv}, y, lstmState)
+
+      -- Loss: exponentiate nll gives perplexity
+      aloss = aloss + loss
+      steps = steps + 1
+   end
+   aloss = aloss / steps
+   local perplexity = math.exp(aloss)
+   print('Test set perplexity = ' .. perplexity)
 end
-
--- Test:
-print('\n\nTest set performance...:')
-local aloss = 0
-local steps = 0
-local lstmState = {}
-local loss
-for i = 1,testData:size(1)-opt.bpropLength,opt.bpropLength do
-   -- Progress:
-   xlua.progress(i,testData:size(1))
-
-   -- Next sequence:
-   local x = testData:narrow(1,i,opt.bpropLength)
-   local y = testData:narrow(1,i+1,opt.bpropLength)
-
-   -- Select word vectors
-   local xv = words:index(1, x:long())
-
-   -- Reshape to batch of 1
-   xv = xv:view(1,opt.bpropLength,opt.wordDim)
-   y = y:view(1,opt.bpropLength)
-
-   -- Estimate loss:
-   loss,lstmState = testf({params=params, x=xv}, y, lstmState)
-
-   -- Loss: exponentiate nll gives perplexity
-   aloss = aloss + loss
-   steps = steps + 1
-end
-aloss = aloss / steps
-local perplexity = math.exp(aloss)
-print('\nTest set perplexity = ' .. perplexity)
