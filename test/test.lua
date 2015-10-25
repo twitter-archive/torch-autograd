@@ -847,10 +847,8 @@ local tests = {
       })
 
       -- Params:
-      params[1].Wx:normal(0,0.01)
-      params[1].bx:normal(0,0.01)
-      params[1].Wh:normal(0,0.01)
-      params[1].bh:normal(0,0.01)
+      params[1].W:normal(0,0.01)
+      params[1].b:normal(0,0.01)
 
       -- Loss
       local loss = function(params, input)
@@ -869,28 +867,22 @@ local tests = {
       -- Gradcheck doesn't support nested params,
       -- need to do a bit of magic to test it.
       local inputs = {
-         Wx = params[1].Wx,
-         bx = params[1].bx,
-         Wh = params[1].Wh,
-         bh = params[1].bh,
+         W = params[1].W,
+         b = params[1].b,
          x = i,
       }
       local closure = function(inputs)
          local params = {
-            Wx = inputs.Wx,
-            bx = inputs.bx,
-            Wh = inputs.Wh,
-            bh = inputs.bh,
+            W = inputs.W,
+            b = inputs.b,
          }
          return loss(params, inputs.x)
       end
       closure(inputs)
       autograd(closure)(inputs)
       tester:assert(gradcheck(closure, inputs, 'x'), 'incorrect gradients on x')
-      tester:assert(gradcheck(closure, inputs, 'Wx'), 'incorrect gradients on Wx')
-      tester:assert(gradcheck(closure, inputs, 'bx'), 'incorrect gradients on bx')
-      tester:assert(gradcheck(closure, inputs, 'Wh'), 'incorrect gradients on Wh')
-      tester:assert(gradcheck(closure, inputs, 'bh'), 'incorrect gradients on bh')
+      tester:assert(gradcheck(closure, inputs, 'W'), 'incorrect gradients on W')
+      tester:assert(gradcheck(closure, inputs, 'b'), 'incorrect gradients on b')
    end,
 
    Models_RecurrentLSTMNetwork = function()
@@ -902,10 +894,8 @@ local tests = {
       })
 
       -- Params:
-      params[1].Wx:normal(0,0.01)
-      params[1].bx:normal(0,0.01)
-      params[1].Wh:normal(0,0.01)
-      params[1].bh:normal(0,0.01)
+      params[1].W:normal(0,0.01)
+      params[1].b:normal(0,0.01)
 
       -- Loss
       local loss = function(params, input)
@@ -924,28 +914,22 @@ local tests = {
       -- Gradcheck doesn't support nested params,
       -- need to do a bit of magic to test it.
       local inputs = {
-         Wx = params[1].Wx,
-         bx = params[1].bx,
-         Wh = params[1].Wh,
-         bh = params[1].bh,
+         W = params[1].W,
+         b = params[1].b,
          x = i,
       }
       local closure = function(inputs)
          local params = {
-            Wx = inputs.Wx,
-            bx = inputs.bx,
-            Wh = inputs.Wh,
-            bh = inputs.bh,
+            W = inputs.W,
+            b = inputs.b,
          }
          return loss(params, inputs.x)
       end
       closure(inputs)
       autograd(closure)(inputs)
       tester:assert(gradcheck(closure, inputs, 'x'), 'incorrect gradients on x')
-      tester:assert(gradcheck(closure, inputs, 'Wx'), 'incorrect gradients on Wx')
-      tester:assert(gradcheck(closure, inputs, 'bx'), 'incorrect gradients on bx')
-      tester:assert(gradcheck(closure, inputs, 'Wh'), 'incorrect gradients on Wh')
-      tester:assert(gradcheck(closure, inputs, 'bh'), 'incorrect gradients on bh')
+      tester:assert(gradcheck(closure, inputs, 'W'), 'incorrect gradients on W')
+      tester:assert(gradcheck(closure, inputs, 'b'), 'incorrect gradients on b')
    end,
 }
 

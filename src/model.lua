@@ -213,15 +213,13 @@ function model.RecurrentNetwork(opt, params)
 
    -- parameters:
    local p = {
-      Wx = torch.zeros(inputFeatures, hiddenFeatures),
-      bx = torch.zeros(1, hiddenFeatures),
-      Wh = torch.zeros(hiddenFeatures, hiddenFeatures),
-      bh = torch.zeros(1, hiddenFeatures),
+      W = torch.zeros(inputFeatures+hiddenFeatures, hiddenFeatures),
+      b = torch.zeros(1, hiddenFeatures),
    }
    table.insert(params, p)
 
    -- function:
-   local f = function(params, x)
+   local f = function(params, x, prevState)
       -- dims:
       local p = params[1] or params
       if getValue(x):dim() == 2 then
@@ -231,6 +229,7 @@ function model.RecurrentNetwork(opt, params)
       local steps = getValue(x):size(2)
 
       -- hiddens:
+      prevState = prevState or {}
       local hs = {}
 
       -- go over time:
@@ -238,27 +237,29 @@ function model.RecurrentNetwork(opt, params)
          -- xt
          local xt = torch.select(x,2,t)
 
-         -- dot prods:
-         local hx = xt * p.Wx + torch.expand(p.bx, batch, hiddenFeatures)
-         local hh
-         if t > 1 then
-            hh = hs[t-1] * p.Wh + torch.expand(p.bh, batch, hiddenFeatures)
-         else
-            hh = torch.expand(p.bh, batch, hiddenFeatures)
-         end
-         hs[t] = torch.tanh(hx+hh)
+         -- prev h
+         local hp = hs[t-1] or prevState.h or getValue(x).new(batch, hiddenFeatures):zero()
+
+         -- next h
+         hs[t] = torch.tanh( torch.cat(xt,hp,2) * p.W + torch.expand(p.b, batch, hiddenFeatures) )
       end
+
+      -- save state
+      -- TODO: we need getValue here to cut tensors from the tape - would be best
+      -- if hidden from the user
+      local newState = {h=getValue(hs[#hs])}
 
       -- output:
       if outputType == 'last' then
          -- return last hidden code:
-         return hs[#hs]
+         return hs[#hs], newState
       else
          -- return all:
          for i in ipairs(hs) do
             hs[i] = torch.view(hs[i], batch,1,hiddenFeatures)
          end
-         return torch.cat(hs,2)
+         local dummy = getValue(torch.cat(hs,2)) -- TODO: wtf, this is necessary???
+         return torch.cat(hs,2), newState
       end
    end
 
@@ -278,10 +279,8 @@ function model.RecurrentLSTMNetwork(opt, params)
 
    -- parameters:
    local p = {
-      Wx = torch.zeros(inputFeatures, 4 * hiddenFeatures),
-      bx = torch.zeros(1, 4 * hiddenFeatures),
-      Wh = torch.zeros(hiddenFeatures, 4 * hiddenFeatures),
-      bh = torch.zeros(1, 4 * hiddenFeatures),
+      W = torch.zeros(inputFeatures+hiddenFeatures, 4 * hiddenFeatures),
+      b = torch.zeros(1, 4 * hiddenFeatures),
    }
    table.insert(params, p)
 
@@ -296,6 +295,7 @@ function model.RecurrentLSTMNetwork(opt, params)
       local steps = getValue(x):size(2)
 
       -- hiddens:
+      prevState = prevState or {}
       local hs = {}
       local cs = {}
 
@@ -304,38 +304,30 @@ function model.RecurrentLSTMNetwork(opt, params)
          -- xt
          local xt = torch.select(x,2,t)
 
+         -- prev h and prev c
+         local hp = hs[t-1] or prevState.h or getValue(x).new(batch, hiddenFeatures):zero()
+         local cp = cs[t-1] or prevState.c or getValue(x).new(batch, hiddenFeatures):zero()
+
          -- pack all dot products:
-         local hx = xt * p.Wx + torch.expand(p.bx, batch, 4*hiddenFeatures)
-         local hh
-         if t > 1 then
-            hh = hs[t-1] * p.Wh + torch.expand(p.bh, batch, 4*hiddenFeatures)
-         elseif prevState then
-            hh = prevState.h * p.Wh + torch.expand(p.bh, batch, 4*hiddenFeatures)
-         else
-            hh = torch.expand(p.bh, batch, 4*hiddenFeatures)
-         end
-         local sums = torch.view(hx+hh, batch, 4, hiddenFeatures)
+         local dots = torch.cat(xt,hp,2) * p.W + torch.expand(p.b, batch, 4*hiddenFeatures)
+
+         -- view as 4 groups:
+         dots = torch.view(dots, batch, 4, hiddenFeatures)
 
          -- batch compute gates:
-         local sigmoids = util.sigmoid( torch.narrow(sums, 2,1,3) )
+         local sigmoids = util.sigmoid( torch.narrow(dots, 2,1,3) )
          local inputGate = torch.select(sigmoids, 2,1)
          local forgetGate = torch.select(sigmoids, 2,2)
          local outputGate = torch.select(sigmoids, 2,3)
 
          -- write inputs
-         local tanhs = torch.tanh( torch.narrow(sums, 2,4,1) )
+         local tanhs = torch.tanh( torch.narrow(dots, 2,4,1) )
          local inputValue = torch.select(tanhs, 2,1)
 
-         -- partial gatings:
-         if t > 1 then
-            cs[t] = torch.cmul(forgetGate, cs[t-1]) + torch.cmul(inputGate, inputValue)
-         elseif prevState then
-            cs[t] = torch.cmul(forgetGate, prevState.c) + torch.cmul(inputGate, inputValue)
-         else
-            cs[t] = torch.cmul(inputGate, inputValue)
-         end
+         -- next c:
+         cs[t] = torch.cmul(forgetGate, cp) + torch.cmul(inputGate, inputValue)
 
-         -- next h
+         -- next h:
          hs[t] = torch.cmul(outputGate, torch.tanh(cs[t]))
       end
 
