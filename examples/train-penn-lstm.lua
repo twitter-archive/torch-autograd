@@ -10,10 +10,10 @@ Options:
    --hiddens        (default 200)     nb of hidden units
    --capEpoch       (default -1)      cap epoch to given number of steps (for debugging)
    --reportEvery    (default 100)     report training accuracy every N steps
-   --learningRate   (default 1)       learning rate
-   --maxGradNorm    (default 5)       cap gradient norm
+   --learningRate   (default 20)      learning rate
+   --maxGradNorm    (default .25)     cap gradient norm
    --paramRange     (default .1)      initial parameter range
-   --dropout        (default 0.1)     dropout probability on hidden states
+   --dropout        (default 0)       dropout probability on hidden states
    --type           (default double)  tensor type: cuda | float | double
 ]]
 
@@ -24,9 +24,13 @@ local getValue = require 'autograd.node'.getValue
 local model = require 'autograd.model'
 local _ = require 'moses'
 
+-- Seed
+torch.manualSeed(1)
+
 -- CUDA?
 if opt.type == 'cuda' then
    require 'cutorch'
+   cutorch.manualSeed(1)
 end
 
 -- Load in PENN Treebank dataset
@@ -104,15 +108,6 @@ local f = function(inputs, y, prevState)
    -- Loss:
    local loss = lossf(yhat, yf)
 
-   -- Equivalent to this (which is way slower for now):
-   -- local loss = 0
-   -- for i = 1,nElements do
-   --    local yhati = torch.select(yhat,1,i)
-   --    local yfi = torch.select(yf,1,i)
-   --    loss = loss - torch.sum( torch.narrow(yhati, 1, yfi, 1) )
-   -- end
-   -- loss = loss / nElements
-
    -- Return avergage loss
    return loss, {newState1, newState2}
 end
@@ -152,12 +147,13 @@ end
 -- Word dictionary to train:
 local words
 if opt.type == 'cuda' then
-   words = torch.CudaTensor(nTokens, opt.wordDim):uniform(-opt.paramRange, opt.paramRange)
+   words = torch.CudaTensor(nTokens, opt.wordDim)
 elseif opt.type == 'double' then
-   words = torch.DoubleTensor(nTokens, opt.wordDim):uniform(-opt.paramRange, opt.paramRange)
+   words = torch.DoubleTensor(nTokens, opt.wordDim)
 else
-   words = torch.FloatTensor(nTokens, opt.wordDim):uniform(-opt.paramRange, opt.paramRange)
+   words = torch.FloatTensor(nTokens, opt.wordDim)
 end
+words:uniform(-opt.paramRange, opt.paramRange)
 
 -- Reformat training data for batches:
 local epochLength = math.floor(trainData:size(1) / opt.batchSize)
@@ -193,9 +189,13 @@ for epoch = 1,opt.nEpochs do
       grads,loss,lstmState = d(trainf)({params=params, x=xv}, y, lstmState)
 
       -- Cap gradient norms:
+      local norm = 0
       for i,grad in ipairs(_.flatten(grads)) do
-         local norm = grad:norm()
-         if norm > opt.maxGradNorm then
+         norm = norm + torch.sum(torch.pow(grad,2))
+      end
+      norm = math.sqrt(norm)
+      if norm > opt.maxGradNorm then
+         for i,grad in ipairs(_.flatten(grads)) do
             grad:mul( opt.maxGradNorm / norm )
          end
       end
@@ -210,8 +210,9 @@ for epoch = 1,opt.nEpochs do
 
       -- Update vectors:
       local gradx = grads.x:view(nElements, opt.wordDim)
+      local xvs = x:view(-1)
       for i = 1,nElements do
-         words[i]:add(-lr, gradx[i])
+         words[xvs[i]]:add(-lr, gradx[i])
       end
 
       -- Loss: exponentiate nll gives perplexity
@@ -224,7 +225,9 @@ for epoch = 1,opt.nEpochs do
       end
 
       -- TODO: get rid of this once autograd allocates less
-      collectgarbage()
+      if ((i-1)/opt.bpropLength+1) % 10 == 0 then
+         collectgarbage()
+      end
    end
 
    -- Validate:
