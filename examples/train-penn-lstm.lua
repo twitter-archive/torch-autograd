@@ -225,9 +225,7 @@ for epoch = 1,opt.nEpochs do
       end
 
       -- TODO: get rid of this once autograd allocates less
-      if ((i-1)/opt.bpropLength+1) % 10 == 0 then
-         collectgarbage()
-      end
+      collectgarbage()
    end
 
    -- Validate:
