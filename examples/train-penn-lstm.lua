@@ -258,7 +258,7 @@ for epoch = 1,opt.nEpochs do
    print('Validation perplexity = ' .. newValPerplexity)
 
    -- Learning rate scheme:
-   if newValPerplexity > valPerplexity or (valPerplexity - newValPerplexity)/valPerplexity < .03 then
+   if newValPerplexity > valPerplexity or (valPerplexity - newValPerplexity)/valPerplexity < .10 then
       -- No progress made, decrease learning rate
       lr = lr / 2
       print('Validation perplexity stagnating, decreasing learning rate to: ' .. lr)
