@@ -302,6 +302,42 @@ f,params = autograd.model.SpatialNetwork({
 })
 ```
 
+#### autograd.model.RecurrentNetwork
+
+API:
+
+```lua
+f,params = autograd.model.RecurrentNetwork({
+   -- number of input features (maps):
+   inputFeatures = 100,
+
+   -- number of output features:
+   hiddenFeatures = 200,
+
+   -- output is either the last h at step t,
+   -- or the concatenation of all h states at all steps
+   outputType = 'last', -- or 'all'
+})
+```
+
+#### autograd.model.RecurrentLSTMNetwork
+
+API:
+
+```lua
+f,params = autograd.model.RecurrentLSTMNetwork({
+   -- number of input features (maps):
+   inputFeatures = 100,
+
+   -- number of output features:
+   hiddenFeatures = 200,
+
+   -- output is either the last h at step t,
+   -- or the concatenation of all h states at all steps
+   outputType = 'last', -- or 'all'
+})
+```
+
 ### Loss Primitives
 
 Similarly to model primitives, we provide common loss functions in
