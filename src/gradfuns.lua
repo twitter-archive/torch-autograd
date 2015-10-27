@@ -287,8 +287,7 @@ gradfuns[torch.expandAs] = {
       return out
    end,
    function(g, ans, x,template)
-      local o = g.new(template:size()):zero()
-      return o
+      return nil
    end
 }
 gradfuns[torch.view] = {
@@ -305,7 +304,7 @@ gradfuns[torch.viewAs] = {
       return torch.viewAs(g,x)
    end,
    function(g, ans, x,template)
-      return g.new(template:size()):zero()
+      return nil -- g.new(template:size()):zero()
    end
 }
 

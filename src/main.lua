@@ -95,10 +95,12 @@ local function grad(fun, argnum, returnTape)
                   end
                end
                local gradUpdate = (node.gradFun[iarg+1])(node.outgrad, node.value, unpack(node.argValues))
-               if thisArg.outgrad == nil or thisArg.outgrad == 0 then
-                  thisArg.outgrad = gradUpdate
-               else
-                  thisArg.outgrad = thisArg.outgrad + gradUpdate
+               if gradUpdate then
+                  if thisArg.outgrad == nil or thisArg.outgrad == 0 then
+                     thisArg.outgrad = gradUpdate
+                  else
+                     thisArg.outgrad = thisArg.outgrad + gradUpdate
+                  end
                end
 
             -- Special-casing table-valued arguments that contain nodes
@@ -114,11 +116,13 @@ local function grad(fun, argnum, returnTape)
                local gradUpdate = (node.gradFun[iarg+1])(node.outgrad, node.value, unpack(node.argValues))
                local la = #thisArg
                for isubArg=1,la do
-                  local thisSubArg = thisArg[isubArg]
-                  if thisSubArg.outgrad == nil or thisSubArg.outgrad == 0 then
-                     thisSubArg.outgrad = gradUpdate[isubArg]
-                  else
-                     thisSubArg.outgrad = thisSubArg.outgrad + gradUpdate[isubArg]
+                  if gradUpdate[isubArg] then
+                     local thisSubArg = thisArg[isubArg]
+                     if thisSubArg.outgrad == nil or thisSubArg.outgrad == 0 then
+                        thisSubArg.outgrad = gradUpdate[isubArg]
+                     else
+                        thisSubArg.outgrad = thisSubArg.outgrad + gradUpdate[isubArg]
+                     end
                   end
                end
             end
