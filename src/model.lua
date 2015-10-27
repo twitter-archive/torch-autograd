@@ -7,7 +7,6 @@ local nn = require('autograd.nnwrapper')('nn')
 -- util
 local util = require 'autograd.util'
 local node = require 'autograd.node'
-local getValue = node.getValue
 
 -- generic generator, from sequential list of layers:
 local function sequence(layers, layer2params)
@@ -245,9 +244,7 @@ function model.RecurrentNetwork(opt, params)
       end
 
       -- save state
-      -- TODO: we need getValue here to cut tensors from the tape - would be best
-      -- if hidden from the user
-      local newState = {h=getValue(hs[#hs])}
+      local newState = {h=hs[#hs]}
 
       -- output:
       if outputType == 'last' then
@@ -258,7 +255,6 @@ function model.RecurrentNetwork(opt, params)
          for i in ipairs(hs) do
             hs[i] = torch.view(hs[i], batch,1,hiddenFeatures)
          end
-         getValue(torch.cat(hs,2)) -- TODO: remove this line, why is it needed?
          return torch.cat(hs,2), newState
       end
    end
