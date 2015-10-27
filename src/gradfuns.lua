@@ -226,9 +226,13 @@ torch["narrow"] = function(A, dim, index, size)
    return A:narrow(dim, index, size)
 end
 
-torch["copy"] = function(A)
+torch["clone"] = function(A)
    local B = A.new(A:size())
    return B:copy(A)
+end
+
+torch["copy"] = function(A,B)
+   
 end
 
 gradfuns[torch.cat] = {
@@ -304,12 +308,23 @@ gradfuns[torch.viewAs] = {
    end
 }
 
-gradfuns[torch.copy] = {
-   "copy",
-   function(g, ans, x, y)
+gradfuns[torch.clone] = {
+   "clone",
+   function(g, ans, x)
       return g
    end,
 }
+
+gradfuns[torch.copy] = {
+   "copy",
+   function(g, ans, x, y)
+      return error("HAHA you thought this would work didn't you?")
+   end,
+   function(g, ans, x, y)
+      return error("Not implemented")
+   end,
+}
+
 
 gradfuns[torch.select] = {
    "select",
