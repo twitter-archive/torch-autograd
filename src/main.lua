@@ -100,7 +100,6 @@ local function grad(fun, argnum, returnTape)
                else
                   thisArg.outgrad = thisArg.outgrad + gradUpdate
                end
-            
 
             -- Special-casing table-valued arguments that contain nodes
             -- right now, this is just torch.cat
@@ -115,7 +114,7 @@ local function grad(fun, argnum, returnTape)
                local gradUpdate = (node.gradFun[iarg+1])(node.outgrad, node.value, unpack(node.argValues))
                local la = #thisArg
                for isubArg=1,la do
-                  thisSubArg = thisArg[isubArg]
+                  local thisSubArg = thisArg[isubArg]
                   if thisSubArg.outgrad == nil or thisSubArg.outgrad == 0 then
                      thisSubArg.outgrad = gradUpdate[isubArg]
                   else

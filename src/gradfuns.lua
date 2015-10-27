@@ -246,7 +246,7 @@ gradfuns[torch.cat] = {
          -- Second argument is dimension if table is passed in
          dim = y or x[1]:nDimension()
          local ln=#x
-         out = {}
+         local out = {}
          local currentIndex = 1
          for i=1,ln do
             local thisSize = x[i]:size(dim)
@@ -415,9 +415,8 @@ gradfuns[torch.log] = {
 gradfuns[torch.min] = {
    "min",
    function(g, ans, x,axis)
-      repeater = repeatToMatchShape(x,axis)
       -- ATTN: THIS IS PROBABLY NOT SMART.
-      repeater = repeatToMatchShape(x,axis)
+      local repeater = repeatToMatchShape(x,axis)
       local out = repeater(g)
       local mask = torch.ne(x,repeater(ans))
       out[mask] = 0
@@ -427,7 +426,7 @@ gradfuns[torch.min] = {
 gradfuns[torch.max] = {
    "max",
    function(g, ans, x,axis)
-      repeater = repeatToMatchShape(x,axis)
+      local repeater = repeatToMatchShape(x,axis)
       local out = repeater(g)
       local mask = torch.ne(x,repeater(ans))
       out[mask] = 0

@@ -94,8 +94,9 @@ local tests = {
       -- Function:
       local f = function(inputs)
          local res = getValue(inputs.x).new(getValue(inputs.x):size())
-         local out = torch.copy( torch.select(res, 1,1), torch.select(inputs.x, 1, 1) * 10 )
-         return torch.sum(out)
+         local out1 = torch.copy( torch.select(res, 1,1), torch.select(inputs.x, 1, 1) * 10 )
+         local out2 = torch.copy( torch.select(res, 1,2), torch.select(inputs.x, 1, 2) * 3 )
+         return torch.sum(out1) + torch.sum(out2)
       end
 
       -- Check grads:
@@ -311,9 +312,9 @@ local tests = {
       end
 
       local beta = torch.eye(2,2)
-      pred = f(beta)
-      g = autograd(f)
-      grad = g(beta)
+      local pred = f(beta)
+      local g = autograd(f)
+      local grad = g(beta)
       tester:asserteq(type(pred), 'number', 'incorrect prediction')
       tester:asserteq(grad:dim(), 2, 'incorrect dims for grad')
    end,
