@@ -7,6 +7,7 @@ local nn = require('autograd.nnwrapper')('nn')
 -- util
 local util = require 'autograd.util'
 local node = require 'autograd.node'
+local getValue = node.getValue
 
 -- generic generator, from sequential list of layers:
 local function sequence(layers, layer2params)
@@ -255,6 +256,7 @@ function model.RecurrentNetwork(opt, params)
          for i in ipairs(hs) do
             hs[i] = torch.view(hs[i], batch,1,hiddenFeatures)
          end
+         getValue(torch.cat(hs,2)) -- TODO: get rid of this?
          return torch.cat(hs,2), newState
       end
    end
@@ -339,6 +341,7 @@ function model.RecurrentLSTMNetwork(opt, params)
          for i in ipairs(hs) do
             hs[i] = torch.view(hs[i], batch,1,hiddenFeatures)
          end
+         getValue(torch.cat(hs,2)) -- TODO: get rid of this?
          return torch.cat(hs,2), newState
       end
    end

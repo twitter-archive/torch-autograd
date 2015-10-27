@@ -1,12 +1,5 @@
+local isTensor = require 'autograd.util'.isTensor
 local nodeApply, getOutgrad, newStartNode, node
-
-local fmt = getmetatable(torch.FloatTensor)
-local dmt = getmetatable(torch.DoubleTensor)
-local cmt = getmetatable(torch.CudaTensor) or fmt
-local function isTensor(t)
-   local qmt = getmetatable(t)
-   return qmt == fmt or qmt == dmt or qmt == cmt
-end
 
 -- Make a node class, which will capture computation as they're used
 local Node = { }
