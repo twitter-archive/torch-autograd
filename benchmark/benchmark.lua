@@ -12,7 +12,6 @@ Options:
 local d = require 'autograd'
 local nn = require 'nn'
 local c = require 'trepl.colorize'
-local getValue = require 'autograd.node'.getValue
 local haveProfi,profi = pcall(require,'ProFi')
 
 -- tic/toc
@@ -492,7 +491,7 @@ local tests = {
 
       do
          local f = function(params, x, y)
-            local N = getValue(x):size(1)
+            local N = x:size(1)
             local h1 = torch.tanh( x * params.W1 + torch.expand(params.b1, N,1000) )
             local h2 = h1 * params.W2 + torch.expand(params.b2, N,10)
             local loss, yhat = d.loss.crossEntropy(h2, y)

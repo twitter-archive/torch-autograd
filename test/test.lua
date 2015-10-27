@@ -4,7 +4,6 @@ local autograd = require 'autograd'
 local node = require 'autograd.node'
 local Node = node.Node
 local isNode = node.isNode
-local getValue = node.getValue
 local gradcheck = require 'autograd.gradcheck'
 local tester = totem.Tester()
 
@@ -93,7 +92,7 @@ local tests = {
 
       -- Function:
       local f = function(inputs)
-         local res = getValue(inputs.x).new(getValue(inputs.x):size())
+         local res = inputs.x.new(inputs.x:size())
          local out1 = torch.copy( torch.select(res, 1,1), torch.select(inputs.x, 1, 1) * 10 )
          local out2 = torch.copy( torch.select(res, 1,2), torch.select(inputs.x, 1, 2) * 3 )
          return torch.sum(out1) + torch.sum(out2)
@@ -535,8 +534,8 @@ local tests = {
 
    NodeClass = function()
       -- Build nodes
-      local n = Node:new(3, nil, nil, nil, nil, { nextIndex = 1 })
-      local m = Node:new(torch.ones(10), nil, nil, nil, nil, { nextIndex = 1 })
+      local n = Node:init(3, nil, nil, nil, nil, { nextIndex = 1 })
+      local m = Node:init(torch.ones(10), nil, nil, nil, nil, { nextIndex = 1 })
 
       -- Test we can identify nodes
       tester:asserteq(isNode(n), true, "Did not detect class properly")

@@ -20,7 +20,7 @@ function Node:__tostring()
    end
 end
 
-function Node:new(value, fun, gradFun, args, values, tape)
+function Node:init(value, fun, gradFun, args, values, tape)
    local o = {}
    setmetatable(o, self)
    o.tape = tape
@@ -31,6 +31,12 @@ function Node:new(value, fun, gradFun, args, values, tape)
    o.gradFun = gradFun
    o.args = args
    o.argValues = values
+   o.size = function(self, ...)
+      return self.value.size(self.value,...)
+   end
+   o.new = function(...)
+      return o.value.new(...)
+   end
    return o
 end
 
@@ -39,11 +45,11 @@ local function isNode(n)
 end
 
 local function getValue(v)
-      if (getmetatable(v) == Node) then
-         return v.value
-      else
-         return v
-      end
+   if (getmetatable(v) == Node) then
+      return v.value
+   else
+      return v
+   end
 end
 
 -- A wrapper for a function
@@ -92,7 +98,7 @@ nodeApply = function(fun, gradFun, ...)
          tape.nextIndex = tape.nextIndex + 1
          return o
       end
-      return Node:new(value, fun, gradFun, arg, values, tape)
+      return Node:init(value, fun, gradFun, arg, values, tape)
    else
       return fun(unpack(values))
    end
@@ -122,7 +128,7 @@ end
 newStartNode = function(val, tape)
    -- If our argument is a tensor, just nodify it straight-up
    if isTensor(val) then
-      return Node:new(val, nil, nil, { }, { }, tape)
+      return Node:init(val, nil, nil, { }, { }, tape)
       -- If our target argument is a table, we'll need to walk its members and node-ify them.
    elseif type(val) == "table" then
       local valCopy = { }
