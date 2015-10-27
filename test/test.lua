@@ -94,8 +94,8 @@ local tests = {
       -- Function:
       local f = function(inputs)
          local res = getValue(inputs.x).new(getValue(inputs.x):size())
-         torch.copy( torch.select(res, 1,1), torch.select(x, 1, 1) * 10 )
-         return torch.sum(res)
+         local out = torch.copy( torch.select(res, 1,1), torch.select(inputs.x, 1, 1) * 10 )
+         return torch.sum(out)
       end
 
       -- Check grads:

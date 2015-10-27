@@ -232,7 +232,8 @@ torch["clone"] = function(A)
 end
 
 torch["copy"] = function(A,B)
-   
+   local o = A:copy(B)
+   return o
 end
 
 gradfuns[torch.cat] = {
@@ -318,10 +319,10 @@ gradfuns[torch.clone] = {
 gradfuns[torch.copy] = {
    "copy",
    function(g, ans, x, y)
-      return error("HAHA you thought this would work didn't you?")
+      return g
    end,
    function(g, ans, x, y)
-      return error("Not implemented")
+      return g
    end,
 }
 
