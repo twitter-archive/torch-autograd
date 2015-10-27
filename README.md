@@ -347,4 +347,16 @@ f,params = autograd.model.RecurrentLSTMNetwork({
 ### Loss Primitives
 
 Similarly to model primitives, we provide common loss functions in
-`autograd.loss`.
+`autograd.loss`:
+
+```lua
+-- cross entropy between 2 vectors:
+-- (for categorical problems, the target should be encoded as one-hot)
+loss = loss.crossEntropy(prediction, target)
+
+-- binary cross entropy - same as above, but labels are considered independent bernoulli variables:
+loss = loss.binaryEntropy(prediction, target)
+
+-- least squares - mean square error between 2 vectors:
+loss = loss.leastSquares(prediction, target)
+```
