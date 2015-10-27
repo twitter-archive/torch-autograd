@@ -222,11 +222,11 @@ function model.RecurrentNetwork(opt, params)
    local f = function(params, x, prevState)
       -- dims:
       local p = params[1] or params
-      if getValue(x):dim() == 2 then
-         x = torch.view(x, 1, getValue(x):size(1), getValue(x):size(2))
+      if x:dim() == 2 then
+         x = torch.view(x, 1, x:size(1), x:size(2))
       end
-      local batch = getValue(x):size(1)
-      local steps = getValue(x):size(2)
+      local batch = x:size(1)
+      local steps = x:size(2)
 
       -- hiddens:
       prevState = prevState or {}
@@ -238,7 +238,7 @@ function model.RecurrentNetwork(opt, params)
          local xt = torch.select(x,2,t)
 
          -- prev h
-         local hp = hs[t-1] or prevState.h or getValue(x).new(batch, hiddenFeatures):zero()
+         local hp = hs[t-1] or prevState.h or x.new(batch, hiddenFeatures):zero()
 
          -- next h
          hs[t] = torch.tanh( torch.cat(xt,hp,2) * p.W + torch.expand(p.b, batch, hiddenFeatures) )
@@ -288,11 +288,11 @@ function model.RecurrentLSTMNetwork(opt, params)
    local f = function(params, x, prevState)
       -- dims:
       local p = params[1] or params
-      if getValue(x):dim() == 2 then
-         x = torch.view(x, 1, getValue(x):size(1), getValue(x):size(2))
+      if x:dim() == 2 then
+         x = torch.view(x, 1, x:size(1), x:size(2))
       end
-      local batch = getValue(x):size(1)
-      local steps = getValue(x):size(2)
+      local batch = x:size(1)
+      local steps = x:size(2)
 
       -- hiddens:
       prevState = prevState or {}
@@ -305,8 +305,8 @@ function model.RecurrentLSTMNetwork(opt, params)
          local xt = torch.select(x,2,t)
 
          -- prev h and prev c
-         local hp = hs[t-1] or prevState.h or getValue(x).new(batch, hiddenFeatures):zero()
-         local cp = cs[t-1] or prevState.c or getValue(x).new(batch, hiddenFeatures):zero()
+         local hp = hs[t-1] or prevState.h or x.new(batch, hiddenFeatures):zero()
+         local cp = cs[t-1] or prevState.c or x.new(batch, hiddenFeatures):zero()
 
          -- pack all dot products:
          local dots = torch.cat(xt,hp,2) * p.W + torch.expand(p.b, batch, 4*hiddenFeatures)

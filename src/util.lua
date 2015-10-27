@@ -45,7 +45,7 @@ end
 function util.lookup(tble, indexes)
    local indexSize = indexes:size():totable()
    local rows = torch.index(tble, 1, indexes:view(-1):long())
-   table.insert(indexSize, getValue(rows):size(2))
+   table.insert(indexSize, rows:size(2))
    return torch.view(rows, unpack(indexSize))
 end
 

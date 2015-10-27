@@ -34,6 +34,9 @@ function Node:init(value, fun, gradFun, args, values, tape)
    o.size = function(self, ...)
       return self.value.size(self.value,...)
    end
+   o.dim = function(self, ...)
+      return self.value.dim(self.value,...)
+   end
    o.new = function(...)
       return o.value.new(...)
    end
