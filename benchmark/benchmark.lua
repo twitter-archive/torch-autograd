@@ -794,6 +794,8 @@ for name,test in pairs(tests) do
       profi:start()
    end
    local tnn,tag = test()
+   tnn = tnn or 1/0
+   tag = tag or 1/0
    if opt.profile ~= 'false' and haveProfi then
       profi:stop()
       profi:writeReport(string.format("%s.profile.txt",name))
