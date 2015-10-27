@@ -24,16 +24,21 @@ Performance
 
 Long-term, `autograd`'s goal is to become the most flexible way to describe
 arbitrary differentiable functions, with no compromise on performance. There
-are currently two main limitations to performance:
+are currently a few limitations to performance:
 
 * no support for sparse tensors: for excessively sparse tensor updates (e.g.
   selecting a row in a tensor, and updating it), the gradient computation
   will be naive and dense. The best way to address this would be to add
   support for sparse tensors in Torch.
+* tape creation and evaluation: currently no caching of the tape is done, and
+  each call to `grad(f)` generates a considerable amount of type checks and
+  function calls. The plan is to write a caching mechanism that will save the
+  tape for each given configuration of the function inputs - this will reduce
+  the overhead considerably.
 * memory re-use: currently `autograd` doesn't do any memory caching, so each
   gradient estimation can potentially allocate lots of intermediate tensors.
   The best way to address this is to create a tensor pool, and have the tape
-  re-use tensors from this pool as needed. This is one of the main TODOs below.
+  re-use tensors from this pool as needed.
 
 TODO
 ----
@@ -41,10 +46,10 @@ TODO
 Autograd is work in progress. Current list of things to be developed includes:
 
 - [ ] Gradients of gradients (Hessian)
-- [ ] Helpers for building weights
-- [x] Debugging facilities (basic debugging in place, nothing amazing) (profile speed & gradient magnitude of each computation. Should just require nodeApply wrapper.)
+- [ ] Add support for caching tape for a given input configuration
 - [ ] Add support for sparse gradients
 - [ ] Implement auto-buffering so that native torch functions can re-use memory
+- [x] Debugging facilities (basic debugging in place, nothing amazing) (profile speed & gradient magnitude of each computation. Should just require nodeApply wrapper.)
 - [x] Implement missing gradients for `torch.max`, `torch.min`, ... more generally,
       allow operators on input data if no gradients will be computed on them (if x:max() is
       called to be used in a subsequent function, but we don't need the gradients wrt x,
@@ -53,6 +58,7 @@ Autograd is work in progress. Current list of things to be developed includes:
 * Helpers for building nn modules (tedious to write out convolution parameters)
   - [x] Basic helper logic for NN, CNN
   - [ ] Improve cascading, and parameter grouping when cascading functions
+- [x] Helpers for building weights [done for model generators]
 * Add more useful examples of models
   - [x] MNIST logistic regression
   - [x] MNIST MLP
