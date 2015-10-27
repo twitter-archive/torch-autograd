@@ -258,6 +258,7 @@ function model.RecurrentNetwork(opt, params)
          for i in ipairs(hs) do
             hs[i] = torch.view(hs[i], batch,1,hiddenFeatures)
          end
+         getValue(torch.cat(hs,2)) -- TODO: remove this line, why is it needed?
          return torch.cat(hs,2), newState
       end
    end
@@ -344,6 +345,7 @@ function model.RecurrentLSTMNetwork(opt, params)
          for i in ipairs(hs) do
             hs[i] = torch.view(hs[i], batch,1,hiddenFeatures)
          end
+         getValue(torch.cat(hs,2)) -- TODO: remove this line, why is it needed?
          return torch.cat(hs,2), newState
       end
    end
