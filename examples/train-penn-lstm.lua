@@ -87,20 +87,26 @@ local lsm = d.nn.LogSoftMax()
 local lossf = d.nn.ClassNLLCriterion()
 
 -- Complete trainable function:
-local f = function(inputs, y, prevState)
+local f = function(params, x, y, prevState)
    -- N elements:
-   local nElements = getValue(inputs.x):size(1) * getValue(inputs.x):size(2)
+   local batchSize = x:size(1)
+   local bpropLength = x:size(2)
+   local nElements = batchSize * bpropLength
+
+   -- Select word vectors
+   x = torch.index(params.words, 1, x:view(-1):long())
+   x = torch.view(x, batchSize, bpropLength, -1)
 
    -- Encode all inputs through LSTM layers:
-   local h1,newState1 = lstm1(inputs.params[1], regularize(inputs.x), prevState[1])
-   local h2,newState2 = lstm2(inputs.params[2], regularize(h1), prevState[2])
+   local h1,newState1 = lstm1(params[1], regularize(x), prevState[1])
+   local h2,newState2 = lstm2(params[2], regularize(h1), prevState[2])
 
    -- Flatten batch + temporal
    local h2f = torch.view(h2, nElements, opt.hiddens)
    local yf = torch.view(y, nElements)
 
    -- Linear classifier:
-   local h3 = regularize(h2f) * inputs.params[3].W + torch.expand(inputs.params[3].b, nElements, nClasses)
+   local h3 = regularize(h2f) * params[3].W + torch.expand(params[3].b, nElements, nClasses)
 
    -- Lsm
    local yhat = lsm(h3)
@@ -154,10 +160,18 @@ else
    words = torch.FloatTensor(nTokens, opt.wordDim)
 end
 words:uniform(-opt.paramRange, opt.paramRange)
+params.words = words
 
 -- Reformat training data for batches:
 local epochLength = math.floor(trainData:size(1) / opt.batchSize)
 trainData = trainData:narrow(1,1,epochLength*opt.batchSize):view(opt.batchSize, epochLength)
+
+-- Reformat val for batches:
+local valLength = math.floor(valData:size(1) / opt.batchSize)
+valData = valData:narrow(1,1,valLength*opt.batchSize):view(opt.batchSize, valLength)
+
+-- Reformat test, no batches (because we want the full perplexity):
+testData = testData:view(1, testData:size(1))
 
 -- Optional cap:
 if tonumber(opt.capEpoch) > 0 then
@@ -182,11 +196,8 @@ for epoch = 1,opt.nEpochs do
       local x = trainData:narrow(2,i,opt.bpropLength):contiguous()
       local y = trainData:narrow(2,i+1,opt.bpropLength):contiguous()
 
-      -- Select word vectors
-      local xv = words:index(1, x:view(-1):long()):view(opt.batchSize, opt.bpropLength, opt.wordDim)
-
       -- Grads:
-      grads,loss,lstmState = d(trainf)({params=params, x=xv}, y, lstmState)
+      grads,loss,lstmState = d(trainf)(params, x, y, lstmState)
 
       -- Cap gradient norms:
       local norm = 0
@@ -201,18 +212,9 @@ for epoch = 1,opt.nEpochs do
       end
 
       -- Update params:
-      for i,params in ipairs(params) do
-         for k,param in pairs(params) do
-            local g = grads.params[i][k]
-            param:add(-lr, g)
-         end
-      end
-
-      -- Update vectors:
-      local gradx = grads.x:view(nElements, opt.wordDim)
-      local xvs = x:view(-1)
-      for i = 1,nElements do
-         words[xvs[i]]:add(-lr, gradx[i])
+      for i,param in ipairs(_.flatten(params)) do
+         local g = _.flatten(grads)[i]
+         param:add(-lr, g)
       end
 
       -- Loss: exponentiate nll gives perplexity
@@ -234,20 +236,13 @@ for epoch = 1,opt.nEpochs do
    local steps = 0
    local lstmState = {}
    local loss
-   for i = 1,valData:size(1)-opt.bpropLength,opt.bpropLength do
+   for i = 1,valData:size(2)-opt.bpropLength,opt.bpropLength do
       -- Next sequence:
-      local x = valData:narrow(1,i,opt.bpropLength)
-      local y = valData:narrow(1,i+1,opt.bpropLength)
-
-      -- Select word vectors
-      local xv = words:index(1, x:long())
-
-      -- Reshape to batch of 1
-      xv = xv:view(1,opt.bpropLength,opt.wordDim)
-      y = y:view(1,opt.bpropLength)
+      local x = valData:narrow(2,i,opt.bpropLength):contiguous()
+      local y = valData:narrow(2,i+1,opt.bpropLength):contiguous()
 
       -- Estimate loss:
-      loss,lstmState = testf({params=params, x=xv}, y, lstmState)
+      loss,lstmState = testf(params, x, y, lstmState)
 
       -- Loss: exponentiate nll gives perplexity
       aloss = aloss + loss
@@ -271,20 +266,13 @@ for epoch = 1,opt.nEpochs do
    local steps = 0
    local lstmState = {}
    local loss
-   for i = 1,testData:size(1)-opt.bpropLength,opt.bpropLength do
+   for i = 1,testData:size(2)-opt.bpropLength,opt.bpropLength do
       -- Next sequence:
-      local x = testData:narrow(1,i,opt.bpropLength)
-      local y = testData:narrow(1,i+1,opt.bpropLength)
-
-      -- Select word vectors
-      local xv = words:index(1, x:long())
-
-      -- Reshape to batch of 1
-      xv = xv:view(1,opt.bpropLength,opt.wordDim)
-      y = y:view(1,opt.bpropLength)
+      local x = testData:narrow(2,i,opt.bpropLength):contiguous()
+      local y = testData:narrow(2,i+1,opt.bpropLength):contiguous()
 
       -- Estimate loss:
-      loss,lstmState = testf({params=params, x=xv}, y, lstmState)
+      loss,lstmState = testf(params, x, y, lstmState)
 
       -- Loss: exponentiate nll gives perplexity
       aloss = aloss + loss
