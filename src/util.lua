@@ -26,10 +26,7 @@ function util.logMultinomialLoss(out, target)
 end
 
 function util.logSumExp(array)
-   local max = 0
-   if torch.typename(array) then -- TODO: fix autograd (missing support for max)
-      max = array:max()
-   end
+   local max = getValue(array):max()
    return torch.log(torch.sum(torch.exp(array-max))) + max
 end
 
