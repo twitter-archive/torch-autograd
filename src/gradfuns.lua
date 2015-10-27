@@ -226,8 +226,9 @@ torch["narrow"] = function(A, dim, index, size)
    return A:narrow(dim, index, size)
 end
 
-torch["copy"] = function(A, B)
-   return A:copy(B)
+torch["copy"] = function(A)
+   local B = A.new(A:size())
+   return B:copy(A)
 end
 
 gradfuns[torch.cat] = {
@@ -305,9 +306,6 @@ gradfuns[torch.viewAs] = {
 
 gradfuns[torch.copy] = {
    "copy",
-   function(g, ans, x, y)
-      return g.new(x:size()):zero()
-   end,
    function(g, ans, x, y)
       return g
    end,
