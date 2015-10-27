@@ -2,7 +2,7 @@ Autograd
 ========
 
 Autograd automatically differentiates native
-[Torch](https://github.com/torch/torch7) code.
+[Torch](https://github.com/torch/torch7) code. Ported to Lua from the [original Python version](https://www.github.com/hips/autograd).
 
 Scope
 -----
@@ -49,29 +49,7 @@ Autograd is work in progress. Current list of things to be developed includes:
 - [ ] Add support for caching tape for a given input configuration
 - [ ] Add support for sparse gradients
 - [ ] Implement auto-buffering so that native torch functions can re-use memory
-- [x] Debugging facilities (basic debugging in place, nothing amazing) (profile speed & gradient magnitude of each computation. Should just require nodeApply wrapper.)
-- [x] Implement missing gradients for `torch.max`, `torch.min`, ... more generally,
-      allow operators on input data if no gradients will be computed on them (if x:max() is
-      called to be used in a subsequent function, but we don't need the gradients wrt x,
-      we should still be able to call it)
-  (i.e. auto-generate code that's similar to what nn does for modules)
-* Helpers for building nn modules (tedious to write out convolution parameters)
-  - [x] Basic helper logic for NN, CNN
-  - [ ] Improve cascading, and parameter grouping when cascading functions
-- [x] Helpers for building weights [done for model generators]
-* Add more useful examples of models
-  - [x] MNIST logistic regression
-  - [x] MNIST MLP
-  - [x] MNIST CNN
-  - [x] RNN (Penn?)
-  - [x] LSTM
-- [x] Missing gradients for functions like `torch.sum(data,index)` if index is provided;
-      these are critical to implement mini-batch support! (for now batches cannot be used)
-- [x] make the process of returning different intermediate outputs easier: right
-  now you have to define one function for each partial output, is it enough?
-  => write examples
-- [x] when calling `dparams = df(...)`, return the result of `f` as a second
-  value: `dparams,loss = df(...)`, this way it doesn't have to be run twice.
+
 
 Examples
 --------
