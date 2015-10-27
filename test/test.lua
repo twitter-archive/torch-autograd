@@ -257,8 +257,8 @@ local tests = {
 
    GradCheck_Inverse = function()
       -- Parameters:
-      local x = torch.Tensor(20):normal()
-      local K = torch.eye(20) + torch.ger(x,x)
+      local x = torch.Tensor(10):normal()
+      local K = torch.eye(10) + torch.ger(x,x)
 
       -- Function:
       local func = function(inputs)
