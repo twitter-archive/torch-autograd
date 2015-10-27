@@ -136,6 +136,71 @@ local tests = {
       return tnn, tag
    end,
 
+   ['logistic (nn)'] = function()
+      local tnn, tag
+      local x = tensor(1000,100):normal()
+      local y = tensor(1000):uniform(1.5,10.5):floor()
+
+      do
+         local model = nn.Sequential()
+         model:add(nn.Linear(100,10))
+         model:add(nn.LogSoftMax())
+         model:type(ttype)
+         local lossf = nn.ClassNLLCriterion()
+         lossf:type(ttype)
+
+         -- force allocs
+         model:zeroGradParameters()
+         local yhat = model:forward(x[1])
+         local loss = lossf:forward(yhat, y[1])
+         local dloss_dyhat = lossf:backward(yhat, y[1])
+         model:backward(x[1], dloss_dyhat)
+
+         tic()
+         for k = 1,20 do
+            for i = 1,x:size(1) do
+               model:zeroGradParameters()
+               local yhat = model:forward(x[i])
+               local loss = lossf:forward(yhat, y[i])
+               local dloss_dyhat = lossf:backward(yhat, y[i])
+               model:backward(x[i], dloss_dyhat)
+            end
+         end
+         tnn = toc()
+      end
+
+      do
+         local lin = d.nn.Linear(100,10)
+         local lsm = d.nn.LogSoftMax()
+         local lossf = d.nn.ClassNLLCriterion()
+
+         local f = function(params, x, y)
+            local h = lin(x, params.W, params.b)
+            local yhat = lsm(h)
+            local loss = lossf(yhat, y)
+            return loss
+         end
+
+         local params = {
+            W = tensor(10, 100):normal(.01),
+            b = tensor(10):zero(),
+         }
+
+         -- force allocs
+         local grads = d(f)(params, x[1], y[1])
+
+         tic()
+         for k = 1,20 do
+            for i = 1,x:size(1) do
+               local grads = d(f)(params, x[i], y[i])
+            end
+         end
+         tag = toc()
+      end
+
+      return tnn, tag
+   end,
+
    ['mlp (ag)'] = function()
       local tnn, tag
       local x = tensor(2000,100):normal()
