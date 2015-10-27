@@ -94,8 +94,7 @@ local f = function(params, x, y, prevState)
    local nElements = batchSize * bpropLength
 
    -- Select word vectors
-   x = torch.index(params.words, 1, x:view(-1):long())
-   x = torch.view(x, batchSize, bpropLength, -1)
+   x = util.lookup(params.words, x)
 
    -- Encode all inputs through LSTM layers:
    local h1,newState1 = lstm1(params[1], regularize(x), prevState[1])

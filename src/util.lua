@@ -1,3 +1,6 @@
+-- getValue
+local getValue = require 'autograd.node'.getValue
+
 -- Utilities
 local util = {}
 
@@ -37,6 +40,13 @@ end
 function util.sigmoid(array,p)
    p = p or 0
    return torch.pow(torch.exp(-array) + 1, -1) * (1-p*2) + p
+end
+
+function util.lookup(tble, indexes)
+   local indexSize = indexes:size():totable()
+   local rows = torch.index(tble, 1, indexes:view(-1):long())
+   table.insert(indexSize, getValue(rows):size(2))
+   return torch.view(rows, unpack(indexSize))
 end
 
 local fmt = getmetatable(torch.FloatTensor)
