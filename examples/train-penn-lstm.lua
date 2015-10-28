@@ -14,7 +14,7 @@ Options:
    --maxGradNorm    (default .25)     cap gradient norm
    --paramRange     (default .1)      initial parameter range
    --dropout        (default 0)       dropout probability on hidden states
-   --type           (default double)  tensor type: cuda | float | double
+   --type           (default float)   tensor type: cuda | float | double
 ]]
 
 -- Libs

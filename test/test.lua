@@ -945,6 +945,31 @@ local tests = {
       tester:assert(gradcheck(closure, inputs, 'x'), 'incorrect gradients on x')
       tester:assert(gradcheck(closure, inputs, 'W'), 'incorrect gradients on W')
       tester:assert(gradcheck(closure, inputs, 'b'), 'incorrect gradients on b')
+
+      -- Define RNN with all states exposed:
+      local f,params = autograd.model.RecurrentLSTMNetwork({
+         inputFeatures = 10,
+         hiddenFeatures = 10,
+         outputType = 'all',
+      })
+
+      -- Loss
+      local loss = function(params, input)
+         local v = f(params, input)
+         return torch.sum(v)
+      end
+
+      -- Move to Float
+      params[1].W = params[1].W:float()
+      params[1].b = params[1].b:float()
+      i = i:float()
+
+      -- Test on sequence data:
+      local o = loss(params, i)
+      local g = autograd(loss)(params, i)
+
+      -- Checks
+      tester:asserteq(type(g), 'table', 'gradients could not be computed')
    end,
 }
 

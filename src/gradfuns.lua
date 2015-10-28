@@ -261,6 +261,13 @@ gradfuns[torch.cat] = {
       return torch.narrow(g, dim, x:size(dim)+1, y:size(dim))
    end
 }
+
+gradfuns[torch.FloatTensor.cat] = gradfuns[torch.cat]
+gradfuns[torch.DoubleTensor.cat] = gradfuns[torch.cat]
+if torch.CudaTensor then
+   gradfuns[torch.CudaTensor.cat] = gradfuns[torch.cat]
+end
+
 gradfuns[torch.expand] = {
    "expand",
    function(g, ans, x,...)
