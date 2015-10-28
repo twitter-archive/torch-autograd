@@ -17,6 +17,13 @@ Options:
    --type           (default float)   tensor type: cuda | float | double
 ]]
 
+-- CUDA?
+if opt.type == 'cuda' then
+   require 'cutorch'
+   require 'cunn'
+   cutorch.manualSeed(1)
+end
+
 -- Libs
 local d = require 'autograd'
 local util = require 'autograd.util'
@@ -26,12 +33,6 @@ local _ = require 'moses'
 
 -- Seed
 torch.manualSeed(1)
-
--- CUDA?
-if opt.type == 'cuda' then
-   require 'cutorch'
-   cutorch.manualSeed(1)
-end
 
 -- Load in PENN Treebank dataset
 local trainData, valData, testData, dict = require('./get-penn.lua')()

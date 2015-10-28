@@ -17,7 +17,7 @@ local tensorTypes = {
    'FloatTensor',
    'DoubleTensor'
 }
-if haveCutorch and cutorch then
+if cutorch then
    tensorTypes[#tensorTypes+1] = 'CudaTensor'
 end
 
