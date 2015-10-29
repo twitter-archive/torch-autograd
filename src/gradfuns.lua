@@ -231,10 +231,21 @@ torch["clone"] = function(A)
    return B:copy(A)
 end
 
+torch["contiguous"] = function(A)
+   return A:contiguous()
+end
+
 torch["copy"] = function(A,B)
    local o = A:copy(B)
    return o
 end
+
+gradfuns[torch.contiguous] = {
+   "contiguous",
+   function(g,ans,x)
+      return g
+   end
+}
 
 gradfuns[torch.cat] = {
    "cat",
@@ -300,7 +311,9 @@ gradfuns[torch.expandAs] = {
 gradfuns[torch.view] = {
    "view",
    function(g, ans, x,sizes)
-      -- TODO: copy required?
+      if not g:isContiguous() then
+         g = g:contiguous()
+      end
       return torch.view(g,x:size())
    end
 }

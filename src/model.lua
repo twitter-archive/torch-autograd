@@ -256,7 +256,6 @@ function model.RecurrentNetwork(opt, params)
          for i in ipairs(hs) do
             hs[i] = torch.view(hs[i], batch,1,hiddenFeatures)
          end
-         getValue(getValue(x).cat(hs,2)) -- TODO: get rid of this?
          return getValue(x).cat(hs,2), newState
       end
    end
@@ -329,6 +328,7 @@ function model.RecurrentLSTMNetwork(opt, params)
          hs[t] = torch.cmul(outputGate, torch.tanh(cs[t]))
       end
 
+
       -- save state
       local newState = {h=hs[#hs], c=cs[#cs]}
 
@@ -341,7 +341,6 @@ function model.RecurrentLSTMNetwork(opt, params)
          for i in ipairs(hs) do
             hs[i] = torch.view(hs[i], batch,1,hiddenFeatures)
          end
-         getValue(getValue(x).cat(hs,2)) -- TODO: get rid of this?
          return getValue(x).cat(hs,2), newState
       end
    end

@@ -181,6 +181,7 @@ end
 local lr = opt.learningRate
 local reportEvery = opt.reportEvery
 local valPerplexity = math.huge
+
 for epoch = 1,opt.nEpochs do
    -- Train:
    print('\nTraining Epoch #'..epoch)
