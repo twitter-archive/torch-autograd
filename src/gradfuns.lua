@@ -348,7 +348,7 @@ gradfuns[torch.index] = {
    function(g, ans, x,dim,index)
       local out = g.new(x:size()):zero()
       for i=1,index:size(1) do
-         torch.select(out,dim,index[i]):add(torch.select(g,dim,i))
+         torch.narrow(out,dim,index[i],1):add(torch.narrow(g,dim,i,1))
       end
       return out
    end
