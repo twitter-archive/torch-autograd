@@ -70,10 +70,7 @@ local lstm2 = model.RecurrentLSTMNetwork({
 
 -- Dropout
 local dropout = function(state)
-   local keep = 1 - opt.dropout
-   if keep == 1 then return state end
-   local keep = state.new(state:size()):bernoulli(keep):mul(1/keep)
-   return torch.cmul(state, keep)
+   return util.dropout(state, opt.dropout)
 end
 local bypass = function(state) return state end
 local regularize = dropout

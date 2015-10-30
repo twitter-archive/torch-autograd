@@ -43,6 +43,13 @@ function util.lookup(tble, indexes)
    return torch.view(rows, unpack(indexSize))
 end
 
+function util.dropout(state, dropout)
+   local keep = 1 - dropout
+   if keep == 1 then return state end
+   local keep = state.new(state:size()):bernoulli(keep):mul(1/keep)
+   return torch.cmul(state, keep)
+end
+
 local fmt = getmetatable(torch.FloatTensor)
 local dmt = getmetatable(torch.DoubleTensor)
 local cmt = getmetatable(torch.CudaTensor) or fmt
