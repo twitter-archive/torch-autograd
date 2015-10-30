@@ -44,6 +44,7 @@ function util.lookup(tble, indexes)
 end
 
 function util.dropout(state, dropout)
+   dropout = dropout or 0
    local keep = 1 - dropout
    if keep == 1 then return state end
    local keep = state.new(state:size()):bernoulli(keep):mul(1/keep)

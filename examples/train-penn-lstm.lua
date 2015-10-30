@@ -69,11 +69,7 @@ local lstm2 = model.RecurrentLSTMNetwork({
 }, params)
 
 -- Dropout
-local dropout = function(state)
-   return util.dropout(state, opt.dropout)
-end
-local bypass = function(state) return state end
-local regularize = dropout
+local regularize = util.dropout
 
 -- Shortcuts
 local nElements = opt.batchSize*opt.bpropLength
@@ -84,7 +80,7 @@ local lsm = d.nn.LogSoftMax()
 local lossf = d.nn.ClassNLLCriterion()
 
 -- Complete trainable function:
-local f = function(params, x, y, prevState)
+local f = function(params, x, y, prevState, dropout)
    -- N elements:
    local batchSize = x:size(1)
    local bpropLength = x:size(2)
@@ -94,15 +90,15 @@ local f = function(params, x, y, prevState)
    x = util.lookup(params.words, x)
 
    -- Encode all inputs through LSTM layers:
-   local h1,newState1 = lstm1(params[1], regularize(x), prevState[1])
-   local h2,newState2 = lstm2(params[2], regularize(h1), prevState[2])
+   local h1,newState1 = lstm1(params[1], regularize(x,dropout), prevState[1])
+   local h2,newState2 = lstm2(params[2], regularize(h1,dropout), prevState[2])
 
    -- Flatten batch + temporal
    local h2f = torch.view(h2, nElements, opt.hiddens)
    local yf = torch.view(y, nElements)
 
    -- Linear classifier:
-   local h3 = regularize(h2f) * params[3].W + torch.expand(params[3].b, nElements, nClasses)
+   local h3 = regularize(h2f,dropout) * params[3].W + torch.expand(params[3].b, nElements, nClasses)
 
    -- Lsm
    local yhat = lsm(h3)
@@ -112,18 +108,6 @@ local f = function(params, x, y, prevState)
 
    -- Return avergage loss
    return loss, {newState1, newState2}
-end
-
--- Training eval
-local trainf = function(...)
-   regularize = dropout
-   return f(...)
-end
-
--- Test eval
-local testf = function(...)
-   regularize = bypass
-   return f(...)
 end
 
 -- Linear classifier params:
@@ -194,7 +178,7 @@ for epoch = 1,opt.nEpochs do
       local y = trainData:narrow(2,i+1,opt.bpropLength):contiguous()
 
       -- Grads:
-      grads,loss,lstmState = d(trainf)(params, x, y, lstmState)
+      grads,loss,lstmState = d(f)(params, x, y, lstmState, opt.dropout)
 
       -- Cap gradient norms:
       local norm = 0
@@ -239,7 +223,7 @@ for epoch = 1,opt.nEpochs do
       local y = valData:narrow(2,i+1,opt.bpropLength):contiguous()
 
       -- Estimate loss:
-      loss,lstmState = testf(params, x, y, lstmState)
+      loss,lstmState = f(params, x, y, lstmState)
 
       -- Loss: exponentiate nll gives perplexity
       aloss = aloss + loss
@@ -269,7 +253,7 @@ for epoch = 1,opt.nEpochs do
       local y = testData:narrow(2,i+1,opt.bpropLength):contiguous()
 
       -- Estimate loss:
-      loss,lstmState = testf(params, x, y, lstmState)
+      loss,lstmState = f(params, x, y, lstmState)
 
       -- Loss: exponentiate nll gives perplexity
       aloss = aloss + loss
