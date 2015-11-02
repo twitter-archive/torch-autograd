@@ -720,6 +720,54 @@ local tests = {
       tester:asserteq(torch.typename(grads.b2), 'torch.FloatTensor', 'incorrect type')
    end,
 
+   NNFunc_DynamicWrap = function()
+      -- Define regular nn model:
+      local model = nn.Sequential()
+      model:add(nn.SpatialConvolutionMM(3, 16, 3, 3, 1, 1, 1, 1))
+      model:add(nn.Tanh())
+      model:add(nn.Reshape(16*8*8))
+      model:add(nn.Linear(16*8*8, 10))
+      model:add(nn.Tanh())
+
+      -- Functionalize!
+      local modelf, params = autograd.functionalize(model)
+
+      -- Loss
+      local loss = autograd.nn.MSECriterion()
+
+      -- Input
+      local x = torch.FloatTensor(3, 8, 8):normal()
+      local y = torch.FloatTensor(10):normal()
+
+      -- Force to float:
+      for i,p in ipairs(params) do
+         params[i] = p:float()
+      end
+
+      -- nn version:
+      local function cnn(params, x, y)
+         local h2 = modelf(params, x)
+         return loss(h2, y)
+      end
+
+      -- Eval:
+      local pred = cnn(params, x, y)
+      local grads = autograd(cnn)(params, x, y)
+
+      -- Clone model to compare to built-in nn grad eval:
+      local model2 = model:clone():float()
+      model2:zeroGradParameters()
+      local yhat = model2:forward(x)
+      model2:backward( x, nn.MSECriterion():float():backward(yhat,y) )
+      local _,grads2 = model:parameters()
+
+      -- Check errs:
+      for i in ipairs(grads) do
+         local err = (grads[i] - grads2[i]):abs():max()
+         tester:asserteq(err, 0, 'incorrect grad wrapper')
+      end
+   end,
+
    Models_NeuralNetwork = function()
       -- Define model:
       local f,params = autograd.model.NeuralNetwork({
