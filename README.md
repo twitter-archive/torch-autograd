@@ -181,7 +181,7 @@ dparams, loss = dneuralNet(params, x, y)
 ```
 
 This code is stricly equivalent to the code above, but will be more efficient
-(this is espacally true for more complex primitives like convolutions, ...).
+(this is especially true for more complex primitives like convolutions, ...).
 
 3rd party libraries that provide a similar API to nn can be
 registered like this:
@@ -192,6 +192,35 @@ module = customnnfuncs.MyNnxModule(...)
 
 -- under the hood, this is already done for nn:
 grad.nn = grad.functionalize('nn')
+```
+
+On top of this functional API, existing `nn` modules and containers, with arbitarily
+nested parameters, can also be wrapped into functions. This is particularly handy
+when doing transfer learning from existing models:
+
+```lua
+-- Define a standard nn model:
+local model = nn.Sequential()
+model:add(nn.SpatialConvolutionMM(3, 16, 3, 3, 1, 1, 1, 1))
+model:add(nn.Tanh())
+model:add(nn.Reshape(16*8*8))
+model:add(nn.Linear(16*8*8, 10))
+model:add(nn.Tanh())
+-- Note that this model could have been pre-trained, and reloaded from disk.
+
+-- Functionalize the model:
+local modelf, params = autograd.functionalize(model)
+
+-- The model can now be used as part of a regular autograd function:
+local loss = autograd.nn.MSECriterion()
+neuralNet = function(params, x, y)
+   local h = modelf(params, x)
+   return loss(h, y)
+end
+
+-- Note: the parameters are always handled as an array, passed as the first
+-- argument to the model function (modelf). This API is similar to the other
+-- model primitives we provide (see below in "Model Primitives").
 ```
 
 ### Gradient checks
