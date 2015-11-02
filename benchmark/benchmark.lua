@@ -664,6 +664,67 @@ local tests = {
       return tnn, tag
    end,
 
+   ['cnn (nnWrap, batched)'] = function()
+      local tnn, tag
+      local x = tensor(32,3,64,64):normal()
+      local y = tensor(32):uniform(1.5,10.5):floor()
+
+      local model = nn.Sequential()
+      model:add(nn.SpatialConvolutionMM(3,16,5,5))
+      model:add(nn.Tanh())
+      model:add(nn.SpatialMaxPooling(2,2,2,2))
+      model:add(nn.SpatialConvolutionMM(16,32,5,5))
+      model:add(nn.Tanh())
+      model:add(nn.SpatialMaxPooling(2,2,2,2))
+      model:add(nn.Reshape(13*13*32))
+      model:add(nn.Linear(13*13*32,10))
+      model:add(nn.LogSoftMax())
+      model:type(ttype)
+      local lossf = nn.ClassNLLCriterion()
+      lossf:type(ttype)
+
+      do
+         -- force allocs
+         model:zeroGradParameters()
+         local yhat = model:forward(x)
+         local loss = lossf:forward(yhat, y)
+         local dloss_dyhat = lossf:backward(yhat, y)
+         model:backward(x, dloss_dyhat)
+
+         tic()
+         for i = 1,10 do
+            model:zeroGradParameters()
+            local yhat = model:forward(x)
+            local loss = lossf:forward(yhat, y)
+            local dloss_dyhat = lossf:backward(yhat, y)
+            model:backward(x, dloss_dyhat)
+         end
+         tnn = toc()
+      end
+
+      do
+         local modelf,params = d.functionalize(model)
+         local lossf = d.nn.ClassNLLCriterion()
+
+         local f = function(params, x, y)
+            local yhat = modelf(params, x)
+            local loss = lossf(yhat, y)
+            return loss
+         end
+
+         -- force allocs
+         local grads = d(f)(params, x, y)
+
+         tic()
+         for i = 1,10 do
+            local grads = d(f)(params, x, y)
+         end
+         tag = toc()
+      end
+
+      return tnn, tag
+   end,
+
    ['lstm (ag+nn)'] = function()
       -- Depends on CXNN reference implementation
       local ok,cxnn = pcall(require, 'cxnn')
