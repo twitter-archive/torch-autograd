@@ -745,20 +745,21 @@ local tests = {
       end
 
       -- nn version:
-      local function cnn(params, x, y)
-         local h2 = modelf(params, x)
+      local function cnn(params, y)
+         local h2 = modelf(params, params.x)
          return loss(h2, y)
       end
 
       -- Eval:
-      local pred = cnn(params, x, y)
-      local grads = autograd(cnn)(params, x, y)
+      params.x = x
+      local pred = cnn(params, y)
+      local grads = autograd(cnn)(params, y)
 
       -- Clone model to compare to built-in nn grad eval:
       local model2 = model:clone():float()
       model2:zeroGradParameters()
       local yhat = model2:forward(x)
-      model2:backward( x, nn.MSECriterion():float():backward(yhat,y) )
+      local gx = model2:backward( x, nn.MSECriterion():float():backward(yhat,y) )
       local _,grads2 = model:parameters()
 
       -- Check errs:
@@ -766,6 +767,8 @@ local tests = {
          local err = (grads[i] - grads2[i]):abs():max()
          tester:asserteq(err, 0, 'incorrect grad wrapper')
       end
+      local err = (gx - grads.x):abs():max()
+      tester:asserteq(err, 0, 'incorrect grad wrapper')
    end,
 
    Models_NeuralNetwork = function()
