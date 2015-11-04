@@ -19,6 +19,11 @@ Autograd has multiple goals:
   with multiple loss functions and/or inputs
 * enable gradients of gradients for transparent computation of Hessians, ...
 
+License
+-------
+
+Licensed under the Apache License, Version 2.0. See LICENSE file.
+
 Performance
 -----------
 
