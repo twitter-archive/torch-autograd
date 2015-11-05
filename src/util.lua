@@ -18,14 +18,6 @@ function util.oneHot(labels, n)
 end
 
 -- Helpers:
-function util.logMultinomialLoss(out, target)
-   return -torch.sum(torch.cmul(out,target))
-end
-
-function util.logBCELoss(out, target)
-   return -torch.sum(torch.cmul(target, torch.log(out)) + torch.cmul(1-target, torch.log(1-out)))
-end
-
 function util.logSumExp(array)
    local max = torch.max(array)
    return torch.log(torch.sum(torch.exp(array-max))) + max

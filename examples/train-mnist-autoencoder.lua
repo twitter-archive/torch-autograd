@@ -3,6 +3,7 @@
 
 -- Libs
 local grad = require 'autograd'
+local lossFuns = require 'autograd.loss'
 local util = require 'autograd.util'
 local optim = require 'optim'
 
@@ -32,7 +33,7 @@ end
 function f(params, input, l2Lambda)
    -- Reconstruction loss
    local prediction = predict(params, input)
-   local loss = util.logBCELoss(prediction, input)
+   local loss = lossFuns.logBCELoss(prediction, input)
 
    -- L2 penalty on the weights
    for i=1,#params.W do

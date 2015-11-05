@@ -1,6 +1,7 @@
 -- Libs
 local grad = require 'autograd'
 local util = require 'autograd.util'
+local lossFuns = require 'autograd.loss'
 local optim = require 'optim'
 
 -- Load in MNIST
@@ -23,7 +24,7 @@ end
 -- Define our training loss
 function f(params, input, target)
    local prediction = predict(params, input, target)
-   local loss = util.logMultinomialLoss(prediction, target)
+   local loss = lossFuns.logMultinomialLoss(prediction, target)
    return loss, prediction
 end
 
