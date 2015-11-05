@@ -145,7 +145,19 @@ local tests = {
          end
       end
    end,
+   Transpose = function()
+      
+      local fn = function(inputs)
+         return torch.sum(torch.t(inputs.x))
+      end
 
+      -- Check grads:
+      local x = torch.Tensor(10,5):normal()
+      for iparam,param in pairs({"x"}) do
+         tester:assert(gradcheck(fn, {x=x}, param), "Incorrect gradient")
+      end
+
+   end,
    Cat = function()
       -- Concat along 1st dim:
       local x1 = torch.Tensor(3,5):normal()
