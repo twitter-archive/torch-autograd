@@ -22,7 +22,7 @@ Autograd has multiple goals:
 License
 -------
 
-Licensed under the Apache License, Version 2.0. See LICENSE file.
+Licensed under the Apache License, Version 2.0. [See LICENSE file](https://github.com/twitter/torch-autograd/blob/master/LICENSE).
 
 Performance
 -----------
