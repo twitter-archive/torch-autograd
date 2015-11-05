@@ -6,10 +6,9 @@ local grad = require 'autograd'
 local util = require 'autograd.util'
 local optim = require 'optim'
 
--- -- Load in MNIST
--- local trainData, testData, classes = require('./get-mnist.lua')()
--- local inputSize = trainData.x[1]:nElement()
--- local confusionMatrix = optim.ConfusionMatrix(classes)
+-- Load in MNIST
+local trainData, testData, classes = require('./get-mnist.lua')()
+local inputSize = trainData.x[1]:nElement()
 
 -- What model to train:
 local predict,f,params
@@ -47,23 +46,26 @@ end
 local df = grad(f)
 
 sizes = {}
-sizes['input'] = 5
-sizes['h1'] = 7
-sizes['h2'] = 3
+sizes['input'] = inputSize
+sizes['h1'] = 50
+sizes['h2'] = 25
 sizes['h3'] = 10
+
+-- L2 penalty strength
+l2Lambda = 1e-3
 
 -- Define our parameters
 -- [-1/sqrt(#output), 1/sqrt(#output)]
 torch.manualSeed(0)
-local W1 = torch.DoubleTensor(sizes['input'],sizes['h1']):uniform(-1/math.sqrt(sizes['h1']),1/math.sqrt(sizes['h1']))
-local W2 = torch.DoubleTensor(sizes['h1'],sizes['h2']):uniform(-1/math.sqrt(sizes['h2']),1/math.sqrt(sizes['h2']))
-local W3 = torch.DoubleTensor(sizes['h2'],sizes['h3']):uniform(-1/math.sqrt(sizes['h3']),1/math.sqrt(sizes['h3']))
-local B1 = 0.1 * torch.randn(1, sizes['h1'])
-local B2 = 0.1 * torch.randn(1, sizes['h2'])
-local B3 = 0.1 * torch.randn(1, sizes['h3'])
-local B4 = 0.1 * torch.randn(1, sizes['h2'])
-local B5 = 0.1 * torch.randn(1, sizes['h1'])
-local B6 = 0.1 * torch.randn(1, sizes['input'])
+local W1 = torch.FloatTensor(sizes['input'],sizes['h1']):uniform(-1/math.sqrt(sizes['h1']),1/math.sqrt(sizes['h1']))
+local W2 = torch.FloatTensor(sizes['h1'],sizes['h2']):uniform(-1/math.sqrt(sizes['h2']),1/math.sqrt(sizes['h2']))
+local W3 = torch.FloatTensor(sizes['h2'],sizes['h3']):uniform(-1/math.sqrt(sizes['h3']),1/math.sqrt(sizes['h3']))
+local B1 = torch.FloatTensor(1, sizes['h1']):fill(0)
+local B2 = torch.FloatTensor(1, sizes['h2']):fill(0)
+local B3 = torch.FloatTensor(1, sizes['h3']):fill(0)
+local B4 = torch.FloatTensor(1, sizes['h2']):fill(0)
+local B5 = torch.FloatTensor(1, sizes['h1']):fill(0)
+local B6 = torch.FloatTensor(1, sizes['input']):fill(0)
 
 -- Trainable parameters:
 params = {
@@ -71,54 +73,29 @@ params = {
    B = {B1, B2, B3, B4, B5, B6},
 }
 
-x = torch.rand(3, 5)
+loss, preds = f(params, trainData.x[1]:view(1, inputSize), l2Lambda)
+grads, loss, preds = df(params, trainData.x[1]:view(1, inputSize), l2Lambda)
 
-print(f(params, x, 0.0))
+-- Train a neural network
+for epoch = 1,100 do
+   print('Training Epoch #'..epoch)
+   for i = 1,trainData.size do
+      -- Next sample:
+      local x = trainData.x[i]:view(1,inputSize)
 
--- Check gradients
--- Computed grad grad
-g = df(params, x, 0.0)
+      -- Grads:
+      local grads, loss, prediction = df(params,x,l2Lambda)
 
--- Finite differences check
-for i=1,#params.B do
-   var = params.B[i]:view(-1)
-   g_true = g.B[i]:view(-1)
-   g_est = var:clone()
-   g_est:zero()
-   print(i)
-   for j=1,var:size(1) do
-      var[j] = var[j] + 1e-5
-      f1 = f(params, x, 0.0)
-      var[j] = var[j] - 2e-5
-      f2 = f(params, x, 0.0)
-      var[j] = var[j] + 1e-5
-      g_est[j] = (f1 - f2) / 2e-5
-      print (g_est[j] - g_true[j])
+      -- Update weights and biases
+      for i=1,#params.W do
+         params.W[i] = params.W[i] - grads.W[i] * 0.01
+      end
+
+      for i=1,#params.B do
+         params.B[i] = params.B[i] - grads.B[i] * 0.01
+      end
    end
+
+   -- Log performance:
+   print('Cross-entropy loss: '..f(params, trainData.x:view(60000, -1), l2Lambda))
 end
-
--- -- Train a neural network
--- for epoch = 1,100 do
---    print('Training Epoch #'..epoch)
---    for i = 1,trainData.size do
---       -- Next sample:
---       local x = trainData.x[i]:view(1,inputSize)
---       local y = torch.view(trainData.y[i], 1, 10)
-
---       -- Grads:
---       local grads, loss, prediction = df(params,x,y)
-
---       -- Update weights and biases
---       for i=1,#params.W do
---          params.W[i] = params.W[i] - grads.W[i] * 0.01
---          params.B[i] = params.B[i] - grads.B[i] * 0.01
---       end
-
---       -- Log performance:
---       confusionMatrix:add(prediction[1], y[1])
---       if i % 1000 == 0 then
---          print(confusionMatrix)
---          confusionMatrix:zero()
---       end
---    end
--- end
