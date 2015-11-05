@@ -214,6 +214,10 @@ gradfuns[torch.abs] = {
    end
 }
 
+torch["t"] = function(A)
+   return A:t() -- TODO: copy required?
+end
+
 torch["select"] = function (A, dim, index)
    return A:select(dim, index)
 end
@@ -239,6 +243,13 @@ torch["copy"] = function(A,B)
    local o = A:copy(B)
    return o
 end
+
+gradfuns[torch.t] = {
+   "t",
+   function(g,ans,x)
+      return torch.t(g)
+   end
+}
 
 gradfuns[torch.contiguous] = {
    "contiguous",
