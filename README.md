@@ -365,6 +365,7 @@ Autograd is work in progress. Current list of things to be developed includes:
 - [ ] Gradients of gradients (Hessian)
 - [ ] Add support for caching tape for a given input configuration
 - [ ] Add support for sparse gradients
+- [ ] Code generation
 - [ ] Implement auto-buffering so that native torch functions can re-use memory
 
 License
