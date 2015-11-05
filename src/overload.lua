@@ -94,9 +94,9 @@ local numberMetatable = {
    end,
    __sub = function(a,b)
       if type(a) == "number" and isTensor(b) then
-         return nodeApply(op.sub, gradfuns["op.sub"], -b, a)
+         return nodeApply(op.add, gradfuns["op.add"], -b, a)
       else
-         return nodeApply(op.sub, gradfuns["op.sub"], a, -b) -- TODO subtraction
+         return nodeApply(op.sub, gradfuns["op.sub"], a, b)
       end
    end,
    __mul = function(a,b)

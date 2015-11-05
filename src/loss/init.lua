@@ -8,6 +8,14 @@ local loss = {}
 -- and produces the loss, plus the transformed ouptut (in the case of a
 -- binary cross entropy loss, the output goes through a sigmoid)
 
+function loss.logMultinomialLoss(out, target)
+   return -torch.sum(torch.cmul(out,target))
+end
+
+function loss.logBCELoss(out, target)
+   return -torch.sum(torch.cmul(target, torch.log(out)) + torch.cmul(1-target, torch.log(1-out)))
+end
+
 function loss.crossEntropy(out, target)
    local yhat = util.logSoftMax(out)
    return -torch.sum(torch.cmul(yhat, target)), yhat
