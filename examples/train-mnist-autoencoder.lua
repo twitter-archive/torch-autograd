@@ -6,13 +6,10 @@ local grad = require 'autograd'
 local util = require 'autograd.util'
 local optim = require 'optim'
 
--- Load in MNIST
-local trainData, testData, classes = require('./get-mnist.lua')()
-local inputSize = trainData.x[1]:nElement()
-local confusionMatrix = optim.ConfusionMatrix(classes)
-
--- What model to train:
-local predict,f,params
+-- -- Load in MNIST
+-- local trainData, testData, classes = require('./get-mnist.lua')()
+-- local inputSize = trainData.x[1]:nElement()
+-- local confusionMatrix = optim.ConfusionMatrix(classes)
 
 -- What model to train:
 local predict,f,params
