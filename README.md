@@ -19,43 +19,6 @@ Autograd has multiple goals:
   with multiple loss functions and/or inputs
 * enable gradients of gradients for transparent computation of Hessians, ...
 
-License
--------
-
-Licensed under the Apache License, Version 2.0. [See LICENSE file](https://github.com/twitter/torch-autograd/blob/master/LICENSE).
-
-Performance
------------
-
-Long-term, `autograd`'s goal is to become the most flexible way to describe
-arbitrary differentiable functions, with no compromise on performance. There
-are currently a few limitations to performance:
-
-* no support for sparse tensors: for excessively sparse tensor updates (e.g.
-  selecting a row in a tensor, and updating it), the gradient computation
-  will be naive and dense. The best way to address this would be to add
-  support for sparse tensors in Torch.
-* tape creation and evaluation: currently no caching of the tape is done, and
-  each call to `grad(f)` generates a considerable amount of type checks and
-  function calls. The plan is to write a caching mechanism that will save the
-  tape for each given configuration of the function inputs - this will reduce
-  the overhead considerably.
-* memory re-use: currently `autograd` doesn't do any memory caching, so each
-  gradient estimation can potentially allocate lots of intermediate tensors.
-  The best way to address this is to create a tensor pool, and have the tape
-  re-use tensors from this pool as needed.
-
-TODO
-----
-
-Autograd is work in progress. Current list of things to be developed includes:
-
-- [ ] Gradients of gradients (Hessian)
-- [ ] Add support for caching tape for a given input configuration
-- [ ] Add support for sparse gradients
-- [ ] Implement auto-buffering so that native torch functions can re-use memory
-
-
 Examples
 --------
 
@@ -372,3 +335,39 @@ loss = loss.binaryEntropy(prediction, target)
 -- least squares - mean square error between 2 vectors:
 loss = loss.leastSquares(prediction, target)
 ```
+
+Performance
+-----------
+
+Long-term, `autograd`'s goal is to become the most flexible way to describe
+arbitrary differentiable functions, with no compromise on performance. There
+are currently a few limitations to performance:
+
+* no support for sparse tensors: for excessively sparse tensor updates (e.g.
+  selecting a row in a tensor, and updating it), the gradient computation
+  will be naive and dense. The best way to address this would be to add
+  support for sparse tensors in Torch.
+* tape creation and evaluation: currently no caching of the tape is done, and
+  each call to `grad(f)` generates a considerable amount of type checks and
+  function calls. The plan is to write a caching mechanism that will save the
+  tape for each given configuration of the function inputs - this will reduce
+  the overhead considerably.
+* memory re-use: currently `autograd` doesn't do any memory caching, so each
+  gradient estimation can potentially allocate lots of intermediate tensors.
+  The best way to address this is to create a tensor pool, and have the tape
+  re-use tensors from this pool as needed.
+
+TODO
+----
+
+Autograd is work in progress. Current list of things to be developed includes:
+
+- [ ] Gradients of gradients (Hessian)
+- [ ] Add support for caching tape for a given input configuration
+- [ ] Add support for sparse gradients
+- [ ] Implement auto-buffering so that native torch functions can re-use memory
+
+License
+-------
+
+Licensed under the Apache License, Version 2.0. [See LICENSE file](https://github.com/twitter/torch-autograd/blob/master/LICENSE).
