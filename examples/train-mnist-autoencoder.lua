@@ -37,9 +37,9 @@ function f(params, input, target, l2Lambda)
    print(prediction)
    print(1-prediction)
    -- L2 penalty on the weights
-   for i=1,#params.W do
-      loss = loss + l2Lambda * torch.sum(torch.pow(params.W[i],2))
-   end
+   -- for i=1,#params.W do
+   --    loss = loss + l2Lambda * torch.sum(torch.pow(params.W[i],2))
+   -- end
 
    return loss, prediction
 end
@@ -70,7 +70,7 @@ params = {
 }
 
 x = torch.randn(3, 5):float()
-print(f(params, x, 2.1))
+f(params, x, 2.1)
 
 -- -- Define our network
 -- function predict(params, input, target)
