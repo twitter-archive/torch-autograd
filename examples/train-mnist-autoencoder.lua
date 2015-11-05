@@ -5,10 +5,12 @@
 local grad = require 'autograd'
 local lossFuns = require 'autograd.loss'
 local util = require 'autograd.util'
+local gradcheck = require 'autograd.gradcheck'
 local optim = require 'optim'
 
 -- Load in MNIST
 local trainData, testData, classes = require('./get-mnist.lua')()
+trainData.x = trainData.x:view(trainData.x:size(1), -1):double()
 local inputSize = trainData.x[1]:nElement()
 
 -- What model to train:
@@ -20,7 +22,6 @@ function predict(params, input)
    local h1 = util.sigmoid(input * params.W[1] + torch.expand(params.B[1], input:size(1), params.B[1]:size(2)))
    local h2 = util.sigmoid(h1 * params.W[2] + torch.expand(params.B[2], input:size(1), params.B[2]:size(2)))
    local h3 = util.sigmoid(h2 * params.W[3] + torch.expand(params.B[3], input:size(1), params.B[3]:size(2)))
-
    -- Decoder
    local h4 = util.sigmoid(h3 * torch.t(params.W[3]) + torch.expand(params.B[4], input:size(1), params.B[4]:size(2)))
    local h5 = util.sigmoid(h4 * torch.t(params.W[2]) + torch.expand(params.B[5], input:size(1), params.B[5]:size(2)))
@@ -33,8 +34,7 @@ end
 function f(params, input, l2Lambda)
    -- Reconstruction loss
    local prediction = predict(params, input)
-   local loss = lossFuns.logBCELoss(prediction, input)
-
+   local loss = lossFuns.logBCELoss(prediction, input, 1e-6) / input:size(1)
    -- L2 penalty on the weights
    for i=1,#params.W do
       loss = loss + l2Lambda * torch.sum(torch.pow(params.W[i],2))
@@ -53,20 +53,20 @@ sizes['h2'] = 25
 sizes['h3'] = 10
 
 -- L2 penalty strength
-l2Lambda = 1e-3
+l2Lambda = 0.0
 
 -- Define our parameters
 -- [-1/sqrt(#output), 1/sqrt(#output)]
 torch.manualSeed(0)
-local W1 = torch.FloatTensor(sizes['input'],sizes['h1']):uniform(-1/math.sqrt(sizes['h1']),1/math.sqrt(sizes['h1']))
-local W2 = torch.FloatTensor(sizes['h1'],sizes['h2']):uniform(-1/math.sqrt(sizes['h2']),1/math.sqrt(sizes['h2']))
-local W3 = torch.FloatTensor(sizes['h2'],sizes['h3']):uniform(-1/math.sqrt(sizes['h3']),1/math.sqrt(sizes['h3']))
-local B1 = torch.FloatTensor(1, sizes['h1']):fill(0)
-local B2 = torch.FloatTensor(1, sizes['h2']):fill(0)
-local B3 = torch.FloatTensor(1, sizes['h3']):fill(0)
-local B4 = torch.FloatTensor(1, sizes['h2']):fill(0)
-local B5 = torch.FloatTensor(1, sizes['h1']):fill(0)
-local B6 = torch.FloatTensor(1, sizes['input']):fill(0)
+local W1 = torch.DoubleTensor(sizes['input'],sizes['h1']):uniform(-1/math.sqrt(sizes['h1']),1/math.sqrt(sizes['h1']))
+local W2 = torch.DoubleTensor(sizes['h1'],sizes['h2']):uniform(-1/math.sqrt(sizes['h2']),1/math.sqrt(sizes['h2']))
+local W3 = torch.DoubleTensor(sizes['h2'],sizes['h3']):uniform(-1/math.sqrt(sizes['h3']),1/math.sqrt(sizes['h3']))
+local B1 = torch.DoubleTensor(1, sizes['h1']):fill(0)
+local B2 = torch.DoubleTensor(1, sizes['h2']):fill(0)
+local B3 = torch.DoubleTensor(1, sizes['h3']):fill(0)
+local B4 = torch.DoubleTensor(1, sizes['h2']):fill(0)
+local B5 = torch.DoubleTensor(1, sizes['h1']):fill(0)
+local B6 = torch.DoubleTensor(1, sizes['input']):fill(0)
 
 -- Trainable parameters:
 params = {
@@ -74,15 +74,12 @@ params = {
    B = {B1, B2, B3, B4, B5, B6},
 }
 
-loss, preds = f(params, trainData.x[1]:view(1, inputSize), l2Lambda)
-grads, loss, preds = df(params, trainData.x[1]:view(1, inputSize), l2Lambda)
-
 -- Train a neural network
 for epoch = 1,100 do
    print('Training Epoch #'..epoch)
-   for i = 1,trainData.size do
-      -- Next sample:
-      local x = trainData.x[i]:view(1,inputSize)
+   for i = 1,trainData.size / 1000 do
+      -- Next minibatch:
+      local x = trainData.x[{{(i-1) * 100 + 1, i * 100}, {}}]
 
       -- Grads:
       local grads, loss, prediction = df(params,x,l2Lambda)
@@ -95,8 +92,9 @@ for epoch = 1,100 do
       for i=1,#params.B do
          params.B[i] = params.B[i] - grads.B[i] * 0.01
       end
+
    end
 
    -- Log performance:
-   print('Cross-entropy loss: '..f(params, trainData.x:view(60000, -1), l2Lambda))
+   print('Cross-entropy loss: '..f(params, trainData.x[{{1,10000}, {}}], l2Lambda))
 end

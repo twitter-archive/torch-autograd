@@ -12,7 +12,11 @@ function loss.logMultinomialLoss(out, target)
    return -torch.sum(torch.cmul(out,target))
 end
 
-function loss.logBCELoss(out, target)
+function loss.logBCELoss(out, target, p)
+   if p then
+      out = out + p
+   end
+
    return -torch.sum(torch.cmul(target, torch.log(out)) + torch.cmul(1-target, torch.log(1-out)))
 end
 
