@@ -2,7 +2,8 @@ Autograd
 ========
 
 Autograd automatically differentiates native
-[Torch](https://github.com/torch/torch7) code. Ported to Lua from the [original Python version](https://www.github.com/hips/autograd).
+[Torch](https://github.com/torch/torch7) code. Ported to Lua from the
+[original Python version](https://www.github.com/hips/autograd).
 
 Scope
 -----
@@ -374,4 +375,5 @@ Autograd is work in progress. Current list of things to be developed includes:
 License
 -------
 
-Licensed under the Apache License, Version 2.0. [See LICENSE file](https://github.com/twitter/torch-autograd/blob/master/LICENSE).
+Licensed under the Apache License, Version 2.0.
+[See LICENSE file](https://github.com/twitter/torch-autograd/blob/master/LICENSE).
