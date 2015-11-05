@@ -1,11 +1,23 @@
 -- Autograd
 local autograd = require 'autograd'
+local __ = require 'moses'
 
 -- Perturbation (finite diffs):
 local perturbation = 1e-6
 
 -- Threshold:
 local threshold = 1e-5
+
+-- Find grad:
+local function findGrad(ref, x, dst)
+   ref = __.flatten(ref)
+   dst = __.flatten(dst)
+   for i,v in ipairs(ref) do
+      if v == x then
+         return dst[i]
+      end
+   end
+end
 
 -- Compute grads with bprop:
 local function jacobianFromAutograd(func, input, var)
@@ -15,14 +27,17 @@ local function jacobianFromAutograd(func, input, var)
    -- Autograd:
    local grads = autograd(func)(input)
 
+   -- Find grad:
+   local g = findGrad(input, var, grads)
+
    -- Return grads:
-   return grads[var]:contiguous():view(-1):clone()
+   return g:contiguous():view(-1):clone()
 end
 
 -- Compute grads from finite differences
 local function jacobianFromFiniteDifferences(func, input, var)
    -- Flat view:
-   local view = input[var]:view(-1)
+   local view = var:view(-1)
 
    -- Grads:
    local grads = view:clone():zero()
@@ -49,24 +64,34 @@ end
 
 -- Test grads:
 local function gradcheck(func, input, var)
-   -- Random input:
-   input[var]:uniform(-1,1)
+   if var then
+      -- Random input:
+      var:uniform(-1,1)
 
-   -- Estimate grads with fprop:
-   local jacobian1 = jacobianFromFiniteDifferences(func, input, var)
+      -- Estimate grads with fprop:
+      local jacobian1 = jacobianFromFiniteDifferences(func, input, var)
 
-   -- Coded grads:
-   local jacobian2 = jacobianFromAutograd(func, input, var)
+      -- Coded grads:
+      local jacobian2 = jacobianFromAutograd(func, input, var)
 
-   -- Error:
-   local err = (jacobian1 - jacobian2):abs():max()
+      -- Error:
+      local err = (jacobian1 - jacobian2):abs():max()
 
-   -- Threhold?
-   local pass = err < threshold
-   if not pass then
-      print('error = ' .. err)
+      -- Threhold?
+      local pass = err < threshold
+      if not pass then
+         print('error = ' .. err)
+      end
+      return pass
+   else
+      -- get all vars:
+      local vars = __.flatten(input)
+      local ok = true
+      for i,var in ipairs(vars) do
+         ok = ok and gradcheck(func, input, var)
+      end
+      return ok
    end
-   return pass
 end
 
 -- Return package

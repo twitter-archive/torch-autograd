@@ -24,7 +24,7 @@ local tests = {
       end
 
       -- Check grads:
-      for iparam,param in pairs({"x", "W"}) do
+      for iparam,param in pairs({x, W}) do
          tester:assert(gradcheck(selectFn, {W=W,x=x}, param), "Incorrect gradient")
          tester:assert(gradcheck(selectFn2, {W=W,x=x}, param), "Incorrect gradient")
       end
@@ -47,7 +47,7 @@ local tests = {
       end
 
       -- Check grads:
-      for iparam,param in pairs({"x", "W"}) do
+      for iparam,param in pairs({x, W}) do
          tester:assert(gradcheck(selectFn, {W=W,x=x}, param), "Incorrect gradient")
       end
    end,
@@ -66,7 +66,7 @@ local tests = {
       end
 
       -- Check grads:
-      for iparam,param in pairs({"x", "W"}) do
+      for iparam,param in pairs({x, W}) do
          tester:assert(gradcheck(NarrowFn1D, {W=W,x=x1}, param), "Incorrect gradient")
          tester:assert(gradcheck(NarrowFn2D, {W=W,x=x2}, param), "Incorrect gradient")
       end
@@ -82,7 +82,7 @@ local tests = {
       end
 
       -- Check grads:
-      for iparam,param in pairs({"x"}) do
+      for iparam,param in pairs({x}) do
          tester:assert(gradcheck(f, {x=x}, param), "Incorrect gradient")
       end
    end,
@@ -99,7 +99,7 @@ local tests = {
       end
 
       -- Check grads:
-      for iparam,param in pairs({"x"}) do
+      for iparam,param in pairs({x}) do
          tester:assert(gradcheck(f, {x=x}, param), "Incorrect gradient")
       end
    end,
@@ -117,7 +117,7 @@ local tests = {
       end
 
       -- Check grads:
-      for iparam,param in pairs({"x", "W"}) do
+      for iparam,param in pairs({x, W}) do
          tester:assert(gradcheck(viewFn, {W=W,x=x}, param), "Incorrect gradient")
          tester:assert(gradcheck(viewAsFn, {W=W,x=x}, param), "Incorrect gradient")
       end
@@ -139,21 +139,21 @@ local tests = {
 
       -- Check grads:
       for ix,x in pairs({x1,x2,x3}) do
-         for iparam,param in pairs({"x", "W"}) do
+         for iparam,param in pairs({x, W}) do
             tester:assert(gradcheck(expandFn, {W=W, x=x}, param), "Incorrect gradient")
             tester:assert(gradcheck(expandAsFn, {W=W, x=x}, param), "Incorrect gradient")
          end
       end
    end,
    Transpose = function()
-      
+
       local fn = function(inputs)
          return torch.sum(torch.t(inputs.x))
       end
 
       -- Check grads:
       local x = torch.Tensor(10,5):normal()
-      for iparam,param in pairs({"x"}) do
+      for iparam,param in pairs({x}) do
          tester:assert(gradcheck(fn, {x=x}, param), "Incorrect gradient")
       end
 
@@ -169,7 +169,7 @@ local tests = {
       end
 
       -- Check grads:
-      for iparam,param in pairs({"x1", "x2"}) do
+      for iparam,param in pairs({x1, x2}) do
          tester:assert(gradcheck(fn, {x1=x1, x2=x2}, param), "Incorrect gradient")
       end
 
@@ -183,7 +183,7 @@ local tests = {
       end
 
       -- Check grads:
-      for iparam,param in pairs({"x1", "x2"}) do
+      for iparam,param in pairs({x1, x2}) do
          tester:assert(gradcheck(fn, {x1=x1, x2=x2}, param), "Incorrect gradient")
       end
 
@@ -196,7 +196,7 @@ local tests = {
       end
 
       -- Check grads:
-      for iparam,param in pairs({1,2,3}) do
+      for iparam,param in pairs(xs) do
          tester:assert(gradcheck(fn, xs, param), "Incorrect gradient")
       end
    end,
@@ -239,8 +239,8 @@ local tests = {
       end
 
       -- Check grads:
-      tester:assert(gradcheck(func, {W=W, x=x}, 'x'), 'incorrect gradients on x')
-      tester:assert(gradcheck(func, {W=W, x=x}, 'W'), 'incorrect gradients on W')
+      tester:assert(gradcheck(func, {W=W, x=x}, x), 'incorrect gradients on x')
+      tester:assert(gradcheck(func, {W=W, x=x}, W), 'incorrect gradients on W')
    end,
 
    Inverse = function()
@@ -277,7 +277,7 @@ local tests = {
       end
 
       -- Check grads:
-      tester:assert(gradcheck(func, {K=K}, 'K'), 'incorrect gradients on K')
+      tester:assert(gradcheck(func, {K=K}, K), 'incorrect gradients on K')
    end,
 
    Scale = function()
@@ -329,6 +329,7 @@ local tests = {
       tester:asserteq(type(pred), 'number', 'incorrect prediction')
       tester:asserteq(grad:dim(), 2, 'incorrect dims for grad')
    end,
+
    MinMax = function()
       local fns = {torch.min,torch.max}
       local preds = {{1,5},{2,10}}
@@ -359,9 +360,11 @@ local tests = {
          tester:asserteq(grads.W:dim(), 2, 'incorrect dims for gradients')
          tester:asserteq(grads.W:size(1), 5, 'incorrect dims for gradients')
          tester:asserteq(grads.W:size(2), 5, 'incorrect dims for gradients')
-         tester:assert(gradcheck(func1, {W=torch.ones(5,5):fill(2)}, 'W'), 'incorrect gradients on W')
+         tester:assert(gradcheck(func1, {W=W}, W), 'incorrect gradients on W')
 
          -- Compute func and grads:
+         local W = torch.ones(5,5):fill(2)
+         W[1] = 1
          local grads, pred = dFunc2({W=W})
 
          -- Tests:
@@ -370,7 +373,7 @@ local tests = {
          tester:asserteq(grads.W:dim(), 2, 'incorrect dims for gradients')
          tester:asserteq(grads.W:size(1), 5, 'incorrect dims for gradients')
          tester:asserteq(grads.W:size(2), 5, 'incorrect dims for gradients')
-         tester:assert(gradcheck(func1, {W=torch.ones(5,5):fill(2)}, 'W'), 'incorrect gradients on W')
+         tester:assert(gradcheck(func1, {W=W}, W), 'incorrect gradients on W')
       end
    end,
 
@@ -385,8 +388,8 @@ local tests = {
       end
 
       -- Check grads:
-      tester:assert(gradcheck(func, {W=W, x=x}, 'x'), 'incorrect gradients on x')
-      tester:assert(gradcheck(func, {W=W, x=x}, 'W'), 'incorrect gradients on W')
+      tester:assert(gradcheck(func, {W=W, x=x}, x), 'incorrect gradients on x')
+      tester:assert(gradcheck(func, {W=W, x=x}, W), 'incorrect gradients on W')
    end,
 
    Unary = function()
@@ -450,8 +453,8 @@ local tests = {
       end
 
       -- Check grads:
-      tester:assert(gradcheck(func, {W=W, x=x}, 'x'), 'incorrect gradients on x')
-      tester:assert(gradcheck(func, {W=W, x=x}, 'W'), 'incorrect gradients on W')
+      tester:assert(gradcheck(func, {W=W, x=x}, x), 'incorrect gradients on x')
+      tester:assert(gradcheck(func, {W=W, x=x}, W), 'incorrect gradients on W')
    end,
 
    FloatType = function()
@@ -650,11 +653,11 @@ local tests = {
       local grads = autograd(mlp)(params)
 
       -- Check grads:
-      tester:assert(gradcheck(mlp, params, 'x'), 'incorrect gradients on x')
-      tester:assert(gradcheck(mlp, params, 'W1'), 'incorrect gradients on W1')
-      tester:assert(gradcheck(mlp, params, 'b1'), 'incorrect gradients on b1')
-      tester:assert(gradcheck(mlp, params, 'W2'), 'incorrect gradients on W2')
-      tester:assert(gradcheck(mlp, params, 'b2'), 'incorrect gradients on b2')
+      tester:assert(gradcheck(mlp, params, x), 'incorrect gradients on x')
+      tester:assert(gradcheck(mlp, params, W1), 'incorrect gradients on W1')
+      tester:assert(gradcheck(mlp, params, b1), 'incorrect gradients on b1')
+      tester:assert(gradcheck(mlp, params, W2), 'incorrect gradients on W2')
+      tester:assert(gradcheck(mlp, params, b2), 'incorrect gradients on b2')
    end,
 
    NNFunc_CNN = function()
@@ -686,11 +689,11 @@ local tests = {
       local grads = autograd(cnn)(params)
 
       -- Check grads:
-      tester:assert(gradcheck(cnn, params, 'x'), 'incorrect gradients on x')
-      tester:assert(gradcheck(cnn, params, 'W1'), 'incorrect gradients on W1')
-      tester:assert(gradcheck(cnn, params, 'b1'), 'incorrect gradients on b1')
-      tester:assert(gradcheck(cnn, params, 'W2'), 'incorrect gradients on W2')
-      tester:assert(gradcheck(cnn, params, 'b2'), 'incorrect gradients on b2')
+      tester:assert(gradcheck(cnn, params, x), 'incorrect gradients on x')
+      tester:assert(gradcheck(cnn, params, W1), 'incorrect gradients on W1')
+      tester:assert(gradcheck(cnn, params, b1), 'incorrect gradients on b1')
+      tester:assert(gradcheck(cnn, params, W2), 'incorrect gradients on W2')
+      tester:assert(gradcheck(cnn, params, b2), 'incorrect gradients on b2')
    end,
 
    NNFunc_Float = function()
@@ -831,11 +834,11 @@ local tests = {
          return loss(params, inputs.x, inputs.y)
       end
       closure(inputs)
-      tester:assert(gradcheck(closure, inputs, 'x'), 'incorrect gradients on x')
-      tester:assert(gradcheck(closure, inputs, 'W1'), 'incorrect gradients on W1')
-      tester:assert(gradcheck(closure, inputs, 'b1'), 'incorrect gradients on b1')
-      tester:assert(gradcheck(closure, inputs, 'W2'), 'incorrect gradients on W2')
-      tester:assert(gradcheck(closure, inputs, 'b2'), 'incorrect gradients on b2')
+      tester:assert(gradcheck(closure, inputs, inputs.x), 'incorrect gradients on x')
+      tester:assert(gradcheck(closure, inputs, inputs.W1), 'incorrect gradients on W1')
+      tester:assert(gradcheck(closure, inputs, inputs.b1), 'incorrect gradients on b1')
+      tester:assert(gradcheck(closure, inputs, inputs.W2), 'incorrect gradients on W2')
+      tester:assert(gradcheck(closure, inputs, inputs.b2), 'incorrect gradients on b2')
    end,
 
    Models_SpatialNetwork = function()
@@ -877,43 +880,12 @@ local tests = {
 
       tester:asserteq(type(l), 'number', 'loss should be a scalar')
 
-      -- Gradcheck doesn't support nested params,
-      -- need to do a bit of magic to test it.
-      local inputs = {
-         W11 = params1[1].W,
-         b11 = params1[1].b,
-         W12 = params1[2].W,
-         b12 = params1[2].b,
-         W21 = params2[1].W,
-         b21 = params2[1].b,
-         W22 = params2[2].W,
-         b22 = params2[2].b,
-         x = i,
-         y = t,
-      }
+      -- Re-wrap for gradcheck:
+      local inputs = {params = params, x = i, y = t}
       local closure = function(inputs)
-         local params = {
-            {
-               {W=inputs.W11, b=inputs.b11},
-               {W=inputs.W12, b=inputs.b12},
-            },
-            {
-               {W=inputs.W21, b=inputs.b21},
-               {W=inputs.W22, b=inputs.b22},
-            },
-         }
-         return loss(params, inputs.x, inputs.y)
+         return loss(inputs.params, inputs.x, inputs.y)
       end
-      closure(inputs)
-      tester:assert(gradcheck(closure, inputs, 'x'), 'incorrect gradients on x')
-      tester:assert(gradcheck(closure, inputs, 'W11'), 'incorrect gradients on W11')
-      tester:assert(gradcheck(closure, inputs, 'b11'), 'incorrect gradients on b11')
-      tester:assert(gradcheck(closure, inputs, 'W12'), 'incorrect gradients on W12')
-      tester:assert(gradcheck(closure, inputs, 'b12'), 'incorrect gradients on b12')
-      tester:assert(gradcheck(closure, inputs, 'W21'), 'incorrect gradients on W21')
-      tester:assert(gradcheck(closure, inputs, 'b21'), 'incorrect gradients on b21')
-      tester:assert(gradcheck(closure, inputs, 'W22'), 'incorrect gradients on W22')
-      tester:assert(gradcheck(closure, inputs, 'b22'), 'incorrect gradients on b22')
+      tester:assert(gradcheck(closure, inputs), 'incorrect gradients')
    end,
 
    Models_RecurrentNetwork = function()
@@ -958,9 +930,9 @@ local tests = {
       end
       closure(inputs)
       autograd(closure)(inputs)
-      tester:assert(gradcheck(closure, inputs, 'x'), 'incorrect gradients on x')
-      tester:assert(gradcheck(closure, inputs, 'W'), 'incorrect gradients on W')
-      tester:assert(gradcheck(closure, inputs, 'b'), 'incorrect gradients on b')
+      tester:assert(gradcheck(closure, inputs, inputs.x), 'incorrect gradients on x')
+      tester:assert(gradcheck(closure, inputs, inputs.W), 'incorrect gradients on W')
+      tester:assert(gradcheck(closure, inputs, inputs.b), 'incorrect gradients on b')
    end,
 
    Models_RecurrentLSTMNetwork = function()
@@ -1005,9 +977,9 @@ local tests = {
       end
       closure(inputs)
       autograd(closure)(inputs)
-      tester:assert(gradcheck(closure, inputs, 'x'), 'incorrect gradients on x')
-      tester:assert(gradcheck(closure, inputs, 'W'), 'incorrect gradients on W')
-      tester:assert(gradcheck(closure, inputs, 'b'), 'incorrect gradients on b')
+      tester:assert(gradcheck(closure, inputs, inputs.x), 'incorrect gradients on x')
+      tester:assert(gradcheck(closure, inputs, inputs.W), 'incorrect gradients on W')
+      tester:assert(gradcheck(closure, inputs, inputs.b), 'incorrect gradients on b')
 
       -- Define RNN with all states exposed:
       local f,params = autograd.model.RecurrentLSTMNetwork({
