@@ -217,11 +217,11 @@ local func = function(inputs)
 end
 
 -- Check grads:
-tester:assert(gradcheck(func, {W=W, x=x}, x), 'incorrect gradients on x')
 tester:assert(gradcheck(func, {W=W, x=x}, W), 'incorrect gradients on W')
+tester:assert(gradcheck(func, {W=W, x=x}, x), 'incorrect gradients on x')
 
 -- If grads wrt all inpts must be checked, omit the last variable:
-tester:assert(gradcheck(func, {W=W, x=x}), 'incorrect gradients on W')
+tester:assert(gradcheck(func, {W=W, x=x}), 'incorrect gradients on W and x')
 ```
 
 ### Model Primitives
