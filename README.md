@@ -20,6 +20,14 @@ Autograd has multiple goals:
   with multiple loss functions and/or inputs
 * enable gradients of gradients for transparent computation of Hessians, ...
 
+Install
+-------
+
+* Install [Torch](www.torch.ch) (instructions [here](http://torch.ch/docs/getting-started.html#_)).
+* Retrieve this repo
+* Run: `luarocks make`
+
+
 Examples
 --------
 
