@@ -23,7 +23,7 @@ Autograd has multiple goals:
 Install
 -------
 
-* Install [Torch](www.torch.ch) (instructions [here](http://torch.ch/docs/getting-started.html#_)).
+* Install [Torch](http://www.torch.ch) (instructions [here](http://torch.ch/docs/getting-started.html#_)).
 * Retrieve this repo
 * Run: `luarocks make`
 
