@@ -456,6 +456,85 @@ local tests = {
       return tnn, tag
    end,
 
+   ['mlp (autoModule, batched)'] = function()
+      local tnn, tag
+      local inputSize, outputSize = 100,1000
+      local x = tensor(32,inputSize):uniform(-5,5)
+      local uniformMultiplier = torch.expand( tensor(inputSize):uniform():resize(1, inputSize), 32, inputSize)
+      local y = x:clone():exp():cmul(uniformMultiplier)
+
+
+      do
+         local model = nn.Sequential()
+         local linear1 = nn.Linear(inputSize, outputSize)
+         local linear2 = nn.Linear(outputSize, inputSize)
+         model:add( linear1 )
+         model:add( nn.ReLU() )
+         model:add( linear2 )
+         model:type(ttype)
+         local lossf = nn.MSECriterion()
+         lossf:type(ttype)
+
+         -- force allocs
+         model:zeroGradParameters()
+         local yhat = model:forward(x)
+         local loss = lossf:forward(yhat, y)
+         local dloss_dyhat = lossf:backward(yhat, y)
+         model:backward(x, dloss_dyhat)
+
+         tic()
+         for i = 1,200 do
+            model:zeroGradParameters()
+            local yhat = model:forward(x)
+            local loss = lossf:forward(yhat, y)
+            local dloss_dyhat = lossf:backward(yhat, y)
+            model:backward(x, dloss_dyhat)
+         end
+         tnn = toc()
+      end
+
+      do
+         local linear  = function(input, weight, bias)
+            local y = input * weight + torch.expand(bias, input:size(1), bias:size(2))
+            return y
+         end
+         local linearReLU  = function(input, weight, bias)
+            local y = input * weight + torch.expand(bias, input:size(1), bias:size(2))
+            local output = torch.mul( torch.abs( y ) + y, 0.5)
+            return output
+         end
+         local mse = function(input, target)
+            local buffer = input-target
+            return torch.sum( torch.cmul(buffer, buffer) ) / (input:dim() == 2 and input:size(1)*input:size(2) or input:size(1))
+         end
+         local autoModel = nn.Sequential()
+         local autoLinear1ReLU = d.nn.AutoModule('AutoLinearReLU')(linearReLU, tensor(inputSize, outputSize), tensor(1,outputSize))
+         local autoLinear2 = d.nn.AutoModule('AutoLinear')(linear, tensor(outputSize, inputSize), tensor(1,inputSize))
+         autoModel:add( autoLinear1ReLU )
+         autoModel:add( autoLinear2 )
+         local lossf = d.nn.AutoCriterion('AutoMSE')(mse)
+
+         -- force allocs
+         autoModel:zeroGradParameters()
+         local yhat = autoModel:forward(x)
+         local loss = lossf:forward(yhat, y)
+         local dloss_dyhat = lossf:backward(yhat, y)
+         autoModel:backward(x, dloss_dyhat)
+
+         tic()
+         for i = 1,200 do
+            autoModel:zeroGradParameters()
+            local yhat = autoModel:forward(x)
+            local loss = lossf:forward(yhat, y)
+            local dloss_dyhat = lossf:backward(yhat, y)
+            autoModel:backward(x, dloss_dyhat)
+         end
+         tag = toc()
+      end
+
+      return tnn, tag
+   end,
+
    ['mlp (ag, batched)'] = function()
       local tnn, tag
       local x = tensor(32,100):normal()
