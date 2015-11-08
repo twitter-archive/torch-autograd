@@ -44,3 +44,6 @@ luac.out
 # Data folders
 mnist/
 penn/
+
+# Build dir
+build

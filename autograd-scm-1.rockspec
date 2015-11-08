@@ -20,23 +20,7 @@ dependencies = {
 }
 
 build = {
-   type = "builtin",
-   modules = {
-      ['autograd.init'] = 'src/init.lua',
-      ['autograd.main'] = 'src/main.lua',
-      ['autograd.util'] = 'src/util.lua',
-      ['autograd.node'] = 'src/node.lua',
-      ['autograd.model'] = 'src/model/init.lua',
-      ['autograd.model.common'] = 'src/model/common.lua',
-      ['autograd.model.NeuralNetwork'] = 'src/model/NeuralNetwork.lua',
-      ['autograd.model.SpatialNetwork'] = 'src/model/SpatialNetwork.lua',
-      ['autograd.model.RecurrentNetwork'] = 'src/model/RecurrentNetwork.lua',
-      ['autograd.model.RecurrentLSTMNetwork'] = 'src/model/RecurrentLSTMNetwork.lua',
-      ['autograd.gradfuns'] = 'src/gradfuns.lua',
-      ['autograd.overload'] = 'src/overload.lua',
-      ['autograd.loss'] = 'src/loss/init.lua',
-      ['autograd.test'] = 'test/test.lua',
-      ['autograd.gradcheck'] = 'src/gradcheck.lua',
-      ['autograd.nnwrapper'] = 'src/nnwrapper.lua',
-   },
+   type = "command",
+   build_command = 'cmake -E make_directory build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$(LUA_BINDIR)/.." -DCMAKE_INSTALL_PREFIX="$(PREFIX)" && $(MAKE)',
+   install_command = "cd build && $(MAKE) install"
 }
