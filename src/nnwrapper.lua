@@ -1,12 +1,9 @@
 -- Register all nn grads into autograd
-local autograd = require 'autograd.main'
-local node = require 'autograd.node'
-
 local loaded = {}
 
 -- Generic auto-wrapper of every function exposed in given
 -- package + arbitary instantiated nn container/module:
-local function functionalize(input)
+local function functionalize(input, nodeApply)
    -- return pre-loaded package:
    if loaded[input] then
       return loaded[input]
@@ -19,15 +16,16 @@ local function functionalize(input)
       local mod = require(pkg)
       local map = { }
 
-      for k,v in pairs(mod) do
+      for modName, v in pairs(mod) do
          local mt = getmetatable(v)
          if mt then
             local mmt = getmetatable(mt)
             if mmt then
                if mmt.__typename == 'nn.Criterion' then
-                  map[k] = function(...)
+                  map[modName] = function(...)
+                     local args = {...}
                      -- Construct object:
-                     local nnObject = v(...)
+                     local nnObject = v(unpack(args))
                      local lastType = ""
 
                      local function forward(x, y)
@@ -36,32 +34,70 @@ local function functionalize(input)
                            lastType = dataType
                            nnObject:type(dataType)
                         end
-
                         return nnObject:forward(x, y)
                      end
 
                      local function backward(g, x, y)
+                        local dataType = x:type()
+                        if lastType ~= dataType then
+                           lastType = dataType
+                           nnObject:type(dataType)
+                        end
                         return nnObject:backward(x, y)
                      end
 
-                     return function(x, W, b)
+                     local fn = function(x, W, b)
+                        local backFnDesc = {
+                           package = input,
+                           ctor = modName,
+                           object = nnObject,
+                           method = "backward",
+                           name = modName .. "_backward",
+                           args = args,
+                           fn = backward
+                        }
                         local gradFn = {
-                           k,
                            function(g,ans,x,y)
-                              return backward(g, x, y)
+                              return nodeApply(backFnDesc, nil, true, g, x, y)
                            end,
                            function(g,ans,x,y)
-                              print'ici'
-                              return y.new(y:size()):zero()
+                              return util.fillSameSizeAs(y, 0)
                            end,
                         }
-                        return node.nodeApply(forward, gradFn, x, W, b)
+                        local fnDesc = {
+                           package = input,
+                           ctor = modName,
+                           object = nnObject,
+                           method = "forward",
+                           name = modName .. "_forward",
+                           args = args,
+                           fn = forward
+                        }
+                        return nodeApply(fnDesc, gradFn, true, x, W, b)
                      end
+
+                     local mod = {
+                        entry = fn,
+                        forward = forward,
+                        backward = backward
+                     }
+
+                     -- Shortcut:
+                     setmetatable(mod, {
+                        __call = function(self, ...)
+                           return self.entry(...)
+                        end
+                     })
+
+                     return mod
                   end
+
+
                else
-                  map[k] = function(...)
+                  map[modName] = function(...)
                      -- Construct object:
-                     local nnObject = v(...)
+                     local args = {...}
+                     local nnObject = v(unpack(args))
                      local lastType = ""
 
                      local function forward(x, W, b)
@@ -78,6 +114,12 @@ local function functionalize(input)
                      end
 
                      local function backward(g, x, W, b)
+                        local dataType = x:type()
+                        if lastType ~= dataType then
+                           lastType = dataType
+                           nnObject:type(dataType)
+                        end
+
                         nnObject.weight = W
                         nnObject.bias = b
 
@@ -97,31 +139,64 @@ local function functionalize(input)
                         }
                      end
 
-                     return function(x, W, b)
+                     local fn = function(x, W, b)
                         local grads = nil
+                        local backFnDesc = {
+                           package = input,
+                           ctor = modName,
+                           object = nnObject,
+                           method = "backward",
+                           name = modName .. "_backward",
+                           args = args,
+                           fn = backward
+                        }
                         local gradFn = {
-                           k,
                            function(g,ans,x,W,b)
                               if grads == nil then
-                                 grads = backward(g, x, W, b)
+                                 grads = nodeApply(backFnDesc, nil, true, g, x, W, b)
                               end
                               return grads[1]
                            end,
                            function(g,ans,x,W,b)
                               if grads == nil then
-                                 grads = backward(g, x, W, b)
+                                 grads = nodeApply(backFnDesc, nil, true, g, x, W, b)
                               end
                               return grads[2]
                            end,
                            function(g,ans,x,W,b)
                               if grads == nil then
-                                 grads = backward(g, x, W, b)
+                                 grads = nodeApply(backFnDesc, nil, true, g, x, W, b)
                               end
                               return grads[3]
                            end
                         }
-                        return node.nodeApply(forward, gradFn, x, W, b)
+                        local fnDesc = {
+                           package = input,
+                           object = nnObject,
+                           ctor = modName,
+                           object = nnObject,
+                           method = "forward",
+                           name = modName .. "_forward",
+                           args = args,
+                           fn = forward
+                        }
+                        return nodeApply(fnDesc, gradFn, true, x, W, b)
                      end
+
+                     local mod = {
+                        entry = fn,
+                        forward = forward,
+                        backward = backward
+                     }
+
+                     -- Shortcut:
+                     setmetatable(mod, {
+                        __call = function(self, ...)
+                           return self.entry(...)
+                        end
+                     })
+
+                     return mod
                   end
                end
             end
@@ -158,6 +233,11 @@ local function functionalize(input)
       end
 
       local function backward(g, params, x)
+         if lastType ~= dataType then
+            lastType = dataType
+            nnObject:type(dataType)
+         end
+
          local modelParams,modelGradParams = nnObject:parameters()
          for i,p in ipairs(modelParams) do
             if p ~= params[i] then
@@ -175,25 +255,51 @@ local function functionalize(input)
          }
       end
 
-      return function(params, x)
+      local mod = {}
+
+      local fn = function(params, x)
          local grads = nil
+         local backFnDesc = {
+            object = mod,
+            method = "backward",
+            name = "model",
+            fn = backward
+         }
          local gradFn = {
-            tostring(forward),
             function(g,ans,params,x)
                if grads == nil then
-                  grads = backward(g, params, x)
+                  grads = nodeApply(backFnDesc, nil, true, g, params, x)
                end
                return grads[1]
             end,
             function(g,ans,params,x)
                if grads == nil then
-                  grads = backward(g, x, params, x)
+                  grads = nodeApply(backFnDesc, nil, true, g, params, x)
                end
                return grads[2]
             end,
          }
-         return node.nodeApply(forward, gradFn, params, x)
-      end, params
+         local fnDesc = {
+            object = mod,
+            method = "forward",
+            name = "model",
+            fn = forward
+         }
+         return nodeApply(fnDesc, gradFn, true, params, x)
+      end
+
+      mod.entry = fn
+      mod.forward = forward
+      mod.backward = backward
+
+      -- Shortcut:
+      setmetatable(mod, {
+         __call = function(self, ...)
+            return self.entry(...)
+         end
+      })
+
+      return mod, params
    end
 end
 

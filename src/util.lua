@@ -47,12 +47,25 @@ function util.dropout(state, dropout)
    return torch.cmul(state, keep)
 end
 
-local fmt = getmetatable(torch.FloatTensor)
-local dmt = getmetatable(torch.DoubleTensor)
-local cmt = getmetatable(torch.CudaTensor) or fmt
-function util.isTensor(t)
-   local qmt = getmetatable(t)
-   return qmt == fmt or qmt == dmt or qmt == cmt
+function util.setNotEqual(a, b, c, v)
+   local mask = torch.ne(a, b)
+   local copy = v:clone()
+   copy[mask] = 0
+   return copy
 end
+
+function util.fillSameSizeAs(a, b)
+   return a.new(a:size()):fill(b)
+end
+
+function util.zerosLike(a, b)
+   b = b or a
+   return a.new(b:size()):zero()
+end
+
+function util.narrowCopy(a, dim, index, size)
+   return a:narrow(dim, index, size):copy()
+end
+
 
 return util

@@ -1,7 +1,5 @@
 -- util
 local util = require 'autograd.util'
-local node = require 'autograd.node'
-local getValue = node.getValue
 
 return function(opt, params)
    -- options:

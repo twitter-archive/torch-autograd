@@ -1,199 +1,340 @@
--- TODO
--- Disallow overwriting anything
--- Tables
-
--- Deps
-local haveCutorch,cutorch = pcall(require,'cutorch')
 local debug = require 'debug'
-local node = require 'autograd.node'
 local overload = require 'autograd.overload'
-local isTensor = require 'autograd.util'.isTensor
-local Node = node.Node
-local nodeApply = node.nodeApply
-local getOutgrad = node.getOutgrad
-local newStartNode = node.newStartNode
-local isNode = node.isNode
-local getValue = node.getValue
-local debugFns = overload.debugFns
+local Node = require 'autograd.Node'
+local Value = require 'autograd.Value'
+local Source = require 'autograd.Source'
 
-require 'pl'
-require 'trepl'
+local function stringBuilder()
+   local strs = { }
+   return {
+      write = function(...)
+         local arg = {...}
+         for i = 1, #arg do
+            strs[#strs + 1] = arg[i]
+         end
+      end,
+      finish = function()
+         return table.concat(strs, "")
+      end
+   }
+end
 
--- For debugging
-local function printSize(a)
-   if type(a) == "number" then
-      print("1x1")
-   elseif isTensor(a) then
-      print(torch.totable(a:size()))
-   else
-      print("???")
+local function walkExecutionOrder(symbols, node, seen, order)
+   if seen[node] == nil then
+      seen[node] = true
+      for k = 1, #node.inputs do
+         local input = node.inputs[k]
+         local root = input.source:getRoot()
+         if root.type == Source.COMPUTED then
+            walkExecutionOrder(symbols, root.node, seen, order)
+         end
+      end
+      table.insert(order, node)
    end
 end
 
--- Make sure we've got the right thing going on
-local function checkInput(arg)
-   if isTensor(arg) then
-      local isValidType = false
-      for _,tensorType in pairs(overload.tensorTypes) do
-         isValidType = isValidType or 'torch.' .. tensorType == torch.typename(arg)
-      end
-      if not isValidType then
-         local errMsg = "Input tensor is invalid type " .. torch.typename(arg) .. ". Valid types are"
-         for _, tensorType in pairs(tensorTypes) do
-            errMsg = errMsg .. " " .. tensorType
-         end
-         error(errMsg)
-      end
-   end
+local function canInline(node, outputNodes)
+   return #node.outputs == 1 and #node.outputTargets[1] == 1 and outputNodes[node] == nil and node.outputs[1].type == Value.NUMBER
 end
 
-local lastTape = { }
-
-local function funOnly(fun, argnum)
-   argnum = argnum or 1
-   local doFun = function(tape, ...)
-      local arg = {...}
-      local tape = tape or {}
-      tape.nextIndex = 1
-
-      -- Check the argument, to make sure it's alright.
-      checkInput(arg[argnum])
-
-      -- If our target argument is a table, we'll need to walk its members and node-ify them.
-      -- For now, if we see a number or a tensor, we'll node-ify it, otherwise,
-      -- if it's a table, we'll try to walk it
---       print('Before new start node.')
---       print(arg[argnum])
-      arg[argnum] = newStartNode(arg[argnum], tape)
---       print('After new start node.')
-      local allAns = {fun(unpack(arg))}
-      local ans = allAns[1]
-      if not isNode(ans) then
-         error("A node type was not returned. This is either because a gradient was not defined, or the input is independent of the output")
-      end
-      -- Now spit out the grads, along with any answers returned along the way
-      local out = {}
-
-      local ansVal = getValue(allAns)
-      if type(allAns) == "table" then
-         for key,value in pairs(ansVal) do
-            out[#out+1] = getValue(value)
-         end
+local function writeExpr(state, node)
+   local out = stringBuilder()
+   local inputSymbols = { }
+   for k = 1, #node.inputs do
+      local input = node.inputs[k]
+      if input.source.type == Source.COMPUTED and canInline(input.source.node, state.outputNodes) then
+         local subExpr = writeExpr(state, input.source.node)
+         inputSymbols[k] = "(" .. subExpr .. ")"
       else
-         out[1] = ansVal
+         local symbol = input.source:symbolPath(state.symbols)
+         inputSymbols[k] = symbol
       end
-      return arg, allAns, tape, unpack(out)
+      if state.refCount[input.source] ~= nil then
+         state.refCount[input.source] = state.refCount[input.source] - 1
+      end
    end
-   return doFun
+   if node.forwardFn.operator ~= nil then
+      local op = node.forwardFn.operator
+      if op == "unm" then
+         out.write("-", inputSymbols[1])
+      else
+         out.write(inputSymbols[1])
+         out.write(" ")
+         if op == "add" then
+            out.write("+")
+         elseif op == "sub" then
+            out.write("-")
+         elseif op == "mul" then
+            out.write("*")
+         elseif op == "div" then
+            out.write("/")
+         end
+         out.write(" ")
+         out.write(inputSymbols[2])
+      end
+   elseif node.forwardFn.object ~= nil then
+      out.write(state.objects[node.forwardFn.object].name, ".", node.forwardFn.method, "(", table.concat(inputSymbols, ", "), ")")
+   else
+      out.write(node.forwardFn.name, "(", table.concat(inputSymbols, ", "), ")")
+   end
+   return out.finish()
 end
 
-local function gradOnly(tape)
-   argnum = argnum or 1
-   local doGradOnly = function(arg, allAns, gradOutput)
-      local ans = allAns[1]
-      ans.outgrad = gradOutput
-      overload.endRecording()
-      for i=tape.nextIndex-1,1,-1 do
-         local node = tape[i]
-         if debugFns.preGradFn then
-            debugFns.preGradFn(node)
-         end
-         for iarg=1,#node.args do
-            local thisArg = node.args[iarg]
-            if getmetatable(thisArg) == Node then
-               if node.outgrad == nil then
-                  if isTensor(node.value) then
-                     node.outgrad = node.value.new(node.value:size()):zero()
-                  elseif type(node.value) == "number" then
-                     node.outgrad = 0.0
-                  end
-               end
-               local gradUpdate = (node.gradFun[iarg+1])(node.outgrad, node.value, unpack(node.argValues))
-               if gradUpdate then
-                  if thisArg.outgrad == nil or thisArg.outgrad == 0 then
-                     thisArg.outgrad = gradUpdate
-                  else
-                     thisArg.outgrad = thisArg.outgrad + gradUpdate
-                  end
-               end
+local function letterForType(val)
+   if val.type == Value.TENSOR then
+      return "t"
+   elseif val.type == Value.NUMBER then
+      return "n"
+   else
+      return "r"
+   end
+end
 
-            -- Special-casing table-valued arguments that contain nodes
-            -- right now, this is just torch.cat
-            elseif type(thisArg) == "table" and getmetatable(thisArg[1]) == Node then
-               if node.outgrad == nil then
-                  if isTensor(node.value) then
-                     node.outgrad = node.value.new(node.value:size()):zero()
-                  elseif type(node.value) == "number" then
-                     node.outgrad = 0.0
-                  end
-               end
-               local gradUpdate = (node.gradFun[iarg+1])(node.outgrad, node.value, unpack(node.argValues))
-               local la = #thisArg
-               for isubArg=1,la do
-                  if gradUpdate[isubArg] then
-                     local thisSubArg = thisArg[isubArg]
-                     if thisSubArg.outgrad == nil or thisSubArg.outgrad == 0 then
-                        thisSubArg.outgrad = gradUpdate[isubArg]
-                     else
-                        thisSubArg.outgrad = thisSubArg.outgrad + gradUpdate[isubArg]
-                     end
-                  end
-               end
+local applyDepth = 0
+
+local function nodeCompute(fn, gradFn, capture, ...)
+   local inputs = {...}
+   applyDepth = applyDepth + 1
+   if applyDepth == 1 and capture then
+      local n = Node.new(fn, gradFn, inputs)
+      local values = {n:evaluateForward()}
+      applyDepth = applyDepth - 1
+      return unpack(values)
+   else
+      local evalArgs = { }
+      for i = 1, #inputs do
+         if Value.isValue(inputs[i]) then
+            evalArgs[i] = inputs[i]:flatten()
+         else
+            evalArgs[i] = inputs[i]
+         end
+      end
+      local values = {fn.fn(unpack(evalArgs))}
+      applyDepth = applyDepth - 1
+      return unpack(values)
+   end
+end
+
+local function generateCode(fn, args, argnum)
+   local values = { }
+   local tensorDims = { }
+   for i = 1, #args do
+      values[i] = Value.from(args[i], Source.param(i, i == argnum))
+   end
+
+   overload.install(nodeCompute)
+
+   -- Call user forward function
+   local answers = {fn(unpack(values))}
+
+   -- Figure out graph traversal order.
+   local seen = { }
+   local forwardExecOrder = { }
+   walkExecutionOrder(symbols, answers[1].source.node, seen, forwardExecOrder)
+
+   -- Walk forward-graph backwards, chaining derivatives.
+   answers[1].source.node.gradients[1] = Value.from(1, Source.gradient(1))
+   for i=#forwardExecOrder,1,-1 do
+      local node = forwardExecOrder[i]
+      node:evaluateBackward()
+   end
+
+   overload.uninstall()
+
+   -- Now we have the full graph, forward and backward, determine final traversal order.
+   local execOrder = { }
+   local seen = { }
+   for k, v in pairs(values[argnum]:get()) do
+      walkExecutionOrder(symbols, v.source.gradients[1].source:getRoot().node, seen, execOrder)
+   end
+
+   -- Assign symbols to params, inputs, outputs.
+   local symbols = { }
+   local refCount = { }
+
+   for i = 1, #values do
+      symbols[values[i].source] = "p" .. i
+   end
+
+   local outputNodes = { }
+   for k, v in pairs(values[argnum]:get()) do
+      outputNodes[v.source.gradients[1].source:getRoot().node] = true
+   end
+
+   for i = 1, #execOrder do
+      local node = execOrder[i]
+      if #node.outputs == 1 then
+         symbols[node.outputs[1].source] = letterForType(node.outputs[1]) .. i
+      else
+         for k = 1, #node.outputs do
+            local output = node.outputs[k]
+            symbols[output.source] = letterForType(node.outputs[k]) .. i .. "_" .. i
+         end
+      end
+      if outputNodes[node] == nil then
+         for k = 1, #node.outputs do
+            local output = node.outputs[k]
+            if output.type == Value.TENSOR then
+               refCount[output.source] = #node.outputTargets[k]
             end
          end
-         if debugFns.postGradFn then
-            debugFns.postGradFn(node)
+      end
+   end
+
+   -- Find all the nn objects we need to create or pass in.
+   local objects = { }
+   local count = 1
+   for i = 1, #execOrder do
+      local node = execOrder[i]
+      local obj = node.forwardFn.object
+      if obj ~= nil and objects[obj] == nil then
+         if node.forwardFn.ctor then
+            objects[obj] = {
+               ctor = node.forwardFn.package .. "." .. node.forwardFn.ctor,
+               name = string.lower(node.forwardFn.ctor .. count),
+               args = node.forwardFn.args
+            }
+         else
+            objects[obj] = {
+               object = obj,
+               name = node.forwardFn.name .. count
+            }
+         end
+         count = count + 1
+      end
+   end
+
+   local state = {
+      symbols = symbols,
+      outputNodes = outputNodes,
+      refCount = refCount,
+      objects = objects
+   }
+
+   -- Collect the objects we use, where we couldn't determine how to construct
+   -- them. They have to be passed in by value.
+   local out = stringBuilder()
+   local noCtorObjectNames = { }
+   local outerArgs = { }
+   for k, v in pairs(objects) do
+      if v.ctor == nil then
+         noCtorObjectNames[#noCtorObjectNames + 1] = v.name
+         outerArgs[#outerArgs + 1] = k
+      end
+   end
+
+   -- Generate code.
+   out.write("return function(", table.concat(noCtorObjectNames, ", "), ")")
+   out.write("\n")
+   out.write("local nn = require('autograd').nn")
+   out.write("\n")
+   out.write("local util = require('autograd.util')")
+   out.write("\n")
+   for k, v in pairs(objects) do
+      if v.ctor ~= nil then
+         out.write("local ", v.name, " = ", v.ctor, "(", table.concat(v.args, ", "), ")")
+         out.write("\n")
+      end
+   end
+   out.write("return function(")
+   local paramSymbols = { }
+   for i = 1, #values do
+      paramSymbols[i] = symbols[values[i].source]
+   end
+   out.write(table.concat(paramSymbols, ", "))
+   out.write(")")
+   out.write("\n")
+   for i = 1, #execOrder do
+      local node = execOrder[i]
+      local outputSymbols = { }
+      for k = 1, #node.outputs do
+         outputSymbols[k] = symbols[node.outputs[k].source]
+      end
+      if not canInline(node, outputNodes) then
+         out.write("    ")
+         if #outputSymbols > 0 then
+            out.write("local ", table.concat(outputSymbols, ", "), " = ")
+         end
+         out.write(writeExpr(state, node))
+         out.write("\n")
+         local toFree = { }
+         for k, v in pairs(refCount) do
+            if v == 0 then
+               toFree[#toFree + 1] = k
+            end
+         end
+         for k = 1, #toFree do
+            refCount[toFree[k]] = nil
+            -- out.write("    ")
+            -- out.write(symbols[toFree[k]])
+            -- out.write(":free()")
+            -- out.write("\n")
          end
       end
-      overload.beginRecording()
-
-      -- Now spit out the grads
-      local out = getOutgrad(arg[argnum])
-      return out
    end
-   return doGradOnly
+   out.write("    ")
+   out.write("return {\n")
+   for k, v in pairs(values[argnum]:get()) do
+      out.write("        " .. k .. " = ")
+      out.write(v.source.gradients[1].source:symbolPath(symbols))
+      out.write(",", "\n")
+   end
+   out.write("    }")
+   out.write("\n")
+   out.write("end")
+   out.write("\n")
+   out.write("end")
+   out.write("\n")
+
+   return out.finish(), outerArgs
 end
 
+local function buildSignature(params, tensorDims)
+   for k, v in pairs(params) do
+      if torch.isTensor(v) then
+         tensorDims[#tensorDims + 1] = table.concat(v:size():totable(), "x")
+      elseif type(v) == 'number' then
+         tensorDims[#tensorDims + 1] = "n"
+      elseif type(v) == 'table' then
+         buildSignature(v, tensorDims)
+      end
+   end
+end
 
--- Step through the computation graph and find the gradient
-local function grad(fun, argnum, returnTape)
+local function grad(fn, argnum)
    argnum = argnum or 1
+   local generatedFunctions = { }
    local doGrad = function(...)
-      local all  = {funOnly(fun)(lastTape, ...)}
-      local arg, allAns, tape, out = all[1], all[2], all[3], all[4]
-      local ans = allAns[1]
-      if type(getValue(ans)) ~= "number" then
-         print("")
-         print("Autograd only supports scalar outputs. This is current functions output: ")
-         print(getValue(ans))
-         error("Autograd only supports scalar return values. Output is not scalar")
+      local args = {...}
+      local tensorDims = { }
+      buildSignature(args, tensorDims)
+      local signature = table.concat(tensorDims, "-")
+      if generatedFunctions[signature] == nil then
+         local code, outerArgs = generateCode(fn, args, argnum)
+         print(code)
+         print("generated code for param signature " .. signature)
+         generatedFunctions[signature] = loadstring(code)()(unpack(outerArgs))
       end
-      local go = gradOnly(tape)(arg, allAns, 1.0)
-      local fout = {}
-      fout[1] = go
-      local ansVal = getValue(allAns)
-      if type(allAns) == "table" then
-         for key,value in pairs(ansVal) do
-            fout[#fout+1] = getValue(value)
-         end
-      else
-         fout[2] = ansVal
-      end
-      return unpack(fout)
+      return generatedFunctions[signature](unpack(args))
    end
    return doGrad
 end
 
-overload.install()
-overload.beginRecording()
+-- Support functions
+include 'support.lua'
+
+-- Standard overloaded functions with gradients
+include 'gradfuns.lua'
+
+-- Sub packages:
+local functionalize = require 'autograd.nnwrapper'
+local nn = require('autograd.nnwrapper')('nn', nodeCompute)
 
 -- Main functions:
 local autograd = {
    grad = grad,
-   debugFns = debugFns,
-   defineGradient = overload.defineGradient,
-   funOnly = funOnly,
-   gradOnly = gradOnly,
+   overload = overload,
+   nn = nn
 }
 
 -- Shortcut:
