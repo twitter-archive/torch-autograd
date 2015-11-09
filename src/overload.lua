@@ -25,6 +25,23 @@ local function module(name, table, fn)
          }
       end
    end
+   local overloadClass = function(table, className, fnName, gradFn, capture)
+      local old = table[fnName]
+      if old ~= nil then
+         local fnDesc = {
+            name = name .. "." .. className .. "." .. fnName,
+            fn = old
+         }
+         local newFn = function(...)
+            return nodeApply(fnDesc, gradFn, capture, ...)
+         end
+        return {
+            name = fnName,
+            newFn = newFn,
+            oldFn = old
+         }
+      end
+   end
    local overloadOp = function(table, opName, gradFn)
       local fnName = "__" .. opName
       local old = table[fnName]
@@ -95,7 +112,7 @@ local function module(name, table, fn)
                local arg = {...}
                for i = 1, #arg do
                   local fnName = arg[i]
-                  local fn = overload(classTable, fnName, nil, true)
+                  local fn = overloadClass(classTable, className, fnName, nil, true)
                   cc.functions[#cc.functions + 1] = fn
                end
             end,

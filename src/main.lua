@@ -34,7 +34,7 @@ local function walkExecutionOrder(symbols, node, seen, order)
 end
 
 local function canInline(node, outputNodes)
-   return #node.outputs == 1 and #node.outputTargets[1] == 1 and outputNodes[node] == nil and node.outputs[1].type == Value.NUMBER
+   return #node.outputs == 1 and #node.outputTargets[1] == 1 and outputNodes[node] == nil
 end
 
 local function writeExpr(state, node)
@@ -75,7 +75,7 @@ local function writeExpr(state, node)
    elseif node.forwardFn.object ~= nil then
       out.write(state.objects[node.forwardFn.object].name, ".", node.forwardFn.method, "(", table.concat(inputSymbols, ", "), ")")
    else
-      out.write(node.forwardFn.name, "(", table.concat(inputSymbols, ", "), ")")
+      out.write(state.functionRemap[node.forwardFn.name], "(", table.concat(inputSymbols, ", "), ")")
    end
    return out.finish()
 end
@@ -115,6 +115,19 @@ local function nodeCompute(fn, gradFn, capture, ...)
    end
 end
 
+local function findGradients(val, grads)
+   if val.source.gradients ~= nil then
+      for i = 1, #val.source.gradients do
+         grads[#grads + 1] = val.source.gradients[i].source
+      end
+   end
+   if val.type == Value.TABLE then
+      for k, v in pairs(val:get()) do
+         findGradients(v, grads)
+      end
+   end
+end
+
 local function generateCode(fn, args, argnum)
    local values = { }
    local tensorDims = { }
@@ -144,31 +157,43 @@ local function generateCode(fn, args, argnum)
    -- Now we have the full graph, forward and backward, determine final traversal order.
    local execOrder = { }
    local seen = { }
-   for k, v in pairs(values[argnum]:get()) do
-      walkExecutionOrder(symbols, v.source.gradients[1].source:getRoot().node, seen, execOrder)
+   local grads = { }
+   local outputNodes = { }
+
+   findGradients(values[argnum], grads)
+   for i = 1, #grads do
+      walkExecutionOrder(symbols, grads[i]:getRoot().node, seen, execOrder)
+      outputNodes[grads[i]:getRoot().node] = true
    end
+
+   local localTable = #execOrder > 198
 
    -- Assign symbols to params, inputs, outputs.
    local symbols = { }
    local refCount = { }
+   local functionRemap = { }
 
    for i = 1, #values do
       symbols[values[i].source] = "p" .. i
    end
 
-   local outputNodes = { }
-   for k, v in pairs(values[argnum]:get()) do
-      outputNodes[v.source.gradients[1].source:getRoot().node] = true
-   end
-
    for i = 1, #execOrder do
       local node = execOrder[i]
       if #node.outputs == 1 then
-         symbols[node.outputs[1].source] = letterForType(node.outputs[1]) .. i
+         if localTable then
+            symbols[node.outputs[1].source] = "locals[" .. i .. "]"
+         else
+            symbols[node.outputs[1].source] = letterForType(node.outputs[1]) .. i
+         end
       else
          for k = 1, #node.outputs do
             local output = node.outputs[k]
-            symbols[output.source] = letterForType(node.outputs[k]) .. i .. "_" .. i
+            if localTable then
+               error('todo')
+               symbols[output.source] = ""
+            else
+               symbols[node.outputs[k].source] = letterForType(node.outputs[k]) .. i
+            end
          end
       end
       if outputNodes[node] == nil then
@@ -178,6 +203,13 @@ local function generateCode(fn, args, argnum)
                refCount[output.source] = #node.outputTargets[k]
             end
          end
+      end
+   end
+
+   for i = 1, #execOrder do
+      local node = execOrder[i]
+      if node.forwardFn.operator == nil then
+         functionRemap[node.forwardFn.name] = string.gsub(node.forwardFn.name, "%.", "_")
       end
    end
 
@@ -208,6 +240,7 @@ local function generateCode(fn, args, argnum)
       symbols = symbols,
       outputNodes = outputNodes,
       refCount = refCount,
+      functionRemap = functionRemap,
       objects = objects
    }
 
@@ -236,6 +269,17 @@ local function generateCode(fn, args, argnum)
          out.write("\n")
       end
    end
+   for k, v in pairs(functionRemap) do
+      out.write("local ", v, " = ", k)
+      out.write("\n")
+   end
+   if localTable then
+      out.write("local locals = { }")
+      out.write("\n")
+      out.write("for i = 1, ", #execOrder, " do locals[i] = 0 end")
+      out.write("\n")
+   end
+
    out.write("return function(")
    local paramSymbols = { }
    for i = 1, #values do
@@ -253,7 +297,10 @@ local function generateCode(fn, args, argnum)
       if not canInline(node, outputNodes) then
          out.write("    ")
          if #outputSymbols > 0 then
-            out.write("local ", table.concat(outputSymbols, ", "), " = ")
+            if not localTable then
+               out.write("local ")
+            end
+            out.write(table.concat(outputSymbols, ", "), " = ")
          end
          out.write(writeExpr(state, node))
          out.write("\n")
@@ -274,11 +321,13 @@ local function generateCode(fn, args, argnum)
    end
    out.write("    ")
    out.write("return {\n")
+   --[[
    for k, v in pairs(values[argnum]:get()) do
       out.write("        " .. k .. " = ")
       out.write(v.source.gradients[1].source:symbolPath(symbols))
       out.write(",", "\n")
    end
+   --]]
    out.write("    }")
    out.write("\n")
    out.write("end")
@@ -311,8 +360,8 @@ local function grad(fn, argnum)
       local signature = table.concat(tensorDims, "-")
       if generatedFunctions[signature] == nil then
          local code, outerArgs = generateCode(fn, args, argnum)
-         print(code)
-         print("generated code for param signature " .. signature)
+        -- print(code)
+        -- print("generated code for param signature " .. signature)
          generatedFunctions[signature] = loadstring(code)()(unpack(outerArgs))
       end
       return generatedFunctions[signature](unpack(args))
@@ -327,13 +376,14 @@ include 'support.lua'
 include 'gradfuns.lua'
 
 -- Sub packages:
-local functionalize = require 'autograd.nnwrapper'
-local nn = require('autograd.nnwrapper')('nn', nodeCompute)
+local functionalize = (require 'autograd.nnwrapper')(nodeCompute)
+local nn = require('autograd.nnwrapper')(nodeCompute)('nn')
 
 -- Main functions:
 local autograd = {
    grad = grad,
    overload = overload,
+   functionalize = functionalize,
    nn = nn
 }
 

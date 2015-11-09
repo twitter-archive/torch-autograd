@@ -18,21 +18,20 @@ local function unbroadcast(g,ans,x)
       if torch.isSameSizeAs(x, g) then
          return g
       end
-
-      if torch.nElement(g) == torch.nElement(x) then
+      if g:nElement() == x:nElement() then
          return torch.viewAs(g,x)
       end
 
-      local size = torch.totable(x:size())
+      local size = torch.totable(torch.size(x))
       local ndim = torch.nDimension(x)
       local grad = g
 
-      while gratorch.nDimension(d) > ndim do
+      while torch.nDimension(grad) > ndim do
          grad = torch.view(torch.sum(grad,1), thisSize)
       end
 
       -- If we're now the same size, then awesome
-      if grad:nElement() == x:nElement() then
+      if torch.nElement(grad) == torch.nElement(x) then
          return torch.viewAs(grad,x)
 
       -- Otherwise, we might have to sum across
@@ -40,7 +39,7 @@ local function unbroadcast(g,ans,x)
       -- but not yet for the gradient
       else
       for i=1,#size do
-            thisSize = torch.totable(grad:size())
+            thisSize = torch.totable(torch.size(grad))
          if size[i] == 1 then
                thisSize[i] = 1
                grad = torch.view(torch.sum(grad,i),unpack(thisSize))
@@ -90,7 +89,7 @@ local function repeatToMatchShape(x,axis)
       return function(g) return util.fillSameSizeAs(x, _sum(g)) end, torch.nElement(x)
    else
       error("todo")
-      size = x:size():fill(1)
+      size = torch.size(x):fill(1)
       size[axis] = x:size(axis)
       return function(g) return torch.repeatTensor(g, size) end, size[axis]
    end
@@ -122,7 +121,7 @@ functions.cat = {
    end,
    function(g,ans,x,y,dim)
       dim = dim or x:nDimension()
-      return torch.narrow(g, dim, x:size(dim)+1, y:size(dim))
+      return torch.narrow(g, dim, torch.size(x, dim) + 1, torch.size(y, dim))
    end
 }
 
@@ -257,7 +256,7 @@ overload.module("torch", torch, function(module)
    module.gradient("cat", functions.cat)
    module.gradient("expand", {
       function(g, ans, x,...)
-         local xSizes = x:size():totable()
+         local xSizes = torch.size(x):totable()
          local out = g
          for dim,size in pairs(xSizes) do
             if size == 1 then
@@ -284,10 +283,7 @@ overload.module("torch", torch, function(module)
    })
    module.gradient("view", {
       function(g, ans, x,sizes)
-         if not g:isContiguous() then
-            g = g:contiguous()
-         end
-         return torch.view(g,x:size())
+         return torch.view(util.makeContiguous(g), torch.size(x))
       end
    })
    module.gradient("viewAs", {
@@ -313,11 +309,7 @@ overload.module("torch", torch, function(module)
    })
    module.gradient("select", {
       function(g, ans, x,dim,index)
-         error("todo, make functional, or move to a util method")
-         local out = newTensor(g, x:size()):zero()
-         local slice = out:select(dim,index)
-         slice:copy(g)
-         return out
+         return util.selectSliceCopy(g, x, dim, index)
       end
    })
    module.gradient("index", {
@@ -332,9 +324,7 @@ overload.module("torch", torch, function(module)
    })
    module.gradient("narrow", {
       function(g, ans, x,dim,index,size)
-         local out = util.zerosLike(g, x)
-         local slice = util.narrowCopy(out, dim, index, size)
-         return slice
+         return util.narrowSliceCopy(g, x, dim, index, size)
       end
    })
    module.gradient("sum", {
@@ -395,7 +385,7 @@ overload.module("torch", torch, function(module)
          return out
       end
    })
-   module.dynamic("ne",  "ger", "new", "fill", "zeros", "transpose", "cosh", "sign")
+   module.dynamic("ne",  "ger", "new", "fill", "zeros", "zero", "transpose", "cosh", "sign")
    module.static("size", "isTensor", "nDimension", "nElement", "isSameSizeAs")
 end)
 
@@ -406,7 +396,7 @@ overload.module("Value", Value, function(module)
 end)
 
 overload.module("util", util, function(module)
-   module.dynamic("setNotEqual", "fillSameSizeAs", "zerosLike", "narrowCopy")
+   module.dynamic("setNotEqual", "fillSameSizeAs", "zerosLike", "narrowCopy", "selectCopy", "selectSliceCopy", "narrowSliceCopy", "makeContiguous")
 end)
 
 

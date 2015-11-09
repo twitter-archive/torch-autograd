@@ -7,7 +7,7 @@ Value.TENSOR = "tensor"
 Value.NUMBER = "number"
 Value.LONG_STORAGE = "long_storage"
 
-function Value.new(type, val, source)
+function Value.create(type, val, source)
 	local v = { }
 	setmetatable(v, Value)
 	v:init(type, val, source)
@@ -28,13 +28,13 @@ function Value.from(v, source)
 		for k,v in pairs(v) do
 			vcopy[k] = Value.from(v, Source.table(source, k))
 		end
-		return Value.new(Value.TABLE, vcopy, source)
+		return Value.create(Value.TABLE, vcopy, source)
 	elseif torch.isTensor(v) then
-		return Value.new(Value.TENSOR, v, source)
+		return Value.create(Value.TENSOR, v, source)
 	elseif type(v) == "number" then
-		return Value.new(Value.NUMBER, v, source)
+		return Value.create(Value.NUMBER, v, source)
 	elseif v.totable then
-		return Value.new(Value.LONG_STORAGE, v, source)
+		return Value.create(Value.LONG_STORAGE, v, source)
 	else
 		error("unknown type " .. type(v))
 	end
@@ -51,6 +51,11 @@ end
 function Value:__index(i)
 	local rtype = rawget(self, "type")
 	if rtype == Value.TABLE then
+		local raw = rawget(self, "raw")
+		if raw[i] ~= nil then
+			return raw[i]
+		end
+	elseif rtype == Value.TENSOR then
 		local raw = rawget(self, "raw")
 		if raw[i] ~= nil then
 			return raw[i]

@@ -64,8 +64,32 @@ function util.zerosLike(a, b)
 end
 
 function util.narrowCopy(a, dim, index, size)
-   return a:narrow(dim, index, size):copy()
+   return a:narrow(dim, index, size):clone()
 end
 
+function util.selectCopy(a, dim, index)
+   return a:select(dim, index):clone()
+end
+
+function util.selectSliceCopy(g, x, dim, index)
+   local out = g.new(x:size()):zero()
+   local slice = out:select(dim,index)
+   slice:copy(g)
+   return out
+end
+
+function util.narrowSliceCopy(g, x, dim, index, size)
+   local out = g.new(x:size()):zero()
+   local slice = out:narrow(dim,index,size)
+   slice:copy(g)
+   return out
+end
+
+function util.makeContiguous(g)
+   if not g:isContiguous() then
+      g = g:contiguous()
+   end
+   return g
+end
 
 return util

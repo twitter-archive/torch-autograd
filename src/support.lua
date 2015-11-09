@@ -46,7 +46,7 @@ torch.transpose = function(A)
    return A:t()
 end
 
-torch.narrow = function(dim, index, size)
+torch.narrow = function(A, dim, index, size)
    return A:narrow(dim, index, size)
 end
 
