@@ -12,6 +12,7 @@ local reusableFunctions = {
    "torch.pow",
    "torch.add",
    "torch.sub",
+   "torch.mul",
    "torch.neg",
    "torch.mm",
    "torch.mv",
@@ -80,34 +81,19 @@ local function writeExpr(state, node, depth)
       if op == "unm" then
          out.write("-", inputSymbols[1])
       else
-         -- Redo this properly as a graph transformation, this is dumb
-         if (op == "add" or op == "sub") and (inputSymbols[1] == "0" or inputSymbols[2] == "0") then
-            if inputSymbols[1] == "0" then
-               out.write(inputSymbols[2])
-            else
-               out.write(inputSymbols[1])
-            end
-         elseif (op == "mul" or op == "div") and (inputSymbols[1] == "1" or inputSymbols[2] == "1") then
-            if inputSymbols[1] == "1" then
-               out.write(inputSymbols[2])
-            else
-               out.write(inputSymbols[1])
-            end
-         else
-            out.write(inputSymbols[1])
-            out.write(" ")
-            if op == "add" then
-               out.write("+")
-            elseif op == "sub" then
-               out.write("-")
-            elseif op == "mul" then
-               out.write("*")
-            elseif op == "div" then
-               out.write("/")
-            end
-            out.write(" ")
-            out.write(inputSymbols[2])
+         out.write(inputSymbols[1])
+         out.write(" ")
+         if op == "add" then
+            out.write("+")
+         elseif op == "sub" then
+            out.write("-")
+         elseif op == "mul" then
+            out.write("*")
+         elseif op == "div" then
+            out.write("/")
          end
+         out.write(" ")
+         out.write(inputSymbols[2])
       end
    elseif node.forwardFn.object ~= nil then
       out.write(state.objects[node.forwardFn.object].name, ".", node.forwardFn.method, "(", table.concat(inputSymbols, ", "), ")")
@@ -158,7 +144,10 @@ end
 local function findGradients(val, grads)
    if val.source.gradients ~= nil then
       for i = 1, #val.source.gradients do
-         grads[#grads + 1] = val.source.gradients[i].source
+         grads[#grads + 1] = {
+            param = val,
+            grad = val.source.gradients[i]
+         }
       end
    end
    if val.type == Value.TABLE then
@@ -166,6 +155,27 @@ local function findGradients(val, grads)
          findGradients(v, grads)
       end
    end
+end
+
+local function writeLiteralTable(wtable, out, depth)
+   depth = depth or 1
+   out.write("{", "\n")
+   for k, v in pairs(wtable) do
+      out.write(string.rep(" ", depth * 4))
+      if type(k) == 'number' or tostring(tonumber(k)) == k then
+         out.write("[", tostring(k), "]")
+      else
+         out.write(tostring(k))
+      end
+      out.write(" = ")
+      if type(v) == 'table' then
+         writeLiteralTable(v, out, depth + 1)
+      else
+         out.write(tostring(v))
+      end
+      out.write(",\n")
+   end
+   out.write(string.rep(" ", (depth-1) * 4), "}")
 end
 
 local function generateCode(fn, args, argnum)
@@ -202,11 +212,11 @@ local function generateCode(fn, args, argnum)
 
    findGradients(values[argnum], grads)
    for i = 1, #grads do
-      walkExecutionOrder(symbols, grads[i]:getRoot().node, seen, execOrder)
-      outputNodes[grads[i]:getRoot().node] = true
+      walkExecutionOrder(symbols, grads[i].grad.source:getRoot().node, seen, execOrder)
+      outputNodes[grads[i].grad.source:getRoot().node] = true
    end
 
-   local localTable = true--#execOrder > 198
+   local localTable = true
 
    -- Assign symbols to params, inputs, outputs.
    local symbols = { }
@@ -262,13 +272,25 @@ local function generateCode(fn, args, argnum)
                elseif d1 == 1 and d2 == 1 then
                   node.forwardFn = { name = "torch.dot" }
                end
+            elseif node.inputs[1].type == Value.TENSOR and node.inputs[2].type == Value.NUMBER then
+               node.forwardFn = { name = "torch.mul" }
+            elseif node.inputs[1].type == Value.NUMBER and node.inputs[2].type == Value.TENSOR then
+               node.forwardFn = { name = "torch.mul" }
             end
          elseif op == "add" then
             if node.inputs[1].type == Value.TENSOR and node.inputs[2].type == Value.TENSOR then
                node.forwardFn = { name = "torch.add" }
+            elseif node.inputs[1].type == Value.TENSOR and node.inputs[2].type == Value.NUMBER then
+               node.forwardFn = { name = "torch.add" }
+            elseif node.inputs[1].type == Value.NUMBER and node.inputs[2].type == Value.TENSOR then
+               node.forwardFn = { name = "torch.add" }
             end
          elseif op == "sub" then
             if node.inputs[1].type == Value.TENSOR and node.inputs[2].type == Value.TENSOR then
+               node.forwardFn = { name = "torch.sub" }
+            elseif node.inputs[1].type == Value.TENSOR and node.inputs[2].type == Value.NUMBER then
+               node.forwardFn = { name = "torch.sub" }
+            elseif node.inputs[1].type == Value.NUMBER and node.inputs[2].type == Value.TENSOR then
                node.forwardFn = { name = "torch.sub" }
             end
          elseif op == "unm" then
@@ -403,21 +425,33 @@ local function generateCode(fn, args, argnum)
       end
    end
    out.write("    ")
-   out.write("return {\n")
-   --[[
-   for k, v in pairs(values[argnum]:get()) do
-      out.write("        " .. k .. " = ")
-      out.write(v.source.gradients[1].source:symbolPath(symbols))
-      out.write(",", "\n")
+   local retTable = { }
+   for i = 1, #grads do
+      local valTable = retTable
+      local stack = grads[i].param.source:getParentsArray()
+      local gradSymbol = grads[i].grad.source:symbolPath(symbols)
+      for k = 1, #stack do
+         local ss = stack[k]
+         if ss.type == Source.TABLE then
+            if valTable[ss.key] == nil then
+               if stack[k + 1] == nil then
+                  valTable[ss.key] = gradSymbol
+               else
+                  local nextTable = { }
+                  valTable[ss.key] = nextTable
+               end
+            end
+            valTable = valTable[ss.key]
+         end
+      end
    end
-   --]]
-   out.write("    }")
+   out.write("return ")
+   writeLiteralTable(retTable, out, 2)
    out.write("\n")
    out.write("end")
    out.write("\n")
    out.write("end")
    out.write("\n")
-
    return out.finish(), outerArgs
 end
 
@@ -444,7 +478,7 @@ local function grad(fn, argnum)
       if generatedFunctions[signature] == nil then
          local code, outerArgs = generateCode(fn, args, argnum)
         print(code)
-        print("generated code for param signature " .. signature)
+        --print("generated code for param signature " .. signature)
          generatedFunctions[signature] = loadstring(code)()(unpack(outerArgs))
       end
       return generatedFunctions[signature](unpack(args))

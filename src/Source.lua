@@ -66,6 +66,15 @@ function Source:getRoot()
 	end
 end
 
+function Source:getParentsArray(arr)
+	arr = arr or { }
+	if self.type == Source.TABLE then
+		self.parent:getParentsArray(arr)
+	end
+	arr[#arr + 1] = self
+	return arr
+end
+
 function Source.param(name, gradient)
 	local s = Source.new(Source.PARAM)
 	s.name = name
