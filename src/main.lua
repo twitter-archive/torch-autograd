@@ -291,8 +291,6 @@ local function generateCode(fn, args, argnum)
       outputNodes[grads[i].grad.source:getRoot().node] = true
    end
 
-   local localTable = true
-
    removeIdentityOperators(execOrder)
    convertOperators(execOrder)
 
@@ -307,6 +305,7 @@ local function generateCode(fn, args, argnum)
    local symbols = { }
    local refCount = { }
    local functionRemap = { }
+   local defined = { }
 
    for i = 1, #values do
       symbols[values[i].source] = "p" .. i
@@ -315,7 +314,8 @@ local function generateCode(fn, args, argnum)
    for i = 1, #execOrder do
       local node = execOrder[i]
       if #node.outputs == 1 then
-         if localTable then
+         if node.outputs[1].type == Value.TENSOR then
+            defined[node.outputs[1].source] = true
             symbols[node.outputs[1].source] = "locals[" .. i .. "]"
          else
             symbols[node.outputs[1].source] = letterForType(node.outputs[1]) .. i
@@ -410,18 +410,17 @@ local function generateCode(fn, args, argnum)
       out.write("local ", v, " = ", k)
       out.write("\n")
    end
-   if localTable then
-      out.write("local locals = { }")
-      out.write("\n")
-      out.write("for i = 1, ", #execOrder, " do locals[i] = 0 end")
-      out.write("\n")
-      for i = 1, #execOrder do
-         local node = execOrder[i]
-         if canReuseOutput(node) then
-            local tensor = node.outputs[1].raw
-            out.write(symbols[node.outputs[1].source], " = ", tensor:type(), "(", table.concat(tensor:size():totable(), ", "), ")")
-            out.write("\n")
-         end
+
+   out.write("local locals = { }")
+   out.write("\n")
+   out.write("for i = 1, ", #execOrder, " do locals[i] = 0 end")
+   out.write("\n")
+   for i = 1, #execOrder do
+      local node = execOrder[i]
+      if canReuseOutput(node) then
+         local tensor = node.outputs[1].raw
+         out.write(symbols[node.outputs[1].source], " = ", tensor:type(), "(", table.concat(tensor:size():totable(), ", "), ")")
+         out.write("\n")
       end
    end
 
@@ -443,7 +442,7 @@ local function generateCode(fn, args, argnum)
          out.write("    ")
          if not canReuseOutput(node) then
             if #outputSymbols > 0 then
-               if not localTable then
+               if not defined[node.outputs[1].source] then
                   out.write("local ")
                end
                out.write(table.concat(outputSymbols, ", "), " = ")
