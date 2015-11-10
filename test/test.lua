@@ -9,6 +9,76 @@ local tester = totem.Tester()
 
 -- List of tests:
 local tests = {
+   AutoModule = function()
+      local linear  = function(input, weight, bias)
+         local y = weight * input + bias
+         return y
+      end
+      local linearReLU  = function(input, weight, bias)
+         local y = weight * input + bias
+         local output = torch.mul( torch.abs( y ) + y, 0.5)
+         return output
+      end
+      local mse = function(input, target)
+         local buffer = input-target
+         return torch.sum( torch.cmul(buffer, buffer) ) / (input:dim() == 2 and input:size(1)*input:size(2) or input:size(1))
+      end
+
+      local inputSize, outputSize = torch.random(10,100), torch.random(100,1000)
+
+
+      local model = nn.Sequential()
+      local linear1 = nn.Linear(inputSize, outputSize)
+      local linear2 = nn.Linear(outputSize, inputSize)
+      model:add( linear1 )
+      model:add( nn.ReLU() )
+      model:add( linear2 )
+
+      local mseCriterion = nn.MSECriterion()
+      local autoModel = nn.Sequential()
+      local autoLinear1ReLU = autograd.nn.AutoModule('AutoLinearReLU')(linearReLU, linear1.weight:clone(), linear1.bias:clone())
+      local autoLinear2 = autograd.nn.AutoModule('AutoLinear')(linear, linear2.weight:clone(), linear2.bias:clone())
+      autoModel:add( autoLinear1ReLU )
+      autoModel:add( autoLinear2 )
+      local autoMseCriterion = autograd.nn.AutoCriterion('AutoMSE')(mse)
+
+      -- Test
+      local n = 1000
+      local lr = 0.001
+      local autoParams,autoGradParams = autoModel:parameters()
+      local params,gradParams = model:parameters()
+      tester:asserteq(#params == #autoParams and #autoParams == #autoGradParams and #autoGradParams == #gradParams, true, 'Wrong number of parameters/gradients parameters')
+
+      for i=1,n do
+         model:zeroGradParameters()
+         autoModel:zeroGradParameters()
+         local input = torch.Tensor(inputSize):uniform(-5,5)
+         local target = input:clone():exp()
+         -- Forward
+         local output1 = model:forward(input)
+         local output2 = autoModel:forward(input)
+         local mseOut1 = mseCriterion:forward(output1, target)
+         local mseOut2 = autoMseCriterion:forward(output2, target)
+         -- Backward
+         local gradOutput1 = mseCriterion:backward(output1, target)
+         local gradOutput2 = autoMseCriterion:backward(output2, target)
+         local gradInput1 = model:backward(input, gradOutput1)
+         local gradInput2 = autoModel:backward(input, gradOutput2)
+         model:accGradParameters(input, gradOutput1)
+         autoModel:accGradParameters(input, gradOutput2)
+         for i=1,#autoParams do
+            autoParams[i]:add(-lr, autoGradParams[i])
+         end
+         for i=1,#params do
+            params[i]:add(-lr, gradParams[i])
+         end
+      end
+      tester:asserteq((model.modules[1].weight - autoModel.modules[1].weight):abs():max() < 1e-6 , true, "gradient accumulation must be the same.")
+      tester:asserteq((model.modules[1].bias - autoModel.modules[1].bias):abs():max() < 1e-6, true, "gradient accumulation must be the same.")
+      tester:asserteq((model.modules[3].weight - autoModel.modules[2].weight):abs():max() < 1e-6, true, "gradient accumulation must be the same.")
+      tester:asserteq((model.modules[3].bias - autoModel.modules[2].bias):abs():max() < 1e-6, true, "gradient accumulation must be the same.")
+   end,
+
    Select = function()
       local W = torch.Tensor(5,25):normal()
       local x = torch.Tensor(1,25):normal()

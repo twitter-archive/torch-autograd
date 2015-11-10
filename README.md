@@ -15,7 +15,7 @@ Autograd has multiple goals:
 * support arbitrary Torch types (e.g. transparent and full support
   for CUDA-backed computations)
 * full integration with [nn](https://github.com/torch/nn) modules: mix and match
-  auto-differentiation with user-provided gradients
+  auto-differentiation with user-provided gradients the ability to define any new nn compliant Module.
 * represent complex evaluation graphs, which is very useful to describe models
   with multiple loss functions and/or inputs
 * enable gradients of gradients for transparent computation of Hessians, ...
@@ -198,6 +198,81 @@ end
 -- Note: the parameters are always handled as an array, passed as the first
 -- argument to the model function (modelf). This API is similar to the other
 -- model primitives we provide (see below in "Model Primitives").
+```
+
+### Creating auto-differentiated nn modules
+
+For those who have a training pipeline that heavily relies on the torch/nn API,
+torch-autograd defines the `autograd.nn.AutoModule` and `autograd.nn.AutoCriterion` and  function. When given a `name`, it will create
+a new class locally under autograd.auto.name. This class can be instantiated by providing a function, a weight, and a bias.
+Here we show an example of writing a 2-layer fully-connected module and an MSE criterion using `AutoModule` and `AutoCriterion`:
+
+Here we rewrite the neural net example from above, but this time relying on a mix of
+`nn` primitives and `autograd`-inferred gradients:
+
+```lua
+-- Define functions for modules
+-- Linear
+local linear  = function(input, weight, bias)
+   local y = weight * input + bias
+   return y
+end
+
+-- Linear + ReLU
+local linearReLU  = function(input, weight, bias)
+   local y = weight * input + bias
+   local output = torch.mul( torch.abs( y ) + y, 0.5)
+   return output
+end
+
+-- Define function for criterion
+-- MSE
+local mse = function(input, target)
+   local buffer = input-target
+   return torch.sum( torch.cmul(buffer, buffer) ) / (input:dim() == 2 and input:size(1)*input:size(2) or input:size(1))
+end
+
+-- Input size, nb of hiddens
+local inputSize, outputSize = 100, 1000
+
+-- Define auto-modules and auto-criteria
+-- and instantiate them immediately
+local autoModel = nn.Sequential()
+local autoLinear1ReLU = autograd.nn.AutoModule('AutoLinearReLU')(linearReLU, linear1.weight:clone(), linear1.bias:clone())
+local autoLinear2 = autograd.nn.AutoModule('AutoLinear')(linear, linear2.weight:clone(), linear2.bias:clone())
+autoModel:add( autoLinear1ReLU )
+autoModel:add( autoLinear2 )
+local autoMseCriterion = autograd.nn.AutoCriterion('AutoMSE')(mse)
+-- At this point, print(autograd.auto) should yield
+-- {
+--   AutoLinearReLU : {...}
+--   AutoMSE : {...}
+--   AutoLinear : {...}
+-- }
+
+-- Define number of iterations and learning rate
+local n = 100000
+local lr = 0.001
+local autoParams,autoGradParams = autoModel:parameters()
+local unifomMultiplier = torch.Tensor(inputSize):uniform()
+
+-- Train: this should learn how to approximate e^(\alpha * x)
+-- with an mlp aith both auto-modules and regular nn
+for i=1,n do
+   autoModel:zeroGradParameters()
+   local input = torch.Tensor(inputSize):uniform(-5,5):cmul(uniformMultiplier)
+   local target = input:clone():exp()
+   -- Forward
+   local output = autoModel:forward(input)
+   local mseOut = autoMseCriterion:forward(output, target)
+   -- Backward
+   local gradOutput = autoMseCriterion:backward(output, target)
+   local gradInput = autoModel:backward(input, gradOutput)
+   autoModel:accGradParameters(input, gradOutput)
+   for i=1,#autoParams do
+      autoParams[i]:add(-lr, autoGradParams[i])
+   end
+end
 ```
 
 ### Gradient checks

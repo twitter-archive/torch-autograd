@@ -49,12 +49,11 @@ end
 
 local lastTape = { }
 
--- Step through the computation graph and find the gradient
-local function grad(fun, argnum, returnTape)
+local function funOnly(fun, argnum)
    argnum = argnum or 1
-   local doGrad = function(...)
+   local doFun = function(tape, ...)
       local arg = {...}
-      local tape = lastTape
+      local tape = tape or {}
       tape.nextIndex = 1
 
       -- Check the argument, to make sure it's alright.
@@ -63,21 +62,36 @@ local function grad(fun, argnum, returnTape)
       -- If our target argument is a table, we'll need to walk its members and node-ify them.
       -- For now, if we see a number or a tensor, we'll node-ify it, otherwise,
       -- if it's a table, we'll try to walk it
+--       print('Before new start node.')
+--       print(arg[argnum])
       arg[argnum] = newStartNode(arg[argnum], tape)
+--       print('After new start node.')
       local allAns = {fun(unpack(arg))}
       local ans = allAns[1]
       if not isNode(ans) then
          error("A node type was not returned. This is either because a gradient was not defined, or the input is independent of the output")
       end
-      if type(getValue(ans)) ~= "number" then
-         print("")
-         print("Autograd only supports scalar outputs. This is current functions output: ")
-         print(getValue(ans))
-         error("Autograd only supports scalar return values. Output is not scalar")
+      -- Now spit out the grads, along with any answers returned along the way
+      local out = {}
+
+      local ansVal = getValue(allAns)
+      if type(allAns) == "table" then
+         for key,value in pairs(ansVal) do
+            out[#out+1] = getValue(value)
+         end
+      else
+         out[1] = ansVal
       end
+      return arg, allAns, tape, unpack(out)
+   end
+   return doFun
+end
 
-      ans.outgrad = 1.0
-
+local function gradOnly(tape)
+   argnum = argnum or 1
+   local doGradOnly = function(arg, allAns, gradOutput)
+      local ans = allAns[1]
+      ans.outgrad = gradOutput
       overload.endRecording()
       for i=tape.nextIndex-1,1,-1 do
          local node = tape[i]
@@ -133,19 +147,39 @@ local function grad(fun, argnum, returnTape)
       end
       overload.beginRecording()
 
-      -- Now spit out the grads, along with any answers returned along the way
-      local out = {}
-      out[1] = getOutgrad(arg[argnum])
+      -- Now spit out the grads
+      local out = getOutgrad(arg[argnum])
+      return out
+   end
+   return doGradOnly
+end
 
+
+-- Step through the computation graph and find the gradient
+local function grad(fun, argnum, returnTape)
+   argnum = argnum or 1
+   local doGrad = function(...)
+      local all  = {funOnly(fun)(lastTape, ...)}
+      local arg, allAns, tape, out = all[1], all[2], all[3], all[4]
+      local ans = allAns[1]
+      if type(getValue(ans)) ~= "number" then
+         print("")
+         print("Autograd only supports scalar outputs. This is current functions output: ")
+         print(getValue(ans))
+         error("Autograd only supports scalar return values. Output is not scalar")
+      end
+      local go = gradOnly(tape)(arg, allAns, 1.0)
+      local fout = {}
+      fout[1] = go
       local ansVal = getValue(allAns)
       if type(allAns) == "table" then
          for key,value in pairs(ansVal) do
-            out[#out+1] = getValue(value)
+            fout[#fout+1] = getValue(value)
          end
       else
-         out[2] = ansVal
+         fout[2] = ansVal
       end
-      return unpack(out)
+      return unpack(fout)
    end
    return doGrad
 end
@@ -157,7 +191,9 @@ overload.beginRecording()
 local autograd = {
    grad = grad,
    debugFns = debugFns,
-   defineGradient = overload.defineGradient
+   defineGradient = overload.defineGradient,
+   funOnly = funOnly,
+   gradOnly = gradOnly,
 }
 
 -- Shortcut:
