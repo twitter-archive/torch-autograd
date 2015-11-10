@@ -4,6 +4,24 @@ local Node = require 'autograd.Node'
 local Value = require 'autograd.Value'
 local Source = require 'autograd.Source'
 
+local reusableFunctions = {
+   "torch.tanh",
+   "torch.cmul",
+   "torch.cdiv",
+   "torch.exp",
+   "torch.pow",
+   "torch.add",
+   "torch.sub",
+   "torch.neg",
+   "torch.mm",
+   "torch.mv",
+}
+
+local reusableFunctionsMap = { }
+for i = 1, #reusableFunctions do
+   reusableFunctionsMap[reusableFunctions[i]] = true
+end
+
 local function stringBuilder()
    local strs = { }
    return {
@@ -33,11 +51,15 @@ local function walkExecutionOrder(symbols, node, seen, order)
    end
 end
 
+local function canReuseOutput(node)
+   return reusableFunctionsMap[node.forwardFn.name] and #node.outputs == 1 and node.outputs[1].type == Value.TENSOR
+end
+
 local function canInline(node, outputNodes)
    return #node.outputs == 1 and #node.outputTargets[1] == 1 and outputNodes[node] == nil
 end
 
-local function writeExpr(state, node)
+local function writeExpr(state, node, depth)
    local out = stringBuilder()
    local inputSymbols = { }
    for k = 1, #node.inputs do
@@ -58,23 +80,41 @@ local function writeExpr(state, node)
       if op == "unm" then
          out.write("-", inputSymbols[1])
       else
-         out.write(inputSymbols[1])
-         out.write(" ")
-         if op == "add" then
-            out.write("+")
-         elseif op == "sub" then
-            out.write("-")
-         elseif op == "mul" then
-            out.write("*")
-         elseif op == "div" then
-            out.write("/")
+         -- Redo this properly as a graph transformation, this is dumb
+         if (op == "add" or op == "sub") and (inputSymbols[1] == "0" or inputSymbols[2] == "0") then
+            if inputSymbols[1] == "0" then
+               out.write(inputSymbols[2])
+            else
+               out.write(inputSymbols[1])
+            end
+         elseif (op == "mul" or op == "div") and (inputSymbols[1] == "1" or inputSymbols[2] == "1") then
+            if inputSymbols[1] == "1" then
+               out.write(inputSymbols[2])
+            else
+               out.write(inputSymbols[1])
+            end
+         else
+            out.write(inputSymbols[1])
+            out.write(" ")
+            if op == "add" then
+               out.write("+")
+            elseif op == "sub" then
+               out.write("-")
+            elseif op == "mul" then
+               out.write("*")
+            elseif op == "div" then
+               out.write("/")
+            end
+            out.write(" ")
+            out.write(inputSymbols[2])
          end
-         out.write(" ")
-         out.write(inputSymbols[2])
       end
    elseif node.forwardFn.object ~= nil then
       out.write(state.objects[node.forwardFn.object].name, ".", node.forwardFn.method, "(", table.concat(inputSymbols, ", "), ")")
    else
+      if canReuseOutput(node) then
+         table.insert(inputSymbols, 1, node.outputs[1].source:symbolPath(state.symbols))
+      end
       out.write(state.functionRemap[node.forwardFn.name], "(", table.concat(inputSymbols, ", "), ")")
    end
    return out.finish()
@@ -166,7 +206,7 @@ local function generateCode(fn, args, argnum)
       outputNodes[grads[i]:getRoot().node] = true
    end
 
-   local localTable = #execOrder > 198
+   local localTable = true--#execOrder > 198
 
    -- Assign symbols to params, inputs, outputs.
    local symbols = { }
@@ -201,6 +241,39 @@ local function generateCode(fn, args, argnum)
             local output = node.outputs[k]
             if output.type == Value.TENSOR then
                refCount[output.source] = #node.outputTargets[k]
+            end
+         end
+      end
+   end
+
+   -- Transform tensorA op tensorB to torch.op(tensorA, tensorB)
+   for i = 1, #execOrder do
+      local node = execOrder[i]
+      if node.forwardFn.operator ~= nil then
+         local op = node.forwardFn.operator
+         if op == "mul" then
+            if node.inputs[1].type == Value.TENSOR and node.inputs[2].type == Value.TENSOR then
+               local d1 = node.inputs[1].raw:nDimension()
+               local d2 = node.inputs[2].raw:nDimension()
+               if d1 == 2 and d2 == 2 then
+                  node.forwardFn = { name = "torch.mm" }
+               elseif d1 == 2 and d2 == 1 then
+                  node.forwardFn = { name = "torch.mv" }
+               elseif d1 == 1 and d2 == 1 then
+                  node.forwardFn = { name = "torch.dot" }
+               end
+            end
+         elseif op == "add" then
+            if node.inputs[1].type == Value.TENSOR and node.inputs[2].type == Value.TENSOR then
+               node.forwardFn = { name = "torch.add" }
+            end
+         elseif op == "sub" then
+            if node.inputs[1].type == Value.TENSOR and node.inputs[2].type == Value.TENSOR then
+               node.forwardFn = { name = "torch.sub" }
+            end
+         elseif op == "unm" then
+            if node.inputs[1].type == Value.TENSOR then
+               node.forwardFn = { name = "torch.neg" }
             end
          end
       end
@@ -278,6 +351,14 @@ local function generateCode(fn, args, argnum)
       out.write("\n")
       out.write("for i = 1, ", #execOrder, " do locals[i] = 0 end")
       out.write("\n")
+      for i = 1, #execOrder do
+         local node = execOrder[i]
+         if canReuseOutput(node) then
+            local tensor = node.outputs[1].raw
+            out.write(symbols[node.outputs[1].source], " = ", tensor:type(), "(", table.concat(tensor:size():totable(), ", "), ")")
+            out.write("\n")
+         end
+      end
    end
 
    out.write("return function(")
@@ -296,11 +377,13 @@ local function generateCode(fn, args, argnum)
       end
       if not canInline(node, outputNodes) then
          out.write("    ")
-         if #outputSymbols > 0 then
-            if not localTable then
-               out.write("local ")
+         if not canReuseOutput(node) then
+            if #outputSymbols > 0 then
+               if not localTable then
+                  out.write("local ")
+               end
+               out.write(table.concat(outputSymbols, ", "), " = ")
             end
-            out.write(table.concat(outputSymbols, ", "), " = ")
          end
          out.write(writeExpr(state, node))
          out.write("\n")
@@ -360,8 +443,8 @@ local function grad(fn, argnum)
       local signature = table.concat(tensorDims, "-")
       if generatedFunctions[signature] == nil then
          local code, outerArgs = generateCode(fn, args, argnum)
-        -- print(code)
-        -- print("generated code for param signature " .. signature)
+        print(code)
+        print("generated code for param signature " .. signature)
          generatedFunctions[signature] = loadstring(code)()(unpack(outerArgs))
       end
       return generatedFunctions[signature](unpack(args))
