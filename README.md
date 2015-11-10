@@ -15,7 +15,8 @@ Autograd has multiple goals:
 * support arbitrary Torch types (e.g. transparent and full support
   for CUDA-backed computations)
 * full integration with [nn](https://github.com/torch/nn) modules: mix and match
-  auto-differentiation with user-provided gradients the ability to define any new nn compliant Module.
+  auto-differentiation with user-provided gradients
+* the ability to define any new nn compliant Module with automatic differentiation
 * represent complex evaluation graphs, which is very useful to describe models
   with multiple loss functions and/or inputs
 * enable gradients of gradients for transparent computation of Hessians, ...
