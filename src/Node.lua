@@ -49,11 +49,7 @@ function Node:evaluateForward()
 		local input = self.inputs[i]
 		local source = input.source
 		if source.type == Source.COMPUTED then
-			local outputTargets = source.node.outputTargets[source.index]
-			outputTargets[#outputTargets + 1] = {
-				node = self,
-				index = i
-			}
+			source.node:linkOutputNode(source.index, self, i)
 		end
 		evalArgs[i] = self.inputs[i]:flatten()
 	end
@@ -98,6 +94,62 @@ function Node:evaluateBackward()
 			end
 		end
 	end
+end
+
+local function removeFromTargetsArray(arr, node)
+   for i = #arr, 1, -1 do
+      if arr[i].node == node then
+         table.remove(arr, i)
+      end
+   end
+end
+
+function Node:unlinkInputs()
+	for i = 1, #self.inputs do
+		if self.inputs[i].source.type == Source.COMPUTED then
+			self.inputs[i].source.node:unlinkOutputNode(self)
+		end
+	end
+	self.inputs = { }
+end
+
+function Node:replaceInput(replaceInput, withInput)
+	for i = 1, #self.inputs do
+		local input = self.inputs[i]
+		if input == replaceInput then
+			if replaceInput.source.type == Source.COMPUTED then
+				replaceInput.source.node:unlinkOutputNode(self)
+			end
+			if withInput.source.type == Source.COMPUTED then
+				local inputIndex = withInput.source.node:outputParamIndex(withInput)
+				withInput.source.node:linkOutputNode(inputIndex, self, i)
+			end
+			self.inputs[i] = withInput
+		end
+	end
+end
+
+function Node:linkOutputNode(srcIndex, node, dstIndex)
+	local outputTargets = self.outputTargets[srcIndex]
+	outputTargets[#outputTargets + 1] = {
+		node = node,
+		index = dstIndex
+	}
+end
+
+function Node:unlinkOutputNode(node)
+	for k = 1, #self.outputTargets do
+		removeFromTargetsArray(self.outputTargets[k], node)
+	end
+end
+
+function Node:outputParamIndex(outputValue)
+	for k = 1, #self.outputs do
+		if self.outputs[k] == outputValue then
+			return k
+		end
+	end
+	return 0
 end
 
 return Node

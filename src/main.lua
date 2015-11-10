@@ -71,9 +71,11 @@ local function writeExpr(state, node, depth)
          local symbol = input.source:symbolPath(state.symbols)
          inputSymbols[k] = symbol
       end
+      --[[
       if state.refCount[input.source] ~= nil then
          state.refCount[input.source] = state.refCount[input.source] - 1
       end
+      --]]
    end
    if node.forwardFn.operator ~= nil then
       local op = node.forwardFn.operator
@@ -177,6 +179,80 @@ local function writeLiteralTable(wtable, out, depth)
    out.write(string.rep(" ", (depth-1) * 4), "}")
 end
 
+local function convertOperators(execOrder)
+   for i = 1, #execOrder do
+      local node = execOrder[i]
+      if node.forwardFn.operator ~= nil then
+         local op = node.forwardFn.operator
+         if op == "mul" and #node.inputs == 2 then
+            if node.inputs[1].type == Value.TENSOR and node.inputs[2].type == Value.TENSOR then
+               local d1 = node.inputs[1].raw:nDimension()
+               local d2 = node.inputs[2].raw:nDimension()
+               if d1 == 2 and d2 == 2 then
+                  node.forwardFn = { name = "torch.mm" }
+               elseif d1 == 2 and d2 == 1 then
+                  node.forwardFn = { name = "torch.mv" }
+               elseif d1 == 1 and d2 == 1 then
+                  node.forwardFn = { name = "torch.dot" }
+               end
+            elseif node.inputs[1].type == Value.TENSOR and node.inputs[2].type == Value.NUMBER then
+               node.forwardFn = { name = "torch.mul" }
+            elseif node.inputs[1].type == Value.NUMBER and node.inputs[2].type == Value.TENSOR then
+               node.forwardFn = { name = "torch.mul" }
+            end
+         elseif op == "add" and #node.inputs == 2 then
+            if node.inputs[1].type == Value.TENSOR and node.inputs[2].type == Value.TENSOR then
+               node.forwardFn = { name = "torch.add" }
+            elseif node.inputs[1].type == Value.TENSOR and node.inputs[2].type == Value.NUMBER then
+               node.forwardFn = { name = "torch.add" }
+            elseif node.inputs[1].type == Value.NUMBER and node.inputs[2].type == Value.TENSOR then
+               node.forwardFn = { name = "torch.add" }
+            end
+         elseif op == "unm" then
+            if node.inputs[1].type == Value.TENSOR then
+               node.forwardFn = { name = "torch.neg" }
+            end
+         end
+      end
+   end
+end
+
+local function replaceNode(nodeValue, withNodeValue)
+   local node = nodeValue.source.node
+   node:unlinkInputs()
+   local toRemove = { }
+   for k = 1, #node.outputs do
+      for i = 1, #node.outputTargets[k] do
+         toRemove[#toRemove + 1] = node.outputTargets[k][i].node
+      end
+   end
+   for i = 1, #toRemove do
+      toRemove[i]:replaceInput(nodeValue, withNodeValue)
+   end
+end
+
+local function removeIdentityOperators(execOrder)
+   for i = 1, #execOrder do
+      local node = execOrder[i]
+      local op = node.forwardFn.operator
+      if node.forwardFn.operator ~= nil then
+         if op == "mul" then
+            if node.inputs[1].source.type == Source.CONSTANT and node.inputs[1]:get() == 1 then
+               replaceNode(node.outputs[1], node.inputs[2])
+            elseif node.inputs[2].source.type == Source.CONSTANT and node.inputs[2]:get() == 1 then
+               replaceNode(node.outputs[1], node.inputs[1])
+            end
+         elseif op == "add" or op == "sub" then
+            if node.inputs[1].source.type == Source.CONSTANT and node.inputs[1]:get() == 0 then
+               replaceNode(node.outputs[1], node.inputs[2])
+            elseif node.inputs[2].source.type == Source.CONSTANT and node.inputs[2]:get() == 0 then
+               replaceNode(node.outputs[1], node.inputs[1])
+            end
+         end
+      end
+   end
+end
+
 local function generateCode(fn, args, argnum)
    local values = { }
    local tensorDims = { }
@@ -217,6 +293,16 @@ local function generateCode(fn, args, argnum)
 
    local localTable = true
 
+   removeIdentityOperators(execOrder)
+   convertOperators(execOrder)
+
+   -- Re-evaluate exec order after optimizations.
+   seen = { }
+   execOrder = { }
+   for i = 1, #grads do
+      walkExecutionOrder(symbols, grads[i].grad.source:getRoot().node, seen, execOrder)
+   end
+
    -- Assign symbols to params, inputs, outputs.
    local symbols = { }
    local refCount = { }
@@ -245,6 +331,7 @@ local function generateCode(fn, args, argnum)
             end
          end
       end
+      --[[
       if outputNodes[node] == nil then
          for k = 1, #node.outputs do
             local output = node.outputs[k]
@@ -253,50 +340,7 @@ local function generateCode(fn, args, argnum)
             end
          end
       end
-   end
-
-   -- Transform tensorA op tensorB to torch.op(tensorA, tensorB)
-   for i = 1, #execOrder do
-      local node = execOrder[i]
-      if node.forwardFn.operator ~= nil then
-         local op = node.forwardFn.operator
-         if op == "mul" then
-            if node.inputs[1].type == Value.TENSOR and node.inputs[2].type == Value.TENSOR then
-               local d1 = node.inputs[1].raw:nDimension()
-               local d2 = node.inputs[2].raw:nDimension()
-               if d1 == 2 and d2 == 2 then
-                  node.forwardFn = { name = "torch.mm" }
-               elseif d1 == 2 and d2 == 1 then
-                  node.forwardFn = { name = "torch.mv" }
-               elseif d1 == 1 and d2 == 1 then
-                  node.forwardFn = { name = "torch.dot" }
-               end
-            elseif node.inputs[1].type == Value.TENSOR and node.inputs[2].type == Value.NUMBER then
-               node.forwardFn = { name = "torch.mul" }
-            elseif node.inputs[1].type == Value.NUMBER and node.inputs[2].type == Value.TENSOR then
-               node.forwardFn = { name = "torch.mul" }
-            end
-         elseif op == "add" then
-            if node.inputs[1].type == Value.TENSOR and node.inputs[2].type == Value.TENSOR then
-               node.forwardFn = { name = "torch.add" }
-            elseif node.inputs[1].type == Value.TENSOR and node.inputs[2].type == Value.NUMBER then
-               node.forwardFn = { name = "torch.add" }
-            elseif node.inputs[1].type == Value.NUMBER and node.inputs[2].type == Value.TENSOR then
-               node.forwardFn = { name = "torch.add" }
-            end
-         elseif op == "unm" then
-            if node.inputs[1].type == Value.TENSOR then
-               node.forwardFn = { name = "torch.neg" }
-            end
-         end
-      end
-   end
-
-   for i = 1, #execOrder do
-      local node = execOrder[i]
-      if node.forwardFn.operator == nil then
-         functionRemap[node.forwardFn.name] = string.gsub(node.forwardFn.name, "%.", "_")
-      end
+      --]]
    end
 
    -- Find all the nn objects we need to create or pass in.
@@ -322,14 +366,6 @@ local function generateCode(fn, args, argnum)
       end
    end
 
-   local state = {
-      symbols = symbols,
-      outputNodes = outputNodes,
-      refCount = refCount,
-      functionRemap = functionRemap,
-      objects = objects
-   }
-
    -- Collect the objects we use, where we couldn't determine how to construct
    -- them. They have to be passed in by value.
    local out = stringBuilder()
@@ -341,6 +377,21 @@ local function generateCode(fn, args, argnum)
          outerArgs[#outerArgs + 1] = k
       end
    end
+
+   for i = 1, #execOrder do
+      local node = execOrder[i]
+      if node.forwardFn.operator == nil then
+         functionRemap[node.forwardFn.name] = string.gsub(node.forwardFn.name, "%.", "_")
+      end
+   end
+
+   local state = {
+      symbols = symbols,
+      outputNodes = outputNodes,
+      refCount = refCount,
+      functionRemap = functionRemap,
+      objects = objects
+   }
 
    -- Generate code.
    out.write("return function(", table.concat(noCtorObjectNames, ", "), ")")
@@ -400,19 +451,19 @@ local function generateCode(fn, args, argnum)
          end
          out.write(writeExpr(state, node))
          out.write("\n")
-         local toFree = { }
-         for k, v in pairs(refCount) do
-            if v == 0 then
-               toFree[#toFree + 1] = k
-            end
-         end
-         for k = 1, #toFree do
-            refCount[toFree[k]] = nil
-            -- out.write("    ")
-            -- out.write(symbols[toFree[k]])
-            -- out.write(":free()")
-            -- out.write("\n")
-         end
+         -- local toFree = { }
+         -- for k, v in pairs(refCount) do
+         --    if v == 0 then
+         --       toFree[#toFree + 1] = k
+         --    end
+         -- end
+         -- for k = 1, #toFree do
+         --    refCount[toFree[k]] = nil
+         --    out.write("    ")
+         --    out.write(symbols[toFree[k]])
+         --    out.write(":free()")
+         --    out.write("\n")
+         -- end
       end
    end
    out.write("    ")
@@ -468,8 +519,8 @@ local function grad(fn, argnum)
       local signature = table.concat(tensorDims, "-")
       if generatedFunctions[signature] == nil then
          local code, outerArgs = generateCode(fn, args, argnum)
-        print(code)
-        print("generated code for param signature " .. signature)
+        --print(code)
+        --print("generated code for param signature " .. signature)
          generatedFunctions[signature] = loadstring(code)()(unpack(outerArgs))
       end
       return generatedFunctions[signature](unpack(args))
