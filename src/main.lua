@@ -11,7 +11,6 @@ local reusableFunctions = {
    "torch.exp",
    "torch.pow",
    "torch.add",
-   "torch.sub",
    "torch.mul",
    "torch.neg",
    "torch.mm",
@@ -285,14 +284,6 @@ local function generateCode(fn, args, argnum)
             elseif node.inputs[1].type == Value.NUMBER and node.inputs[2].type == Value.TENSOR then
                node.forwardFn = { name = "torch.add" }
             end
-         elseif op == "sub" then
-            if node.inputs[1].type == Value.TENSOR and node.inputs[2].type == Value.TENSOR then
-               node.forwardFn = { name = "torch.sub" }
-            elseif node.inputs[1].type == Value.TENSOR and node.inputs[2].type == Value.NUMBER then
-               node.forwardFn = { name = "torch.sub" }
-            elseif node.inputs[1].type == Value.NUMBER and node.inputs[2].type == Value.TENSOR then
-               node.forwardFn = { name = "torch.sub" }
-            end
          elseif op == "unm" then
             if node.inputs[1].type == Value.TENSOR then
                node.forwardFn = { name = "torch.neg" }
@@ -478,7 +469,7 @@ local function grad(fn, argnum)
       if generatedFunctions[signature] == nil then
          local code, outerArgs = generateCode(fn, args, argnum)
         print(code)
-        --print("generated code for param signature " .. signature)
+        print("generated code for param signature " .. signature)
          generatedFunctions[signature] = loadstring(code)()(unpack(outerArgs))
       end
       return generatedFunctions[signature](unpack(args))
