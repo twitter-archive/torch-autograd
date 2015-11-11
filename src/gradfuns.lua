@@ -18,7 +18,7 @@ local function unbroadcast(g,ans,x)
       if torch.isSameSizeAs(x, g) then
          return g
       end
-      if g:nElement() == x:nElement() then
+      if torch.nElement(g) == torch.nElement(x) then
          return torch.viewAs(g,x)
       end
 
@@ -83,15 +83,15 @@ local function repeatToMatchShape(x,axis)
    if not torch.isTensor(x) then
       return function(x) return x end, 1
    end
-
    local size
    if not axis then
       return function(g) return util.fillSameSizeAs(x, _sum(g)) end, torch.nElement(x)
    else
-      error("todo")
-      size = torch.size(x):fill(1)
-      size[axis] = x:size(axis)
-      return function(g) return torch.repeatTensor(g, size) end, size[axis]
+      axis = axis:get()
+      local size = torch.size(x):fill(1)
+      size[axis] = torch.size(x, axis)
+      return function(g)
+         return torch.repeatTensor(g, size) end, size[axis]
    end
 end
 
@@ -106,21 +106,11 @@ functions.cat = {
          return torch.narrow(g, dim, 1, torch.size(x, dim))
       else
          -- Second argument is dimension if table is passed in
-         error("todo")
-         dim = y or x[1]:nDimension()
-         local ln=#x
-         local out = {}
-         local currentIndex = 1
-         for i=1,ln do
-            local thisSize = x[i]:size(dim)
-            out[i] = torch.narrow(g,dim,currentIndex,thisSize)
-            currentIndex = currentIndex + thisSize
-         end
-         return out
+         return util.catTable(g, x, y)
       end
    end,
    function(g,ans,x,y,dim)
-      dim = dim or x:nDimension()
+      dim = dim or torch.nDimension(x)
       return torch.narrow(g, dim, torch.size(x, dim) + 1, torch.size(y, dim))
    end
 }
@@ -268,7 +258,7 @@ overload.module("torch", torch, function(module)
    })
    module.gradient("expandAs", {
       function(g, ans, x,template)
-         local sizes = x:size():totable()
+         local sizes = torch.size(x):totable()
          local out = g
          for dim,size in pairs(sizes) do
             if size == 1 then
@@ -288,7 +278,7 @@ overload.module("torch", torch, function(module)
    })
    module.gradient("viewAs", {
       function(g, ans, x,template)
-         return torch.copy(torch.viewAs(g,x))
+         return torch.clone(torch.viewAs(g,x))
       end,
       function(g, ans, x,template)
          return nil -- g.new(template:size()):zero()
@@ -314,12 +304,7 @@ overload.module("torch", torch, function(module)
    })
    module.gradient("index", {
       function(g, ans, x,dim,index)
-         error("todo, make functional, or move to a util method")
-         local out = util.zerosLike(g, x)
-         for i=1,index:size(1) do
-            torch.narrow(out,dim,index[i],1):add(torch.narrow(g,dim,i,1))
-         end
-         return out
+         return util.indexAdd(g, x, dim, index)
       end
    })
    module.gradient("narrow", {
@@ -385,7 +370,12 @@ overload.module("torch", torch, function(module)
          return out
       end
    })
-   module.dynamic("ne",  "ger", "new", "fill", "zeros", "zero", "transpose", "cosh", "sign")
+   module.gradient("transpose", {
+      function(g, ans, x)
+         return g
+      end
+   })
+   module.dynamic("ne",  "ger", "new", "fill", "zeros", "zero", "cosh", "sign", "repeatTensor")
    module.static("size", "isTensor", "nDimension", "nElement", "isSameSizeAs")
 end)
 
@@ -396,7 +386,7 @@ overload.module("Value", Value, function(module)
 end)
 
 overload.module("util", util, function(module)
-   module.dynamic("setNotEqual", "fillSameSizeAs", "zerosLike", "narrowCopy", "selectCopy", "selectSliceCopy", "narrowSliceCopy", "makeContiguous")
+   module.dynamic("setNotEqual", "fillSameSizeAs", "zerosLike", "narrowCopy", "selectCopy", "selectSliceCopy", "narrowSliceCopy", "makeContiguous", "indexAdd", "catTable")
 end)
 
 

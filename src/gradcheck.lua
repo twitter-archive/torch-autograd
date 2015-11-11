@@ -20,22 +20,19 @@ local function findGrad(ref, x, dst)
 end
 
 -- Compute grads with bprop:
-local function jacobianFromAutograd(func, input, var)
-   -- Eval to get output size
-   local output = func(input)
-
+local function jacobianFromAutograd(func, inputs, var)
    -- Autograd:
-   local grads = autograd(func)(input)
+   local grads = autograd(func)(unpack(inputs))
 
    -- Find grad:
-   local g = findGrad(input, var, grads)
+   local g = findGrad(inputs[1], var, grads)
 
    -- Return grads:
    return g:contiguous():view(-1):clone()
 end
 
 -- Compute grads from finite differences
-local function jacobianFromFiniteDifferences(func, input, var)
+local function jacobianFromFiniteDifferences(func, inputs, var)
    -- Flat view:
    local view = var:view(-1)
 
@@ -49,49 +46,49 @@ local function jacobianFromFiniteDifferences(func, input, var)
 
       -- Perturbate:
       view[i] = val - perturbation/2
-      local pred1 = func(input)
+      local pred1 = func(unpack(inputs))
       view[i] = val + perturbation/2
-      local pred2 = func(input)
+      local pred2 = func(unpack(inputs))
       view[i] = val
 
       -- Finite diff:
       grads[i] = (pred2-pred1) / perturbation
    end
-
    -- Return grads:
    return grads
 end
 
--- Test grads:
-local function gradcheck(func, input, var)
-   if var then
-      -- Random input:
-      var:uniform(-1,1)
+local function gradcheckvar(func, inputs, var)
+   -- Random input:
+   var:uniform(-1,1)
 
-      -- Estimate grads with fprop:
-      local jacobian1 = jacobianFromFiniteDifferences(func, input, var)
+   -- Estimate grads with fprop:
+   local jacobian1 = jacobianFromFiniteDifferences(func, inputs, var)
 
-      -- Coded grads:
-      local jacobian2 = jacobianFromAutograd(func, input, var)
+   -- Coded grads:
+   local jacobian2 = jacobianFromAutograd(func, inputs, var)
 
-      -- Error:
-      local err = (jacobian1 - jacobian2):abs():max()
+   -- Error:
+   local err = (jacobian1 - jacobian2):abs():max()
 
-      -- Threhold?
-      local pass = err < threshold
-      if not pass then
-         print('error = ' .. err)
-      end
-      return pass
-   else
-      -- get all vars:
-      local vars = __.flatten(input)
-      local ok = true
-      for i,var in ipairs(vars) do
-         ok = ok and gradcheck(func, input, var)
-      end
-      return ok
+   -- Threhold?
+   local pass = err < threshold
+   if not pass then
+      print('error = ' .. err)
    end
+   return pass
+end
+
+-- Test grads:
+local function gradcheck(func, ...)
+   local args = {...}
+   -- get all vars:
+   local vars = __.flatten(args[1])
+   local ok = true
+   for i,var in ipairs(vars) do
+      ok = ok and gradcheckvar(func, args, var)
+   end
+   return ok
 end
 
 -- Return package

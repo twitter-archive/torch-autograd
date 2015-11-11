@@ -13,7 +13,7 @@ torch.narrow = function(A, dim, index, size)
 end
 
 torch.clone = function(A)
-   local B = newTensor(A, A:size())
+   local B = A.new(A:size())
    return B:copy(A)
 end
 

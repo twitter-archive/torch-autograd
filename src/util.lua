@@ -85,6 +85,34 @@ function util.narrowSliceCopy(g, x, dim, index, size)
    return out
 end
 
+function util.narrowSliceCopy(g, x, dim, index, size)
+   local out = g.new(x:size()):zero()
+   local slice = out:narrow(dim,index,size)
+   slice:copy(g)
+   return out
+end
+
+function util.indexAdd(g, x, dim, index)
+   local out = util.zerosLike(g, x)
+   for i=1,torch.size(index, 1) do
+      torch.narrow(out,dim,index[i],1):add(torch.narrow(g,dim,i,1))
+   end
+   return out
+end
+
+function util.catTable(g, x, y)
+   dim = y or torch.nDimension(x[1])
+   local ln=#x
+   local out = {}
+   local currentIndex = 1
+   for i=1,ln do
+      local thisSize = torch.size(x[i], dim)
+      out[i] = torch.narrow(g,dim,currentIndex,thisSize)
+      currentIndex = currentIndex + thisSize
+   end
+   return out
+end
+
 function util.makeContiguous(g)
    if not g:isContiguous() then
       g = g:contiguous()

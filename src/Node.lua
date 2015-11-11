@@ -20,6 +20,13 @@ function Node:init(forwardFn, gradientFn, inputs)
 		if Value.isValue(input) then
 			self.inputs[i] = input
 		else
+			if torch.isTensor(input) then
+				if torch.nDimension(input) > 1 then
+					print(inputs)
+					print(self.forwardFn.name)
+					error("constant tensor with more than one dimension")
+				end
+			end
 			self.inputs[i] = Value.from(input, Source.constant(input))
 		end
 	end
@@ -64,7 +71,9 @@ function Node:evaluateForward()
 end
 
 function Node:evaluateBackward()
-	for o = 1, #self.outputs do
+	-- Only eval one gradient for now?
+	local numGrads = 1 --#self.outputs
+	for o = 1, numGrads do
 		local output = self.outputs[o]
 		for i = 1, #self.inputs do
 			local input = self.inputs[i]

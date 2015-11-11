@@ -118,11 +118,12 @@ local function letterForType(val)
 end
 
 local applyDepth = 0
+local nodeDisabled = true
 
 local function nodeCompute(fn, gradFn, capture, ...)
    local inputs = {...}
    applyDepth = applyDepth + 1
-   if applyDepth == 1 and capture then
+   if not nodeDisabled and applyDepth == 1 and capture then
       local n = Node.new(fn, gradFn, inputs)
       local values = {n:evaluateForward()}
       applyDepth = applyDepth - 1
@@ -253,7 +254,22 @@ local function removeIdentityOperators(execOrder)
    end
 end
 
-local function generateCode(fn, args, argnum)
+local function pruneOutputs(execOrder, outputNodes)
+   for i = 1, #execOrder do
+      local node = execOrder[i]
+      if outputNodes[node] == nil then
+         for k = #node.outputs, 2, -1 do
+            if #node.outputTargets[k] == 0 then
+               table.remove(node.outputs, k)
+            else
+               break
+            end
+         end
+      end
+   end
+end
+
+local function generateCode(fn, args, argnum, skipPred)
    local values = { }
    local tensorDims = { }
    for i = 1, #args do
@@ -261,6 +277,7 @@ local function generateCode(fn, args, argnum)
    end
 
    overload.install(nodeCompute)
+   nodeDisabled = false
 
    -- Call user forward function
    local answers = {fn(unpack(values))}
@@ -277,6 +294,7 @@ local function generateCode(fn, args, argnum)
       node:evaluateBackward()
    end
 
+   nodeDisabled = true
    overload.uninstall()
 
    -- Now we have the full graph, forward and backward, determine final traversal order.
@@ -286,13 +304,21 @@ local function generateCode(fn, args, argnum)
    local outputNodes = { }
 
    findGradients(values[argnum], grads)
+
    for i = 1, #grads do
       walkExecutionOrder(symbols, grads[i].grad.source:getRoot().node, seen, execOrder)
       outputNodes[grads[i].grad.source:getRoot().node] = true
    end
 
+   if not skipPred then
+      walkExecutionOrder(symbols, answers[1].source:getRoot().node, seen, execOrder)
+   end
+
+   outputNodes[answers[1].source:getRoot().node] = true
+
    removeIdentityOperators(execOrder)
    convertOperators(execOrder)
+   pruneOutputs(execOrder, outputNodes)
 
    -- Re-evaluate exec order after optimizations.
    seen = { }
@@ -301,11 +327,16 @@ local function generateCode(fn, args, argnum)
       walkExecutionOrder(symbols, grads[i].grad.source:getRoot().node, seen, execOrder)
    end
 
+   if not skipPred then
+      walkExecutionOrder(symbols, answers[1].source:getRoot().node, seen, execOrder)
+   end
+
    -- Assign symbols to params, inputs, outputs.
    local symbols = { }
    local refCount = { }
    local functionRemap = { }
    local defined = { }
+   local constants = { }
 
    for i = 1, #values do
       symbols[values[i].source] = "p" .. i
@@ -323,12 +354,15 @@ local function generateCode(fn, args, argnum)
       else
          for k = 1, #node.outputs do
             local output = node.outputs[k]
-            if localTable then
-               error('todo')
-               symbols[output.source] = ""
-            else
-               symbols[node.outputs[k].source] = letterForType(node.outputs[k]) .. i
-            end
+            symbols[node.outputs[k].source] = letterForType(node.outputs[k]) .. i .. "_" .. k
+         end
+      end
+      for k = 1, #node.inputs do
+         local input = node.inputs[k]
+         local source = input.source:getRoot()
+         if source.type == Source.CONSTANT and symbols[source] == nil and torch.isTensor(source.val) then
+            constants[#constants + 1] = source
+            symbols[source] = "c" .. #constants
          end
       end
       --[[
@@ -410,7 +444,10 @@ local function generateCode(fn, args, argnum)
       out.write("local ", v, " = ", k)
       out.write("\n")
    end
-
+   for i = 1, #constants do
+      out.write("local ", constants[i]:symbolPath(symbols), " = ", constants[i]:symbolPath({}))
+      out.write("\n")
+   end
    out.write("local locals = { }")
    out.write("\n")
    out.write("for i = 1, ", #execOrder, " do locals[i] = 0 end")
@@ -466,28 +503,38 @@ local function generateCode(fn, args, argnum)
       end
    end
    out.write("    ")
-   local retTable = { }
-   for i = 1, #grads do
-      local valTable = retTable
-      local stack = grads[i].param.source:getParentsArray()
-      local gradSymbol = grads[i].grad.source:symbolPath(symbols)
-      for k = 1, #stack do
-         local ss = stack[k]
-         if ss.type == Source.TABLE then
-            if valTable[ss.key] == nil then
-               if stack[k + 1] == nil then
-                  valTable[ss.key] = gradSymbol
-               else
-                  local nextTable = { }
-                  valTable[ss.key] = nextTable
+   out.write("return ")
+   if #grads == 1 and grads[1].grad.type == Value.TABLE then
+      -- This doesn't feel quite right, should be possible to unify this with the other path.
+      out.write(grads[1].grad.source:symbolPath(symbols))
+   elseif #grads == 1 and grads[1].grad.type == Value.TENSOR and grads[1].param.source.type == Source.PARAM then
+      out.write(grads[1].grad.source:symbolPath(symbols))
+   else
+      local retTable = { }
+      for i = 1, #grads do
+         local valTable = retTable
+         local stack = grads[i].param.source:getParentsArray()
+         local gradSymbol = grads[i].grad.source:symbolPath(symbols)
+         for k = 1, #stack do
+            local ss = stack[k]
+            if ss.type == Source.TABLE then
+               if valTable[ss.key] == nil then
+                  if stack[k + 1] == nil then
+                     valTable[ss.key] = gradSymbol
+                  else
+                     local nextTable = { }
+                     valTable[ss.key] = nextTable
+                  end
                end
+               valTable = valTable[ss.key]
             end
-            valTable = valTable[ss.key]
          end
       end
+      writeLiteralTable(retTable, out, 2)
    end
-   out.write("return ")
-   writeLiteralTable(retTable, out, 2)
+   if not skipPred then
+      out.write(", ", answers[1].source:symbolPath(symbols))
+   end
    out.write("\n")
    out.write("end")
    out.write("\n")
@@ -518,8 +565,8 @@ local function grad(fn, argnum)
       local signature = table.concat(tensorDims, "-")
       if generatedFunctions[signature] == nil then
          local code, outerArgs = generateCode(fn, args, argnum)
-        --print(code)
-        --print("generated code for param signature " .. signature)
+         --print(code)
+         --print("generated code for param signature " .. signature)
          generatedFunctions[signature] = loadstring(code)()(unpack(outerArgs))
       end
       return generatedFunctions[signature](unpack(args))

@@ -34,9 +34,18 @@ function Source:symbolPath(rootSymbols)
 			return self.parent:symbolPath(rootSymbols) .. "." .. self.key
 		end
 	elseif self.type == Source.CONSTANT then
-		if type(self.val) == "userdata" and self.val.totable then
-			local tt = self.val:totable()
-			return table.concat(tt, ", ")
+		if type(self.val) == "userdata" and self.val.totable ~= nil then
+			if torch.isTensor(self.val) then
+				if rootSymbols[self] then
+					return rootSymbols[self]
+				else
+					local tt = self.val:totable()
+					return self.val:type() .. "({" .. table.concat(tt, ", ") .. "})"
+				end
+			else
+				local tt = self.val:totable()
+				return table.concat(tt, ", ")
+			end
 		else
 			return tostring(self.val)
 		end
@@ -44,6 +53,9 @@ function Source:symbolPath(rootSymbols)
 		-- TODO TENSOR
 		return tostring(self.val)
 	else
+		if rootSymbols[self] == nil then
+			error("unknown symbol for node")
+		end
 		return rootSymbols[self]
 	end
 end
