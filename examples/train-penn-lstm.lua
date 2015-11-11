@@ -29,6 +29,7 @@ local d = require 'autograd'
 local util = require 'autograd.util'
 local model = require 'autograd.model'
 local _ = require 'moses'
+local tablex = require('pl.tablex')
 
 -- Seed
 torch.manualSeed(1)
@@ -162,6 +163,8 @@ local lr = opt.learningRate
 local reportEvery = opt.reportEvery
 local valPerplexity = math.huge
 
+local df =  d(f)
+
 for epoch = 1,opt.nEpochs do
    -- Train:
    print('\nTraining Epoch #'..epoch)
@@ -177,7 +180,7 @@ for epoch = 1,opt.nEpochs do
       local y = trainData:narrow(2,i+1,opt.bpropLength):contiguous()
 
       -- Grads:
-      grads,loss,lstmState = d(f)(params, x, y, lstmState, opt.dropout)
+      grads,loss,lstmState = df(params, x, y, lstmState, opt.dropout)
 
       -- Cap gradient norms:
       local norm = 0
@@ -190,7 +193,8 @@ for epoch = 1,opt.nEpochs do
             grad:mul( opt.maxGradNorm / norm )
          end
       end
-
+      params = tablex.copy(params)
+      grads = tablex.copy(grads)
       -- Update params:
       for i,param in ipairs(_.flatten(params)) do
          local g = _.flatten(grads)[i]
@@ -207,7 +211,7 @@ for epoch = 1,opt.nEpochs do
       end
 
       -- TODO: get rid of this once autograd allocates less
-      collectgarbage()
+      --collectgarbage()
    end
 
    -- Validate:
