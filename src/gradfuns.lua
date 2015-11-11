@@ -374,7 +374,7 @@ overload.module("torch", torch, function(module)
    })
    module.gradient("transpose", {
       function(g, ans, x)
-         return g:transpose()
+         return torch.transpose(g)
       end
    })
    module.gradient("long", {

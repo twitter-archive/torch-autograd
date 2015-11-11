@@ -259,22 +259,24 @@ local function replaceNode(nodeValue, withNodeValue)
    end
 end
 
-local function removeIdentityOperators(execOrder)
+local function removeIdentityOperators(execOrder, outputNodes)
    for i = 1, #execOrder do
       local node = execOrder[i]
-      local op = node.forwardFn.operator
-      if node.forwardFn.operator ~= nil then
-         if op == "mul" then
-            if node.inputs[1].source.type == Source.CONSTANT and node.inputs[1]:get() == 1 then
-               replaceNode(node.outputs[1], node.inputs[2])
-            elseif node.inputs[2].source.type == Source.CONSTANT and node.inputs[2]:get() == 1 then
-               replaceNode(node.outputs[1], node.inputs[1])
-            end
-         elseif op == "add" or op == "sub" then
-            if node.inputs[1].source.type == Source.CONSTANT and node.inputs[1]:get() == 0 then
-               replaceNode(node.outputs[1], node.inputs[2])
-            elseif node.inputs[2].source.type == Source.CONSTANT and node.inputs[2]:get() == 0 then
-               replaceNode(node.outputs[1], node.inputs[1])
+      if outputNodes[node] == nil then
+         local op = node.forwardFn.operator
+         if node.forwardFn.operator ~= nil then
+            if op == "mul" then
+               if node.inputs[1].source.type == Source.CONSTANT and node.inputs[1]:get() == 1 then
+                  replaceNode(node.outputs[1], node.inputs[2])
+               elseif node.inputs[2].source.type == Source.CONSTANT and node.inputs[2]:get() == 1 then
+                  replaceNode(node.outputs[1], node.inputs[1])
+               end
+            elseif op == "add" or op == "sub" then
+               if node.inputs[1].source.type == Source.CONSTANT and node.inputs[1]:get() == 0 then
+                  replaceNode(node.outputs[1], node.inputs[2])
+               elseif node.inputs[2].source.type == Source.CONSTANT and node.inputs[2]:get() == 0 then
+                  replaceNode(node.outputs[1], node.inputs[1])
+               end
             end
          end
       end
@@ -360,7 +362,7 @@ local function generateCode(fn, args, argnum, skipPred)
 
    walkTableRecursive(answers, execOrder, seen, outputNodes)
 
-  removeIdentityOperators(execOrder)
+  removeIdentityOperators(execOrder, outputNodes)
   convertOperators(execOrder)
   changeToReuseFunctions(execOrder)
   pruneOutputs(execOrder, outputNodes)
@@ -589,8 +591,8 @@ local function grad(fn, argnum)
       local signature = table.concat(tensorDims, "-")
       if generatedFunctions[signature] == nil then
          local code, outerArgs = generateCode(fn, args, argnum)
-       -- print(code)
-        -- print("generated code for param signature " .. signature)
+         --print(code)
+         --print("generated code for param signature " .. signature)
          local outer = loadstring(code)
          if outer == nil then
             error("failed to parse generated code")

@@ -48,6 +48,14 @@ function Value.isValue(v)
 	return getmetatable(v) == Value
 end
 
+function Value.len(v)
+	if Value.isValue(v) then
+		return #v.raw
+	else
+		return #v
+	end
+end
+
 function Value:get()
 	return self.raw
 end
@@ -66,6 +74,10 @@ function Value:__index(i)
 		end
 	end
 	return rawget(Value, i)
+end
+
+function Value:__len()
+	return #self.raw
 end
 
 function Value:flatten()

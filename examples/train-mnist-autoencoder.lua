@@ -5,6 +5,7 @@
 local grad = require 'autograd'
 local lossFuns = require 'autograd.loss'
 local util = require 'autograd.util'
+local Value = require 'autograd.Value'
 local gradcheck = require 'autograd.gradcheck'
 local optim = require 'optim'
 
@@ -19,13 +20,13 @@ local predict,f,params
 -- Define our neural net
 function predict(params, input)
    -- Encoder
-   local h1 = util.sigmoid(input * params.W[1] + torch.expand(params.B[1], input:size(1), params.B[1]:size(2)))
-   local h2 = util.sigmoid(h1 * params.W[2] + torch.expand(params.B[2], input:size(1), params.B[2]:size(2)))
-   local h3 = util.sigmoid(h2 * params.W[3] + torch.expand(params.B[3], input:size(1), params.B[3]:size(2)))
+   local h1 = util.sigmoid(input * params.W[1] + torch.expand(params.B[1], torch.size(input, 1), torch.size(params.B[1], 2)))
+   local h2 = util.sigmoid(h1 * params.W[2] + torch.expand(params.B[2], torch.size(input, 1), torch.size(params.B[2], 2)))
+   local h3 = util.sigmoid(h2 * params.W[3] + torch.expand(params.B[3], torch.size(input, 1), torch.size(params.B[3], 2)))
    -- Decoder
-   local h4 = util.sigmoid(h3 * torch.t(params.W[3]) + torch.expand(params.B[4], input:size(1), params.B[4]:size(2)))
-   local h5 = util.sigmoid(h4 * torch.t(params.W[2]) + torch.expand(params.B[5], input:size(1), params.B[5]:size(2)))
-   local out = util.sigmoid(h5 * torch.t(params.W[1]) + torch.expand(params.B[6], input:size(1), params.B[6]:size(2)))
+   local h4 = util.sigmoid(h3 * torch.transpose(params.W[3]) + torch.expand(params.B[4], torch.size(input, 1), torch.size(params.B[4], 2)))
+   local h5 = util.sigmoid(h4 * torch.transpose(params.W[2]) + torch.expand(params.B[5], torch.size(input, 1), torch.size(params.B[5], 2)))
+   local out = util.sigmoid(h5 * torch.transpose(params.W[1]) + torch.expand(params.B[6], torch.size(input, 1), torch.size(params.B[6], 2)))
 
    return out
 end
@@ -34,9 +35,9 @@ end
 function f(params, input, l2Lambda)
    -- Reconstruction loss
    local prediction = predict(params, input)
-   local loss = lossFuns.logBCELoss(prediction, input, 1e-6) / input:size(1)
+   local loss = lossFuns.logBCELoss(prediction, input, 1e-6) / torch.size(input, 1)
    -- L2 penalty on the weights
-   for i=1,#params.W do
+   for i=1,Value.len(params.W) do
       loss = loss + l2Lambda * torch.sum(torch.pow(params.W[i],2))
    end
 
