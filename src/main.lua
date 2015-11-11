@@ -184,7 +184,7 @@ local function findGradients(val, grads)
    end
 end
 
-local function writeLiteralTable(wtable, out, depth)
+local function writeLiteralTable(wtable, out, symbols, depth)
    depth = depth or 1
    out.write("{", "\n")
    for k, v in pairs(wtable) do
@@ -195,8 +195,10 @@ local function writeLiteralTable(wtable, out, depth)
          out.write(tostring(k))
       end
       out.write(" = ")
-      if type(v) == 'table' then
-         writeLiteralTable(v, out, depth + 1)
+      if Value.isValue(v) then
+         out.write(v.source:symbolPath(symbols))
+      elseif type(v) == 'table' then
+         writeLiteralTable(v, out, symbols, depth + 1)
       else
          out.write(tostring(v))
       end
@@ -304,6 +306,17 @@ local function pruneOutputs(execOrder, outputNodes)
    end
 end
 
+local function walkTableRecursive(table, execOrder, seen, outputNodes)
+   for k, answer in pairs(table) do
+      if Value.isValue(answer) then
+         outputNodes[answer.source:getRoot().node] = true
+         walkExecutionOrder(symbols, answer.source:getRoot().node, seen, execOrder)
+      elseif type(answer) == "table" then
+         walkTableRecursive(answer, execOrder, seen, outputNodes)
+      end
+   end
+end
+
 local function generateCode(fn, args, argnum, skipPred)
    local values = { }
    local tensorDims = { }
@@ -345,11 +358,7 @@ local function generateCode(fn, args, argnum, skipPred)
       outputNodes[grads[i].grad.source:getRoot().node] = true
    end
 
-   for i = 1, #answers do
-      outputNodes[answers[i].source:getRoot().node] = true
-      walkExecutionOrder(symbols, answers[i].source:getRoot().node, seen, execOrder)
-   end
-
+   walkTableRecursive(answers, execOrder, seen, outputNodes)
 
   removeIdentityOperators(execOrder)
   convertOperators(execOrder)
@@ -363,9 +372,7 @@ local function generateCode(fn, args, argnum, skipPred)
       walkExecutionOrder(symbols, grads[i].grad.source:getRoot().node, seen, execOrder)
    end
 
-   for i = 1, #answers do
-      walkExecutionOrder(symbols, answers[i].source:getRoot().node, seen, execOrder)
-   end
+   walkTableRecursive(answers, execOrder, seen, outputNodes)
 
    -- Assign symbols to params, inputs, outputs.
    local symbols = { }
@@ -541,10 +548,16 @@ local function generateCode(fn, args, argnum, skipPred)
             end
          end
       end
-      writeLiteralTable(retTable, out, 2)
+      writeLiteralTable(retTable, out, symbols, 2)
    end
    for i = 1, #answers do
-      out.write(", ", answers[i].source:symbolPath(symbols))
+      local answer = answers[i]
+      if Value.isValue(answer) then
+         out.write(", ", answers[i].source:symbolPath(symbols))
+      elseif type(answer) == "table" then
+         out.write(", ")
+         writeLiteralTable(answer, out, symbols, 2)
+      end
    end
    out.write("\n")
    out.write("end")

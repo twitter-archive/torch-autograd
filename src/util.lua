@@ -17,6 +17,14 @@ function util.oneHot(labels, n)
    return out
 end
 
+function unwrapTensorValue(v)
+   if type(v) == "table" then
+      return v.raw
+   else
+      return v
+   end
+end
+
 -- Helpers:
 function util.logSumExp(array)
    local max = torch.max(array)
@@ -33,9 +41,9 @@ function util.sigmoid(array,p)
 end
 
 function util.lookup(tble, indexes)
-   local indexSize = indexes:size():totable()
-   local rows = torch.index(tble, 1, indexes:view(-1):long())
-   table.insert(indexSize, rows:size(2))
+   local indexSize = torch.size(indexes):totable()
+   local rows = torch.index(tble, 1, torch.long(torch.view(indexes, -1)))
+   table.insert(indexSize, torch.size(rows, 2))
    return torch.view(rows, unpack(indexSize))
 end
 

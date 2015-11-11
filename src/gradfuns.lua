@@ -374,7 +374,12 @@ overload.module("torch", torch, function(module)
    })
    module.gradient("transpose", {
       function(g, ans, x)
-         return g
+         return g:transpose()
+      end
+   })
+   module.gradient("long", {
+      function(g, ans, x)
+         return torch.typeAs(g, x)
       end
    })
    module.dynamic("ne",  "ger", "new", "fill", "zeros", "zero", "cosh", "sign", "repeatTensor")
@@ -388,7 +393,7 @@ overload.module("Value", Value, function(module)
 end)
 
 overload.module("util", util, function(module)
-   module.dynamic("lookup", "setNotEqual", "fillSameSizeAs", "zerosLike", "narrowCopy", "selectCopy", "selectSliceCopy", "narrowSliceCopy", "makeContiguous", "indexAdd", "catTable")
+   module.dynamic("setNotEqual", "fillSameSizeAs", "zerosLike", "narrowCopy", "selectCopy", "selectSliceCopy", "narrowSliceCopy", "makeContiguous", "indexAdd", "catTable")
 end)
 
 

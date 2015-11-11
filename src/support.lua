@@ -46,16 +46,34 @@ torch.transpose = function(A)
    return A:t()
 end
 
+torch.long = function(A)
+   return A:long()
+end
+
 torch.narrow = function(A, dim, index, size)
    return A:narrow(dim, index, size)
 end
 
+torch.typeAs = function(A, B)
+   return A:type(B:type())
+end
+
 -- Allow number * tensor style operations
+
+function unwrapNumberValue(v)
+   if type(v) == 'table' then
+      return v.raw
+   else
+      return v
+   end
+end
 
 local numberMetatable = {
    __add = function(a,b)
       if type(a) == "number" and torch.isTensor(b) then
          return b + a
+      elseif type(a) == "number" and type(b) == "table" then
+         return a + unwrapNumberValue(b)
       else
          return a + b
       end
@@ -63,6 +81,8 @@ local numberMetatable = {
    __sub = function(a,b)
       if type(a) == "number" and torch.isTensor(b) then
          return -b + a
+      elseif type(a) == "number" and type(b) == "table" then
+         return a - unwrapNumberValue(b)
       else
          return a - b
       end
@@ -70,6 +90,8 @@ local numberMetatable = {
    __mul = function(a,b)
       if type(a) == "number" and torch.isTensor(b) then
          return b * a
+      elseif type(a) == "number" and type(b) == "table" then
+         return a * unwrapNumberValue(b)
       else
          return a * b
       end
