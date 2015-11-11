@@ -54,8 +54,19 @@ function util.setNotEqual(a, b, c, v)
    return copy
 end
 
+function util.setNotEqualInPlace(o, a, b, c, v)
+   local mask = torch.ne(a, b)
+   local copy = o:copy(v)
+   copy[mask] = 0
+   return copy
+end
+
 function util.fillSameSizeAs(a, b)
    return a.new(a:size()):fill(b)
+end
+
+function util.fillSameSizeAsInPlace(o, a, b)
+   return o:fill(b)
 end
 
 function util.zerosLike(a, b)
@@ -63,16 +74,35 @@ function util.zerosLike(a, b)
    return a.new(b:size()):zero()
 end
 
+function util.zerosLikeInPlace(o, a, b)
+   return o:zero()
+end
+
 function util.narrowCopy(a, dim, index, size)
    return a:narrow(dim, index, size):clone()
 end
 
-function util.selectCopy(a, dim, index)
+function util.narrowCopyInPlace(a, dim, index, size)
+   return o:copy(a:narrow(dim, index, size))
+end
+
+function util.selectCopy(o, a, dim, index)
    return a:select(dim, index):clone()
+end
+
+function util.selectCopyInPlace(o, a, dim, index)
+   return o:copy(a:select(dim, index))
 end
 
 function util.selectSliceCopy(g, x, dim, index)
    local out = g.new(x:size()):zero()
+   local slice = out:select(dim,index)
+   slice:copy(g)
+   return out
+end
+
+function util.selectSliceCopyInPlace(o, g, x, dim, index)
+   local out = o:zero()
    local slice = out:select(dim,index)
    slice:copy(g)
    return out
@@ -85,8 +115,8 @@ function util.narrowSliceCopy(g, x, dim, index, size)
    return out
 end
 
-function util.narrowSliceCopy(g, x, dim, index, size)
-   local out = g.new(x:size()):zero()
+function util.narrowSliceCopyInPlace(o, g, x, dim, index, size)
+   local out = o:zero()
    local slice = out:narrow(dim,index,size)
    slice:copy(g)
    return out
@@ -94,6 +124,14 @@ end
 
 function util.indexAdd(g, x, dim, index)
    local out = util.zerosLike(g, x)
+   for i=1,torch.size(index, 1) do
+      torch.narrow(out,dim,index[i],1):add(torch.narrow(g,dim,i,1))
+   end
+   return out
+end
+
+function util.indexAddInPlace(o, g, x, dim, index)
+   local out = o:zero()
    for i=1,torch.size(index, 1) do
       torch.narrow(out,dim,index[i],1):add(torch.narrow(g,dim,i,1))
    end

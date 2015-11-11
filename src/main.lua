@@ -4,23 +4,43 @@ local Node = require 'autograd.Node'
 local Value = require 'autograd.Value'
 local Source = require 'autograd.Source'
 
-local reusableFunctions = {
-   "torch.tanh",
-   "torch.cmul",
-   "torch.cdiv",
-   "torch.exp",
-   "torch.pow",
-   "torch.add",
-   "torch.mul",
-   "torch.neg",
-   "torch.mm",
-   "torch.mv",
+local reusableFunctionsMap = {
+   ["torch.tanh"] = true,
+   ["torch.cmul"] = true,
+   ["torch.cdiv"] = true,
+   ["torch.exp"]  = true,
+   ["torch.pow"]  = true,
+   ["torch.add"]  = true,
+   ["torch.mul"]  = true,
+   ["torch.neg"]  = true,
+   ["torch.ger"]  = true,
+   ["torch.mm"]   = true,
+   ["torch.mv"]   = true,
+   ["torch.cosh"] = true,
+   ["torch.expand"] = true,
+   ["torch.cat"] = true,
+   ["torch.log"] = true,
+   ["util.narrowSliceCopyInPlace"] = true,
+   ["util.selectSliceCopyInPlace"] = true,
+   ["util.fillSameSizeAsInPlace"] = true,
+   ["util.fillSameSizeAsInPlace"] = true,
+   ["util.zerosLikeInPlace"] = true,
+   ["util.setNotEqualInPlace"] = true,
+   ["util.narrowCopyInPlace"] = true,
+   ["util.selectCopyInPlace"] = true,
+   ["util.indexAdd"] = true,
 }
 
-local reusableFunctionsMap = { }
-for i = 1, #reusableFunctions do
-   reusableFunctionsMap[reusableFunctions[i]] = true
-end
+local reusableFunctionTransforms = {
+   ["util.narrowSliceCopy"] = "util.narrowSliceCopyInPlace",
+   ["util.selectSliceCopy"] = "util.selectSliceCopyInPlace",
+   ["util.fillSameSizeAs"] = "util.fillSameSizeAsInPlace",
+   ["util.zerosLike"] = "util.zerosLikeInPlace",
+   ["util.setNotEqual"] = "util.setNotEqualInPlace",
+   ["util.narrowCopy"] = "util.narrowCopyInPlace",
+   ["util.selectCopy"] = "util.selectCopyInPlace",
+   ["util.indexAdd"] = "util.indexAddInPlace",
+}
 
 local function stringBuilder()
    local strs = { }
@@ -61,7 +81,7 @@ local function walkExecutionOrder(symbols, node, seen, order)
 end
 
 local function canReuseOutput(node)
-   return reusableFunctionsMap[node.forwardFn.name] and #node.outputs == 1 and node.outputs[1].type == Value.TENSOR
+   return reusableFunctionsMap[node.forwardFn.name] ~= nil and #node.outputs == 1 and node.outputs[1].type == Value.TENSOR
 end
 
 local function canInline(node, outputNodes)
@@ -108,10 +128,11 @@ local function writeExpr(state, node, depth)
    elseif node.forwardFn.object ~= nil then
       out.write(state.objects[node.forwardFn.object].name, ".", node.forwardFn.method, "(", table.concat(inputSymbols, ", "), ")")
    else
+      local fnName = node.forwardFn.name
       if canReuseOutput(node) then
          table.insert(inputSymbols, 1, node.outputs[1].source:symbolPath(state.symbols))
       end
-      out.write(state.functionRemap[node.forwardFn.name], "(", table.concat(inputSymbols, ", "), ")")
+      out.write(state.functionRemap[fnName], "(", table.concat(inputSymbols, ", "), ")")
    end
    return out.finish()
 end
@@ -263,6 +284,16 @@ local function removeIdentityOperators(execOrder)
    end
 end
 
+local function changeToReuseFunctions(execOrder)
+   for i = 1, #execOrder do
+      local node = execOrder[i]
+      local tfn = reusableFunctionTransforms[node.forwardFn.name]
+      if tfn ~= nil and  #node.outputs == 1 and node.outputs[1].type == Value.TENSOR then
+         node.forwardFn.name = tfn
+      end
+   end
+end
+
 local function pruneOutputs(execOrder, outputNodes)
    for i = 1, #execOrder do
       local node = execOrder[i]
@@ -327,6 +358,7 @@ local function generateCode(fn, args, argnum, skipPred)
 
   removeIdentityOperators(execOrder)
   convertOperators(execOrder)
+  changeToReuseFunctions(execOrder)
   pruneOutputs(execOrder, outputNodes)
 
    -- Re-evaluate exec order after optimizations.
@@ -574,7 +606,7 @@ local function grad(fn, argnum)
       local signature = table.concat(tensorDims, "-")
       if generatedFunctions[signature] == nil then
          local code, outerArgs = generateCode(fn, args, argnum)
-        -- print(code)
+        --print(code)
         -- print("generated code for param signature " .. signature)
          local outer = loadstring(code)
          if outer == nil then
