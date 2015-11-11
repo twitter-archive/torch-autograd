@@ -42,9 +42,18 @@ local function walkExecutionOrder(symbols, node, seen, order)
       seen[node] = true
       for k = 1, #node.inputs do
          local input = node.inputs[k]
-         local root = input.source:getRoot()
-         if root.type == Source.COMPUTED then
-            walkExecutionOrder(symbols, root.node, seen, order)
+         if input.type == Value.TABLE then
+            for k, v in pairs(input:get()) do
+               local root = v.source:getRoot()
+               if root.type == Source.COMPUTED then
+                  walkExecutionOrder(symbols, root.node, seen, order)
+               end
+            end
+         else
+            local root = input.source:getRoot()
+            if root.type == Source.COMPUTED then
+               walkExecutionOrder(symbols, root.node, seen, order)
+            end
          end
       end
       table.insert(order, node)
@@ -316,9 +325,9 @@ local function generateCode(fn, args, argnum, skipPred)
 
    outputNodes[answers[1].source:getRoot().node] = true
 
-   removeIdentityOperators(execOrder)
-   convertOperators(execOrder)
-   pruneOutputs(execOrder, outputNodes)
+  removeIdentityOperators(execOrder)
+  convertOperators(execOrder)
+  pruneOutputs(execOrder, outputNodes)
 
    -- Re-evaluate exec order after optimizations.
    seen = { }
@@ -565,9 +574,13 @@ local function grad(fn, argnum)
       local signature = table.concat(tensorDims, "-")
       if generatedFunctions[signature] == nil then
          local code, outerArgs = generateCode(fn, args, argnum)
-         --print(code)
-         --print("generated code for param signature " .. signature)
-         generatedFunctions[signature] = loadstring(code)()(unpack(outerArgs))
+        -- print(code)
+        -- print("generated code for param signature " .. signature)
+         local outer = loadstring(code)
+         if outer == nil then
+            error("failed to parse generated code")
+         end
+         generatedFunctions[signature] = outer()(unpack(outerArgs))
       end
       return generatedFunctions[signature](unpack(args))
    end

@@ -174,15 +174,17 @@ operators.pow = {
 }
 
 overload.module("torch", torch, function(module)
-   local tensorTypes = {"FloatTensor", "DoubleTensor"}
+   local tensorTypes = {"FloatTensor", "DoubleTensor", "CudaTensor"}
    for i = 1, #tensorTypes do
       local tt = tensorTypes[i]
-      module.class(tt, function(class)
-         for k, v in pairs(operators) do
-            class.operator(k, v)
-         end
-         class.dynamic("new")
-      end)
+      if torch[tt] ~= nil then
+         module.class(tt, function(class)
+            for k, v in pairs(operators) do
+               class.operator(k, v)
+            end
+            class.dynamic("new", "cat")
+         end)
+      end
    end
    module.gradient("add", {
       function(g, ans, x, y) return unbroadcast(g,ans,x) end,
@@ -223,7 +225,7 @@ overload.module("torch", torch, function(module)
    module.gradient("tanh", {
       function(g, ans, x)
          local cx = torch.cosh(x)
-         local cxx = torch.cmul(x, x)
+         local cxx = torch.cmul(cx, cx)
          return elemwiseDiv(g, cxx)
       end
    })

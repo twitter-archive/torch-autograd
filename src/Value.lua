@@ -22,11 +22,15 @@ end
 
 function Value.from(v, source)
 	if Value.isValue(v) then
-		error("already a value type")
+		return v
 	elseif type(v) == "table" then
 		local vcopy = { }
 		for k,v in pairs(v) do
-			vcopy[k] = Value.from(v, Source.table(source, k))
+			if Value.isValue(v) then
+				vcopy[k] = v
+			else
+				vcopy[k] = Value.from(v, Source.table(source, k))
+			end
 		end
 		return Value.create(Value.TABLE, vcopy, source)
 	elseif torch.isTensor(v) then

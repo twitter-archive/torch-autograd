@@ -46,12 +46,27 @@ function Source:symbolPath(rootSymbols)
 				local tt = self.val:totable()
 				return table.concat(tt, ", ")
 			end
+		elseif type(self.val) == "table" then
+			local Value = require 'autograd.Value'
+			local elements = { }
+			for k, v in pairs(self.val) do
+				if Value.isValue(v) then
+					elements[#elements + 1] = v.source:symbolPath(rootSymbols)
+				else
+					elements[#elements + 1] = tostring(v)
+				end
+			end
+			return "{" .. table.concat(elements, ", ") .. "}"
 		else
 			return tostring(self.val)
 		end
 	elseif self.type == Source.GRADIENT then
 		-- TODO TENSOR
-		return tostring(self.val)
+		if self.tensorType ~= nil then
+			return "(" .. self.tensorType .. "(" .. table.concat(self.dims:totable(), ", ") .. "):fill(" .. self.val .. ")" .. ")"
+		else
+			return tostring(self.val)
+		end
 	else
 		if rootSymbols[self] == nil then
 			error("unknown symbol for node")
@@ -107,9 +122,10 @@ function Source.table(parent, key)
 	return s
 end
 
-function Source.gradient(val, dims)
+function Source.gradient(val, tensorType, dims)
 	local s = Source.new(Source.GRADIENT)
 	s.val = val
+	s.tensorType = tensorType
 	s.dims = dims
 	return s
 end

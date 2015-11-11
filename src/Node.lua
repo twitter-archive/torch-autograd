@@ -82,7 +82,8 @@ function Node:evaluateBackward()
 				if self.gradients[o] == nil then
 					if output.type == Value.TENSOR then
 						-- TODO CORRECT TENSOR TYPE
-						self.gradients[o] = Value.from(torch.FloatTensor(output:get():size()):zero(), Source.gradient(0, output:get():size()))
+						local tens = output:get()
+						self.gradients[o] = Value.from(torch[tens:type():gsub("torch%.", "")](tens:size()):zero(), Source.gradient(0, tens:type(), tens:size()))
 					elseif output.type == Value.NUMBER then
 						self.gradients[o] = Value.from(0.0, Source.gradient(0))
 					end
