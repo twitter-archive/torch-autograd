@@ -100,11 +100,6 @@ local function writeExpr(state, node, depth)
          local symbol = input.source:symbolPath(state.symbols)
          inputSymbols[k] = symbol
       end
-      --[[
-      if state.refCount[input.source] ~= nil then
-         state.refCount[input.source] = state.refCount[input.source] - 1
-      end
-      --]]
    end
    if node.forwardFn.operator ~= nil then
       local op = node.forwardFn.operator
@@ -374,7 +369,6 @@ local function generateCode(fn, args, argnum, skipPred)
 
    -- Assign symbols to params, inputs, outputs.
    local symbols = { }
-   local refCount = { }
    local functionRemap = { }
    local defined = { }
    local constants = { }
@@ -406,16 +400,6 @@ local function generateCode(fn, args, argnum, skipPred)
             symbols[source] = "c" .. #constants
          end
       end
-      --[[
-      if outputNodes[node] == nil then
-         for k = 1, #node.outputs do
-            local output = node.outputs[k]
-            if output.type == Value.TENSOR then
-               refCount[output.source] = #node.outputTargets[k]
-            end
-         end
-      end
-      --]]
    end
 
    -- Find all the nn objects we need to create or pass in.
@@ -463,7 +447,6 @@ local function generateCode(fn, args, argnum, skipPred)
    local state = {
       symbols = symbols,
       outputNodes = outputNodes,
-      refCount = refCount,
       functionRemap = functionRemap,
       objects = objects
    }
@@ -528,19 +511,6 @@ local function generateCode(fn, args, argnum, skipPred)
          end
          out.write(writeExpr(state, node))
          out.write("\n")
-         -- local toFree = { }
-         -- for k, v in pairs(refCount) do
-         --    if v == 0 then
-         --       toFree[#toFree + 1] = k
-         --    end
-         -- end
-         -- for k = 1, #toFree do
-         --    refCount[toFree[k]] = nil
-         --    out.write("    ")
-         --    out.write(symbols[toFree[k]])
-         --    out.write(":free()")
-         --    out.write("\n")
-         -- end
       end
    end
    out.write("    ")
