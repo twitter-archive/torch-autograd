@@ -345,11 +345,11 @@ local function generateCode(fn, args, argnum, skipPred)
       outputNodes[grads[i].grad.source:getRoot().node] = true
    end
 
-   if not skipPred then
-      walkExecutionOrder(symbols, answers[1].source:getRoot().node, seen, execOrder)
+   for i = 1, #answers do
+      outputNodes[answers[i].source:getRoot().node] = true
+      walkExecutionOrder(symbols, answers[i].source:getRoot().node, seen, execOrder)
    end
 
-   outputNodes[answers[1].source:getRoot().node] = true
 
   removeIdentityOperators(execOrder)
   convertOperators(execOrder)
@@ -363,8 +363,8 @@ local function generateCode(fn, args, argnum, skipPred)
       walkExecutionOrder(symbols, grads[i].grad.source:getRoot().node, seen, execOrder)
    end
 
-   if not skipPred then
-      walkExecutionOrder(symbols, answers[1].source:getRoot().node, seen, execOrder)
+   for i = 1, #answers do
+      walkExecutionOrder(symbols, answers[i].source:getRoot().node, seen, execOrder)
    end
 
    -- Assign symbols to params, inputs, outputs.
@@ -543,8 +543,8 @@ local function generateCode(fn, args, argnum, skipPred)
       end
       writeLiteralTable(retTable, out, 2)
    end
-   if not skipPred then
-      out.write(", ", answers[1].source:symbolPath(symbols))
+   for i = 1, #answers do
+      out.write(", ", answers[i].source:symbolPath(symbols))
    end
    out.write("\n")
    out.write("end")

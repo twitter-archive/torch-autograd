@@ -54,21 +54,21 @@ end
 
 local numberMetatable = {
    __add = function(a,b)
-      if type(a) == "number" and isTensor(b) then
+      if type(a) == "number" and torch.isTensor(b) then
          return b + a
       else
          return a + b
       end
    end,
    __sub = function(a,b)
-      if type(a) == "number" and isTensor(b) then
+      if type(a) == "number" and torch.isTensor(b) then
          return -b + a
       else
          return a - b
       end
    end,
    __mul = function(a,b)
-      if type(a) == "number" and isTensor(b) then
+      if type(a) == "number" and torch.isTensor(b) then
          return b * a
       else
          return a * b

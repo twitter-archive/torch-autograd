@@ -27,7 +27,6 @@ end
 -- Libs
 local d = require 'autograd'
 local util = require 'autograd.util'
-local getValue = require 'autograd.node'.getValue
 local model = require 'autograd.model'
 local _ = require 'moses'
 
@@ -82,8 +81,8 @@ local lossf = d.nn.ClassNLLCriterion()
 -- Complete trainable function:
 local f = function(params, x, y, prevState, dropout)
    -- N elements:
-   local batchSize = x:size(1)
-   local bpropLength = x:size(2)
+   local batchSize = torch.size(x, 1)
+   local bpropLength = torch.size(x, 2)
    local nElements = batchSize * bpropLength
 
    -- Select word vectors

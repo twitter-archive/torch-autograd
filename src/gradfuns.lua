@@ -388,7 +388,7 @@ overload.module("Value", Value, function(module)
 end)
 
 overload.module("util", util, function(module)
-   module.dynamic("setNotEqual", "fillSameSizeAs", "zerosLike", "narrowCopy", "selectCopy", "selectSliceCopy", "narrowSliceCopy", "makeContiguous", "indexAdd", "catTable")
+   module.dynamic("lookup", "setNotEqual", "fillSameSizeAs", "zerosLike", "narrowCopy", "selectCopy", "selectSliceCopy", "narrowSliceCopy", "makeContiguous", "indexAdd", "catTable")
 end)
 
 
