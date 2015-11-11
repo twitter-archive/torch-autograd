@@ -28,7 +28,7 @@ local reusableFunctionsMap = {
    ["util.setNotEqualInPlace"] = true,
    ["util.narrowCopyInPlace"] = true,
    ["util.selectCopyInPlace"] = true,
-   ["util.indexAdd"] = true,
+   ["util.indexAddInPlace"] = true,
 }
 
 local reusableFunctionTransforms = {
@@ -576,7 +576,7 @@ local function grad(fn, argnum)
       local signature = table.concat(tensorDims, "-")
       if generatedFunctions[signature] == nil then
          local code, outerArgs = generateCode(fn, args, argnum)
-        --print(code)
+       -- print(code)
         -- print("generated code for param signature " .. signature)
          local outer = loadstring(code)
          if outer == nil then
