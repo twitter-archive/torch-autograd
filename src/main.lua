@@ -316,10 +316,13 @@ local function walkOutputRoots(val, execOrder, seen, outputNodes)
    seen = seen or { }
    execOrder = execOrder or { }
    if Value.isValue(val) then
-      if outputNodes ~= nil then
-         outputNodes[val.source:getRoot().node] = true
+      local root = val.source:getRoot()
+      if root.type == Source.COMPUTED then
+         if outputNodes ~= nil then
+            outputNodes[val.source:getRoot().node] = true
+         end
+         walkNode(val.source:getRoot().node, execOrder, seen)
       end
-      walkNode(val.source:getRoot().node, execOrder, seen)
    elseif type(val) == "table" then
       for k, subVal in pairs(val) do
          walkOutputRoots(subVal, execOrder, seen, outputNodes)
@@ -365,6 +368,7 @@ local function createGraph(fn, args, opt)
    local withGradients = defaultBool(opt.withGradients, true)
    local values = { }
    local tensorDims = { }
+
    for i = 1, #args do
       values[i] = Value.from(args[i], Source.param(i, i == argnum))
    end
@@ -383,8 +387,7 @@ local function createGraph(fn, args, opt)
    if withGradients then
       -- Walk the execution order backwards, chaining derivatives.
       if answers[1].type == Value.TENSOR and opt.partialGrad then
-         local tens = answers[1]:get()
-         answers[1].source.node.gradients[1] = Value.from(torch[tens:type():gsub("torch%.", "")](tens:size()):zero(), Source.gradient(1, tens:type(), tens:size()))
+         answers[1].source.node.gradients[1] = args[#arg]
       elseif answers[1].type == Value.NUMBER then
          answers[1].source.node.gradients[1] = Value.from(1, Source.gradient(1))
       else
@@ -732,7 +735,7 @@ local function grad(fn, gradOpt)
             reuseLocals = rlocals
          }
          local code, outerArgs = generateCode(fn, args, opt)
-         --print(code)
+         print(code)
          --print("generated code for param signature " .. signature)
          local outer = loadstring(code)
          if outer == nil then

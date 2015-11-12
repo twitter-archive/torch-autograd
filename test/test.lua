@@ -18,11 +18,10 @@ local tests = {
       end
       local mse = function(input, target)
          local buffer = input-target
-         return torch.sum( torch.cmul(buffer, buffer) ) / (input:dim() == 2 and input:size(1)*input:size(2) or input:size(1))
+         return torch.sum( torch.cmul(buffer, buffer) ) / (torch.nDimension(input) == 2 and torch.size(input, 1) * torch.size(input, 2) or torch.size(input, 1))
       end
 
       local inputSize, outputSize = torch.random(10,100), torch.random(100,1000)
-
 
       local model = nn.Sequential()
       local linear1 = nn.Linear(inputSize, outputSize)
@@ -75,7 +74,7 @@ local tests = {
       tester:asserteq((model.modules[3].weight - autoModel.modules[2].weight):abs():max() < 1e-6, true, "gradient accumulation must be the same.")
       tester:asserteq((model.modules[3].bias - autoModel.modules[2].bias):abs():max() < 1e-6, true, "gradient accumulation must be the same.")
    end,
-   
+
    Select = function()
       local W = torch.Tensor(5,25):normal()
       local x = torch.Tensor(1,25):normal()

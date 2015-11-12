@@ -39,8 +39,8 @@ return function(moduleName)
    end
 
    function module:updateGradInput(input, gradOutput)
-      self.grads = self.b({input=input, weight=self.weight, bias=self.bias})
-      self.gradInput = self.grads.input--torch.cmul(self.grads.input, gradOutput)
+      self.grads = self.b({input=input, weight=self.weight, bias=self.bias}, gradOutput)
+      self.gradInput = self.grads.input
       return self.gradInput
    end
 
