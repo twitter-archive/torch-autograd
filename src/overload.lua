@@ -104,8 +104,8 @@ local function module(name, table, fn)
                local fn = overloadOp(classTable, opName, gradFn)
                cc.functions[#cc.functions + 1] = fn
             end,
-            gradient = function()
-               local fn = overload(classTable, fnName, gradFn, true)
+            gradient = function(fnName, gradFn)
+               local fn = overloadClass(classTable, className, fnName, gradFn, true)
                cc.functions[#cc.functions + 1] = fn
             end,
             dynamic = function(...)

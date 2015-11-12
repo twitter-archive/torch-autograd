@@ -82,7 +82,19 @@ function Source:differentiable()
 		return self.node:differentiable()
 	elseif self.type == Source.PARAM then
 		return self.gradient
+	elseif self.type == Source.CONSTANT then
+		if type(self.val) == "table" then
+			local Value = require 'autograd.Value'
+			for k, v in pairs(self.val) do
+				if Value.isValue(v) then
+					if v.source:differentiable() then
+						return true
+					end
+				end
+			end
+		end
 	end
+	return false
 end
 
 function Source:getRoot()

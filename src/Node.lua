@@ -57,6 +57,13 @@ function Node:evaluateForward()
 		local source = input.source
 		if source.type == Source.COMPUTED then
 			source.node:linkOutputNode(source.index, self, i)
+		elseif source.type == Source.CONSTANT and input.type == Value.TABLE then
+			-- Constant table assembled by the user.
+			for k, v in pairs(input:get()) do
+				if Value.isValue(v) then
+					source.node:linkOutputNode(source.index, self, i)
+				end
+			end
 		end
 		evalArgs[i] = self.inputs[i]:flatten()
 	end
@@ -81,24 +88,44 @@ function Node:evaluateBackward()
 			if source:differentiable() then
 				if self.gradients[o] == nil then
 					if output.type == Value.TENSOR then
-						-- TODO CORRECT TENSOR TYPE
 						local tens = output:get()
 						self.gradients[o] = Value.from(torch[tens:type():gsub("torch%.", "")](tens:size()):zero(), Source.gradient(0, tens:type(), tens:size()))
 					elseif output.type == Value.NUMBER then
 						self.gradients[o] = Value.from(0.0, Source.gradient(0))
 					end
 				end
-				local gradUpdate = (self.gradientFn[i])(self.gradients[o], output, unpack(self.inputs))
-				if gradUpdate then
-					local sourceIndex = source.index or 1
-					local gradSource = source.node or source
-					if gradSource.gradients == nil then
-						gradSource.gradients = { }
+				if input.type == Value.TABLE then
+					local gradUpdates = (self.gradientFn[i])(self.gradients[o], output, unpack(self.inputs))
+					if gradUpdates then
+						for k, v in pairs(input:get()) do
+							local gradUpdate = gradUpdates[k]
+							local subArg = v
+							local source = subArg.source
+							local sourceIndex = source.index or 1
+							local gradSource = source.node or source
+							if gradSource.gradients == nil then
+								gradSource.gradients = { }
+							end
+							if gradSource.gradients[sourceIndex] == nil or gradSource.gradients[sourceIndex] == 0 then
+								gradSource.gradients[sourceIndex] = gradUpdate
+							else
+								gradSource.gradients[sourceIndex] = gradSource.gradients[sourceIndex] + gradUpdate
+							end
+						end
 					end
-					if gradSource.gradients[sourceIndex] == nil or gradSource.gradients[sourceIndex] == 0 then
-						gradSource.gradients[sourceIndex] = gradUpdate
-					else
-						gradSource.gradients[sourceIndex] = gradSource.gradients[sourceIndex] + gradUpdate
+				else
+					local gradUpdate = (self.gradientFn[i])(self.gradients[o], output, unpack(self.inputs))
+					if gradUpdate then
+						local sourceIndex = source.index or 1
+						local gradSource = source.node or source
+						if gradSource.gradients == nil then
+							gradSource.gradients = { }
+						end
+						if gradSource.gradients[sourceIndex] == nil or gradSource.gradients[sourceIndex] == 0 then
+							gradSource.gradients[sourceIndex] = gradUpdate
+						else
+							gradSource.gradients[sourceIndex] = gradSource.gradients[sourceIndex] + gradUpdate
+						end
 					end
 				end
 			end

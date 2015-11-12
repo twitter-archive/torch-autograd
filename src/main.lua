@@ -57,7 +57,7 @@ local function stringBuilder()
    }
 end
 
-local function walkExecutionOrder(symbols, node, seen, order)
+local function walkExecutionOrder(node, seen, order)
    if seen[node] == nil then
       seen[node] = true
       for k = 1, #node.inputs do
@@ -66,13 +66,13 @@ local function walkExecutionOrder(symbols, node, seen, order)
             for k, v in pairs(input:get()) do
                local root = v.source:getRoot()
                if root.type == Source.COMPUTED then
-                  walkExecutionOrder(symbols, root.node, seen, order)
+                  walkExecutionOrder(root.node, seen, order)
                end
             end
          else
             local root = input.source:getRoot()
             if root.type == Source.COMPUTED then
-               walkExecutionOrder(symbols, root.node, seen, order)
+               walkExecutionOrder(root.node, seen, order)
             end
          end
       end
@@ -312,7 +312,7 @@ local function walkTableRecursive(table, execOrder, seen, outputNodes)
    for k, answer in pairs(table) do
       if Value.isValue(answer) then
          outputNodes[answer.source:getRoot().node] = true
-         walkExecutionOrder(symbols, answer.source:getRoot().node, seen, execOrder)
+         walkExecutionOrder(answer.source:getRoot().node, seen, execOrder)
       elseif type(answer) == "table" then
          walkTableRecursive(answer, execOrder, seen, outputNodes)
       end
@@ -335,7 +335,7 @@ local function generateCode(fn, args, argnum, skipPred)
    -- Figure out graph traversal order.
    local seen = { }
    local forwardExecOrder = { }
-   walkExecutionOrder(symbols, answers[1].source.node, seen, forwardExecOrder)
+   walkExecutionOrder(answers[argnum].source.node, seen, forwardExecOrder)
 
    -- Walk forward-graph backwards, chaining derivatives.
    answers[1].source.node.gradients[1] = Value.from(1, Source.gradient(1))
@@ -356,22 +356,22 @@ local function generateCode(fn, args, argnum, skipPred)
    findGradients(values[argnum], grads)
 
    for i = 1, #grads do
-      walkExecutionOrder(symbols, grads[i].grad.source:getRoot().node, seen, execOrder)
+      walkExecutionOrder(grads[i].grad.source:getRoot().node, seen, execOrder)
       outputNodes[grads[i].grad.source:getRoot().node] = true
    end
 
    walkTableRecursive(answers, execOrder, seen, outputNodes)
 
-  removeIdentityOperators(execOrder, outputNodes)
-  convertOperators(execOrder)
-  changeToReuseFunctions(execOrder)
-  pruneOutputs(execOrder, outputNodes)
+   removeIdentityOperators(execOrder, outputNodes)
+   convertOperators(execOrder)
+   changeToReuseFunctions(execOrder)
+   pruneOutputs(execOrder, outputNodes)
 
    -- Re-evaluate exec order after optimizations.
    seen = { }
    execOrder = { }
    for i = 1, #grads do
-      walkExecutionOrder(symbols, grads[i].grad.source:getRoot().node, seen, execOrder)
+      walkExecutionOrder(grads[i].grad.source:getRoot().node, seen, execOrder)
    end
 
    walkTableRecursive(answers, execOrder, seen, outputNodes)

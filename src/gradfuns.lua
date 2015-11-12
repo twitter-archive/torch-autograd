@@ -182,7 +182,8 @@ overload.module("torch", torch, function(module)
             for k, v in pairs(operators) do
                class.operator(k, v)
             end
-            class.dynamic("new", "cat")
+            class.gradient("cat", functions.cat)
+            class.dynamic("new")
          end)
       end
    end
@@ -379,10 +380,11 @@ overload.module("torch", torch, function(module)
    })
    module.gradient("long", {
       function(g, ans, x)
+        error("wtf")
          return torch.typeAs(g, x)
       end
    })
-   module.dynamic("ne",  "ger", "new", "fill", "zeros", "zero", "cosh", "sign", "repeatTensor")
+   module.dynamic("ne",  "ger", "new", "fill", "zeros", "zero", "cosh", "sign", "repeatTensor", "typeAs")
    module.static("size", "isTensor", "nDimension", "nElement", "isSameSizeAs")
 end)
 
