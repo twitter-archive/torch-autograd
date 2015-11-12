@@ -57,29 +57,6 @@ local function stringBuilder()
    }
 end
 
-local function walkExecutionOrder(node, seen, order)
-   if seen[node] == nil then
-      seen[node] = true
-      for k = 1, #node.inputs do
-         local input = node.inputs[k]
-         if input.type == Value.TABLE then
-            for k, v in pairs(input:get()) do
-               local root = v.source:getRoot()
-               if root.type == Source.COMPUTED then
-                  walkExecutionOrder(root.node, seen, order)
-               end
-            end
-         else
-            local root = input.source:getRoot()
-            if root.type == Source.COMPUTED then
-               walkExecutionOrder(root.node, seen, order)
-            end
-         end
-      end
-      table.insert(order, node)
-   end
-end
-
 local function canReuseOutput(node)
    return reusableFunctionsMap[node.forwardFn.name] ~= nil and #node.outputs == 1 and node.outputs[1].type == Value.TENSOR
 end
@@ -168,7 +145,8 @@ local function nodeCompute(fn, gradFn, capture, ...)
    end
 end
 
-local function findGradients(val, grads)
+local function collectGradients(val, grads)
+   grads = grads or { }
    if val.source.gradients ~= nil then
       for i = 1, #val.source.gradients do
          grads[#grads + 1] = {
@@ -179,9 +157,10 @@ local function findGradients(val, grads)
    end
    if val.type == Value.TABLE then
       for k, v in pairs(val:get()) do
-         findGradients(v, grads)
+         collectGradients(v, grads)
       end
    end
+   return grads
 end
 
 local function writeLiteralTable(wtable, out, symbols, depth)
@@ -308,15 +287,56 @@ local function pruneOutputs(execOrder, outputNodes)
    end
 end
 
-local function walkTableRecursive(table, execOrder, seen, outputNodes)
-   for k, answer in pairs(table) do
-      if Value.isValue(answer) then
-         outputNodes[answer.source:getRoot().node] = true
-         walkExecutionOrder(answer.source:getRoot().node, seen, execOrder)
-      elseif type(answer) == "table" then
-         walkTableRecursive(answer, execOrder, seen, outputNodes)
+local function walkNode(node, order, seen)
+   if seen[node] == nil then
+      seen[node] = true
+      for k = 1, #node.inputs do
+         local input = node.inputs[k]
+         if input.type == Value.TABLE then
+            for k, v in pairs(input:get()) do
+               local root = v.source:getRoot()
+               if root.type == Source.COMPUTED then
+                  walkNode(root.node, order, seen)
+               end
+            end
+         else
+            local root = input.source:getRoot()
+            if root.type == Source.COMPUTED then
+               walkNode(root.node, order, seen)
+            end
+         end
+      end
+      table.insert(order, node)
+   end
+end
+
+local function walkOutputRoots(val, execOrder, seen, outputNodes)
+   seen = seen or { }
+   execOrder = execOrder or { }
+   if Value.isValue(val) then
+      if outputNodes ~= nil then
+         outputNodes[val.source:getRoot().node] = true
+      end
+      walkNode(val.source:getRoot().node, execOrder, seen)
+   elseif type(val) == "table" then
+      for k, subVal in pairs(val) do
+         walkOutputRoots(subVal, execOrder, seen, outputNodes)
       end
    end
+   return execOrder
+end
+
+local function execGraph(graph)
+   local seen = { }
+   local grads = graph.grads
+   local answers = graph.answers
+   local execOrder = { }
+   local outputNodes = { }
+   for i = 1, #grads do
+      walkOutputRoots(grads[i].grad, execOrder, seen, outputNodes)
+   end
+   walkOutputRoots(answers, execOrder, seen, outputNodes)
+   return execOrder, outputNodes
 end
 
 local function searchMatchingLocal(tensor, locals, usedLocals)
@@ -333,7 +353,7 @@ local function searchMatchingLocal(tensor, locals, usedLocals)
    return 0
 end
 
-local function generateCode(fn, args, opt)
+local function createGraph(fn, args, opt)
    local argnum = opt.argnum or 1
    local values = { }
    local tensorDims = { }
@@ -341,24 +361,25 @@ local function generateCode(fn, args, opt)
       values[i] = Value.from(args[i], Source.param(i, i == argnum))
    end
 
+   -- Begin recording all torch operations.
    overload.install(nodeCompute)
    nodeDisabled = false
 
-   -- Call user forward function
+   -- Call user forward function.
    local answers = {fn(unpack(values))}
 
-   -- Figure out graph traversal order.
-   local seen = { }
-   local forwardExecOrder = { }
-   walkExecutionOrder(answers[argnum].source.node, seen, forwardExecOrder)
+   -- Figure out forward graph traversal order.
+   -- Only walk from the answer we need to differentiate (usually the first).
+   local forwardExecOrder = walkOutputRoots(answers[argnum])
 
-   -- Walk forward-graph backwards, chaining derivatives.
+   -- Walk the execution order backwards, chaining derivatives.
    answers[1].source.node.gradients[1] = Value.from(1, Source.gradient(1))
    for i=#forwardExecOrder,1,-1 do
       local node = forwardExecOrder[i]
       node:evaluateBackward()
    end
 
+   -- End recording.
    nodeDisabled = true
    overload.uninstall()
 
@@ -368,47 +389,39 @@ local function generateCode(fn, args, opt)
    local grads = { }
    local outputNodes = { }
 
-   findGradients(values[argnum], grads)
+   local grads = collectGradients(values[argnum])
 
-   for i = 1, #grads do
-      walkExecutionOrder(grads[i].grad.source:getRoot().node, seen, execOrder)
-      outputNodes[grads[i].grad.source:getRoot().node] = true
-   end
+   local graph = {
+      grads = grads,
+      params = values,
+      answers = answers
+   }
 
-   walkTableRecursive(answers, execOrder, seen, outputNodes)
+   return graph
+end
 
+local function optimizeGraph(graph, opt)
+   local execOrder, outputNodes = execGraph(graph)
    removeIdentityOperators(execOrder, outputNodes)
    convertOperators(execOrder)
    changeToReuseFunctions(execOrder)
    pruneOutputs(execOrder, outputNodes)
+end
 
-   -- Re-evaluate exec order after optimizations.
-   seen = { }
-   execOrder = { }
-   for i = 1, #grads do
-      walkExecutionOrder(grads[i].grad.source:getRoot().node, seen, execOrder)
-   end
-
-   walkTableRecursive(answers, execOrder, seen, outputNodes)
-
+local function createSymbolTable(graph, execOrder, reuseLocals)
    -- Assign symbols to params, inputs, outputs.
    local symbols = { }
-   local functionRemap = { }
    local defined = { }
    local constants = { }
 
-   for i = 1, #values do
-      symbols[values[i].source] = "p" .. i
+   for i = 1, #graph.params do
+      symbols[graph.params[i].source] = "p" .. i
    end
 
    local reusableLocalMap = { }
    local reusedLocals = { }
-   local nextReusableLocal = 1
-   if opt.reuseLocals ~= nil then
-      nextReusableLocal = #opt.reuseLocals + 1
-   end
+   local nextReusableLocal = #reuseLocals + 1
    local reusableLocalStart = nextReusableLocal
-
    local nextLocal = 1
 
    for i = 1, #execOrder do
@@ -419,8 +432,8 @@ local function generateCode(fn, args, opt)
 
             if canReuseOutput(node) then
                local index = nil
-               if opt.reuseLocals ~= nil and canReuseOutput(node) then
-                  local matchingIndex = searchMatchingLocal(node.outputs[1]:get(), opt.reuseLocals, reusedLocals)
+               if reuseLocals ~= nil and canReuseOutput(node) then
+                  local matchingIndex = searchMatchingLocal(node.outputs[1]:get(), reuseLocals, reusedLocals)
                   if matchingIndex > 0 then
                      index = matchingIndex
                      reusedLocals[matchingIndex] = true
@@ -456,6 +469,10 @@ local function generateCode(fn, args, opt)
       end
    end
 
+   return symbols, defined, constants, nextLocal - 1, nextReusableLocal - 1, reusableLocalMap
+end
+
+local function collectObjects(execOrder)
    -- Find all the nn objects we need to create or pass in.
    local objects = { }
    local count = 1
@@ -478,13 +495,27 @@ local function generateCode(fn, args, opt)
          count = count + 1
       end
    end
+   return objects
+end
 
-   -- Collect the objects we use, where we couldn't determine how to construct
-   -- them. They have to be passed in by value.
+local function generateCode(fn, args, opt)
+   local optimize = opt.optimize or true
+   local reuseLocals = opt.reuseLocals or { }
+
+   local graph = createGraph(fn, args, opt)
+
+   if optimize then
+      optimizeGraph(graph)
+   end
+
+   local execOrder, outputNodes = execGraph(graph)
+   local symbols, defined, constants, numLocals, numReusableLocals, reusableLocalMap = createSymbolTable(graph, execOrder, reuseLocals)
+   local objects = collectObjects(execOrder)
+
    local out = stringBuilder()
    local outerArgNames = {"rlocals"}
    local outerArgs = { }
-   outerArgs[#outerArgs + 1] = opt.reuseLocals or { }
+   outerArgs[#outerArgs + 1] = reuseLocals
 
    for k, v in pairs(objects) do
       if v.ctor == nil then
@@ -493,6 +524,7 @@ local function generateCode(fn, args, opt)
       end
    end
 
+   local functionRemap = { }
    for i = 1, #execOrder do
       local node = execOrder[i]
       if node.forwardFn.operator == nil then
@@ -530,12 +562,12 @@ local function generateCode(fn, args, opt)
    end
    out.write("local locals = { }")
    out.write("\n")
-   out.write("for i = ", 1, ", ", nextLocal - 1, " do locals[i] = 0 end")
+   out.write("for i = ", 1, ", ", numLocals, " do locals[i] = 0 end")
    out.write("\n")
-   if reusableLocalStart ~= nextReusableLocal then
-      out.write("for i = ", reusableLocalStart, ", ", nextReusableLocal - 1, " do rlocals[i] = 0 end")
+   if numReusableLocals ~= #reuseLocals then
+      out.write("for i = ", #reuseLocals + 1, ", ", numLocals, " do rlocals[i] = 0 end")
       out.write("\n")
-      for i = reusableLocalStart, nextReusableLocal - 1 do
+      for i = #reuseLocals + 1, numReusableLocals do
          local output = reusableLocalMap[i]
          local tensor = output:get()
          out.write(symbols[output.source], " = ", tensor:type(), "(", table.concat(tensor:size():totable(), ", "), ")")
@@ -545,8 +577,8 @@ local function generateCode(fn, args, opt)
 
    out.write("return function(")
    local paramSymbols = { }
-   for i = 1, #values do
-      paramSymbols[i] = symbols[values[i].source]
+   for i = 1, #graph.params do
+      paramSymbols[i] = symbols[graph.params[i].source]
    end
    out.write(table.concat(paramSymbols, ", "))
    out.write(")")
@@ -573,6 +605,8 @@ local function generateCode(fn, args, opt)
    end
    out.write("    ")
    out.write("return ")
+   local grads = graph.grads
+   local answers = graph.answers
    if #grads == 1 and grads[1].grad.type == Value.TABLE then
       -- This doesn't feel quite right, should be possible to unify this with the other path.
       out.write(grads[1].grad.source:symbolPath(symbols))
