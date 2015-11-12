@@ -595,7 +595,7 @@ local function generateCode(fn, args, opt)
    out.write("for i = ", 1, ", ", numLocals, " do locals[i] = 0 end")
    out.write("\n")
    if numReusableLocals ~= #reuseLocals then
-      out.write("for i = ", #reuseLocals + 1, ", ", numLocals, " do rlocals[i] = 0 end")
+      out.write("for i = ", #reuseLocals + 1, ", ", numReusableLocals, " do rlocals[i] = 0 end")
       out.write("\n")
       for i = #reuseLocals + 1, numReusableLocals do
          local output = reusableLocalMap[i]
