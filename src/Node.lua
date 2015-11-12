@@ -22,8 +22,6 @@ function Node:init(forwardFn, gradientFn, inputs)
 		else
 			if torch.isTensor(input) then
 				if torch.nDimension(input) > 1 then
-					print(inputs)
-					print(self.forwardFn.name)
 					error("constant tensor with more than one dimension")
 				end
 			end

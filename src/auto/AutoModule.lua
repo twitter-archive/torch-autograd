@@ -46,7 +46,7 @@ return function(moduleName)
 
    function module:accGradParameters(input, gradOutput, scale)
       if not self.grads then
-         self.grads = self.b({input=input, weight=self.weight, bias=self.bias})
+         self.grads = self.b({input=input, weight=self.weight, bias=self.bias}, gradOutput)
       end
       self.gradWeight:add(scale, self.grads.weight)
       self.gradBias:add(scale, self.grads.bias)

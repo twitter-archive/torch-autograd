@@ -113,6 +113,7 @@ local function defaultBool(b, db)
    return b
 end
 
+local debugger
 local applyDepth = 0
 local nodeDisabled = true
 
@@ -387,7 +388,7 @@ local function createGraph(fn, args, opt)
    if withGradients then
       -- Walk the execution order backwards, chaining derivatives.
       if answers[1].type == Value.TENSOR and opt.partialGrad then
-         answers[1].source.node.gradients[1] = args[#arg]
+         answers[1].source.node.gradients[1] = values[#values]
       elseif answers[1].type == Value.NUMBER then
          answers[1].source.node.gradients[1] = Value.from(1, Source.gradient(1))
       else
@@ -735,7 +736,7 @@ local function grad(fn, gradOpt)
             reuseLocals = rlocals
          }
          local code, outerArgs = generateCode(fn, args, opt)
-         print(code)
+         --print(code)
          --print("generated code for param signature " .. signature)
          local outer = loadstring(code)
          if outer == nil then
