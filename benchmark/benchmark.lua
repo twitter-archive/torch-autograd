@@ -80,7 +80,6 @@ local tests = {
       local tnn, tag
       local x = tensor(1000,100):normal()
       local y = tensor(1000):uniform(1.5,10.5):floor()
-      local yOneHot = d.util.oneHot(y,10)
 
       do
          local model = nn.Sequential()
@@ -113,7 +112,8 @@ local tests = {
       do
          local f = function(params, x, y)
             local wx = params.W * x + params.b
-            local loss, yhat = d.loss.crossEntropy(wx, y)
+            local yhat = d.util.logSoftMax(wx)
+            local loss = -torch.sum(torch.narrow(yhat,1,y,1))
             return loss
          end
          local params = {
@@ -123,12 +123,12 @@ local tests = {
 
          -- force allocs
          local df = d(f)
-         local grads = df(params, x[1], yOneHot[1])
+         local grads = df(params, x[1], y[1])
 
          tic()
          for k = 1,40 do
             for i = 1,x:size(1) do
-               local grads = df(params, x[i], yOneHot[i])
+               local grads = df(params, x[i], y[i])
             end
          end
          tag = toc()
@@ -207,7 +207,6 @@ local tests = {
       local tnn, tag
       local x = tensor(2000,100):normal()
       local y = tensor(2000):uniform(1.5,10.5):floor()
-      local yOneHot = d.util.oneHot(y,10)
 
       do
          local model = nn.Sequential()
@@ -243,7 +242,8 @@ local tests = {
          local f = function(params, x, y)
             local h1 = torch.tanh( params.W1 * x + params.b1 )
             local h2 = params.W2 * h1 + params.b2
-            local loss, yhat = d.loss.crossEntropy(h2, y)
+            local yhat = d.util.logSoftMax(h2)
+            local loss = -torch.sum(torch.narrow(yhat,1,y,1))
             return loss
          end
          local params = {
@@ -255,12 +255,12 @@ local tests = {
 
          -- force allocs
          local df = d(f)
-         local grads = df(params, x[1], yOneHot[1])
+         local grads = df(params, x[1], y[1])
 
          tic()
          for k = 1,10 do
             for i = 1,x:size(1) do
-               local grads = df(params, x[i], yOneHot[i])
+               local grads = df(params, x[i], y[i])
             end
          end
          tag = toc()
@@ -273,7 +273,6 @@ local tests = {
       local tnn, tag
       local x = tensor(2000,100):normal()
       local y = tensor(2000):uniform(1.5,10.5):floor()
-      local yOneHot = d.util.oneHot(y,10)
 
       do
          local model = nn.Sequential()
@@ -315,7 +314,7 @@ local tests = {
             local h1 = tanh( lin1(x, params.W1, params.b1) )
             local h2 = lin2(h1, params.W2, params.b2)
             local yhat = lsm(h2)
-            local loss = -torch.sum(torch.cmul(yhat, y))
+            local loss = -torch.sum(torch.narrow(yhat, 1, y, 1))
             return loss
          end
          local params = {
@@ -327,12 +326,12 @@ local tests = {
 
          -- force allocs
          local df = d(f)
-         local grads = df(params, x[1], yOneHot[1])
+         local grads = df(params, x[1], y[1])
 
          tic()
          for k = 1,10 do
             for i = 1,x:size(1) do
-               local grads = df(params, x[i], yOneHot[i])
+               local grads = df(params, x[i], y[i])
             end
          end
          tag = toc()
