@@ -722,6 +722,7 @@ local function grad(fn, gradOpt)
    local partialGrad = defaultBool(gradOpt.partialGrad, false)
    argnum = argnum or 1
    local generatedFunctions = { }
+   local cachedTensors = { }
    local doGrad = function(...)
       local args = {...}
       local tensorDims = { }
@@ -733,7 +734,7 @@ local function grad(fn, gradOpt)
             withForward = withForward,
             withGradients = withGradients,
             partialGrad = partialGrad,
-            reuseLocals = rlocals
+            reuseLocals = cachedTensors
          }
          local code, outerArgs = generateCode(fn, args, opt)
          --print(code)
