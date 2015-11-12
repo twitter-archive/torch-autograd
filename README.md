@@ -424,26 +424,35 @@ loss = loss.binaryEntropy(prediction, target)
 loss = loss.leastSquares(prediction, target)
 ```
 
-Performance
------------
+### Debugging and fine-grain control
 
-Long-term, `autograd`'s goal is to become the most flexible way to describe
-arbitrary differentiable functions, with no compromise on performance. There
-are currently a few limitations to performance:
+Debugging hooks can be inserted when wrapping the function with `autograd`:
 
-* no support for sparse tensors: for excessively sparse tensor updates (e.g.
-  selecting a row in a tensor, and updating it), the gradient computation
-  will be naive and dense. The best way to address this would be to add
-  support for sparse tensors in Torch.
-* tape creation and evaluation: currently no caching of the tape is done, and
-  each call to `grad(f)` generates a considerable amount of type checks and
-  function calls. The plan is to write a caching mechanism that will save the
-  tape for each given configuration of the function inputs - this will reduce
-  the overhead considerably.
-* memory re-use: currently `autograd` doesn't do any memory caching, so each
-  gradient estimation can potentially allocate lots of intermediate tensors.
-  The best way to address this is to create a tensor pool, and have the tape
-  re-use tensors from this pool as needed.
+```lua
+grad(f, {
+   debugHook = function(debugger, msg)
+      -- dump a dot representation of the graph:
+      debugger.generateDot('result.dot')
+   end
+})
+```
+
+Finer-grain control over execution can also be achieved using these flags:
+
+```lua
+-- All of these options default to true:
+grad(f, {
+   withForward = true | false,    -- compute the forward path
+   withGradients = true | false,  -- compute the gradients (after forward)
+   partialGrad = true | false     -- partial grad means that d(f) expects grads wrt output
+})
+
+-- Running this:
+pred = grad(f, {withForward=true, withGradients=false})(inputs)
+-- is equivalent to:
+pred = f(inputs)
+-- ... but the function is compiled, and benefits from tensor re-use!
+```
 
 TODO
 ----
@@ -451,10 +460,10 @@ TODO
 Autograd is work in progress. Current list of things to be developed includes:
 
 - [ ] Gradients of gradients (Hessian)
-- [ ] Add support for caching tape for a given input configuration
 - [ ] Add support for sparse gradients
-- [ ] Code generation
-- [ ] Implement auto-buffering so that native torch functions can re-use memory
+- [x] Add support for caching tape for a given input configuration
+- [x] Code generation
+- [x] Implement auto-buffering so that native torch functions can re-use memory
 
 License
 -------
