@@ -19,7 +19,7 @@ local tests = {
 
       -- Grads:
       local sawHook = 0
-      local dFunc = autograd(func, nil, {
+      local dFunc = autograd(func, {
          debugHook = function(debugger, msg)
             debugger.generateDot("stuff.dot")
             sawHook = sawHook + 1
