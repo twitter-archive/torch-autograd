@@ -61,7 +61,9 @@ function Node:evaluateForward()
 			-- Constant table assembled by the user.
 			for k, v in pairs(input:get()) do
 				if Value.isValue(v) then
-					source.node:linkOutputNode(source.index, self, i)
+					if v.source.type == Source.COMPUTED then
+						v.source.node:linkOutputNode(v.source.index, self, i)
+					end
 				end
 			end
 		end
