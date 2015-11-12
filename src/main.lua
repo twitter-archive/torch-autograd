@@ -319,7 +319,22 @@ local function walkTableRecursive(table, execOrder, seen, outputNodes)
    end
 end
 
-local function generateCode(fn, args, argnum, skipPred)
+local function searchMatchingLocal(tensor, locals, usedLocals)
+   local ttype = tensor:type()
+   local tdims = tensor:nDimension()
+   for i = 1, #locals do
+      local lt = locals[i]
+      if usedLocals[i] == nil then
+         if lt:type() == ttype and lt:nDimension() == tdims and lt:isSameSizeAs(tensor) then
+            return i
+         end
+      end
+   end
+   return 0
+end
+
+local function generateCode(fn, args, opt)
+   local argnum = opt.argnum or 1
    local values = { }
    local tensorDims = { }
    for i = 1, #args do
@@ -386,12 +401,42 @@ local function generateCode(fn, args, argnum, skipPred)
       symbols[values[i].source] = "p" .. i
    end
 
+   local reusableLocalMap = { }
+   local reusedLocals = { }
+   local nextReusableLocal = 1
+   if opt.reuseLocals ~= nil then
+      nextReusableLocal = #opt.reuseLocals + 1
+   end
+   local reusableLocalStart = nextReusableLocal
+
+   local nextLocal = 1
+
    for i = 1, #execOrder do
       local node = execOrder[i]
       if #node.outputs == 1 then
          if node.outputs[1].type == Value.TENSOR then
             defined[node.outputs[1].source] = true
-            symbols[node.outputs[1].source] = "locals[" .. i .. "]"
+
+            if canReuseOutput(node) then
+               local index = nil
+               if opt.reuseLocals ~= nil and canReuseOutput(node) then
+                  local matchingIndex = searchMatchingLocal(node.outputs[1]:get(), opt.reuseLocals, reusedLocals)
+                  if matchingIndex > 0 then
+                     index = matchingIndex
+                     reusedLocals[matchingIndex] = true
+                  end
+               end
+               if index == nil then
+                  index = nextReusableLocal
+                  nextReusableLocal = nextReusableLocal + 1
+               end
+               symbols[node.outputs[1].source] = "rlocals[" .. index .. "]"
+               reusableLocalMap[index] = node.outputs[1]
+            else
+               symbols[node.outputs[1].source] = "locals[" .. nextLocal .. "]"
+               nextLocal = nextLocal + 1
+            end
+
          else
             symbols[node.outputs[1].source] = letterForType(node.outputs[1]) .. i
          end
@@ -437,11 +482,13 @@ local function generateCode(fn, args, argnum, skipPred)
    -- Collect the objects we use, where we couldn't determine how to construct
    -- them. They have to be passed in by value.
    local out = stringBuilder()
-   local noCtorObjectNames = { }
+   local outerArgNames = {"rlocals"}
    local outerArgs = { }
+   outerArgs[#outerArgs + 1] = opt.reuseLocals or { }
+
    for k, v in pairs(objects) do
       if v.ctor == nil then
-         noCtorObjectNames[#noCtorObjectNames + 1] = v.name
+         outerArgNames[#outerArgNames + 1] = v.name
          outerArgs[#outerArgs + 1] = k
       end
    end
@@ -461,7 +508,7 @@ local function generateCode(fn, args, argnum, skipPred)
    }
 
    -- Generate code.
-   out.write("return function(", table.concat(noCtorObjectNames, ", "), ")")
+   out.write("return function(", table.concat(outerArgNames, ", "), ")")
    out.write("\n")
    out.write("local nn = require('autograd').nn")
    out.write("\n")
@@ -483,13 +530,15 @@ local function generateCode(fn, args, argnum, skipPred)
    end
    out.write("local locals = { }")
    out.write("\n")
-   out.write("for i = 1, ", #execOrder, " do locals[i] = 0 end")
+   out.write("for i = ", 1, ", ", nextLocal - 1, " do locals[i] = 0 end")
    out.write("\n")
-   for i = 1, #execOrder do
-      local node = execOrder[i]
-      if canReuseOutput(node) then
-         local tensor = node.outputs[1].raw
-         out.write(symbols[node.outputs[1].source], " = ", tensor:type(), "(", table.concat(tensor:size():totable(), ", "), ")")
+   if reusableLocalStart ~= nextReusableLocal then
+      out.write("for i = ", reusableLocalStart, ", ", nextReusableLocal - 1, " do rlocals[i] = 0 end")
+      out.write("\n")
+      for i = reusableLocalStart, nextReusableLocal - 1 do
+         local output = reusableLocalMap[i]
+         local tensor = output:get()
+         out.write(symbols[output.source], " = ", tensor:type(), "(", table.concat(tensor:size():totable(), ", "), ")")
          out.write("\n")
       end
    end
@@ -584,13 +633,18 @@ end
 local function grad(fn, argnum)
    argnum = argnum or 1
    local generatedFunctions = { }
+   local rlocals = { }
    local doGrad = function(...)
       local args = {...}
       local tensorDims = { }
       buildSignature(args, tensorDims)
       local signature = table.concat(tensorDims, "-")
       if generatedFunctions[signature] == nil then
-         local code, outerArgs = generateCode(fn, args, argnum)
+         local opt = {
+            argnum = 1,
+            reuseLocals = rlocals
+         }
+         local code, outerArgs = generateCode(fn, args, opt)
          --print(code)
          --print("generated code for param signature " .. signature)
          local outer = loadstring(code)
