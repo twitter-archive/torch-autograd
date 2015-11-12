@@ -19,13 +19,6 @@ function Source:init(type)
 	self.type = type
 end
 
-function Source.computed(node, index)
-	local s = Source.new(Source.COMPUTED)
-	s.node = node
-	s.index = index
-	return s
-end
-
 function Source:symbolPath(rootSymbols)
 	if self.type == Source.TABLE then
 		if type(self.key) == 'number' then
@@ -112,6 +105,19 @@ function Source:getParentsArray(arr)
 	end
 	arr[#arr + 1] = self
 	return arr
+end
+
+function Source:changeNodeTargetIndex(target, currentIdx, newIdx)
+	if self.type == Source.COMPUTED then
+		self.node:changeTargetIndex(self.index, target, currentIdx, newIdx)
+	end
+end
+
+function Source.computed(node, index)
+	local s = Source.new(Source.COMPUTED)
+	s.node = node
+	s.index = index
+	return s
 end
 
 function Source.param(name, gradient)
