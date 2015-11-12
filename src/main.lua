@@ -507,7 +507,7 @@ local function generateCode(fn, args, opt)
    outerArgs[#outerArgs + 1] = reuseLocals
 
    if debugger then
-      debugger.setExecOrderAndSymbols(execOrder, symbols)
+      debugger.setMain(execOrder, symbols, graph.grads, graph.answers)
       outerArgNames[#outerArgNames + 1] = "debugger"
       outerArgs[#outerArgs + 1] = debugger
    end
@@ -578,6 +578,11 @@ local function generateCode(fn, args, opt)
    out.write(table.concat(paramSymbols, ", "))
    out.write(")")
    out.write("\n")
+   if debugger then
+      for i = 1, #graph.params do
+         debugger.generateInputCheck(graph.params[i], paramSymbols[i], out)
+      end
+   end
    for i = 1, #execOrder do
       local node = execOrder[i]
       local outputSymbols = { }
@@ -598,7 +603,7 @@ local function generateCode(fn, args, opt)
          out.write("\n")
          if debugger then
             for k = 1, #node.outputs do
-               debugger.generateValueCheck(node, k, outputSymbols[k], out)
+               debugger.generateOutputCheck(node, k, outputSymbols[k], out)
             end
          end
       end
@@ -606,7 +611,9 @@ local function generateCode(fn, args, opt)
    out.write("    ")
    out.write("return ")
    local grads = graph.grads
+   print(grads)
    local answers = graph.answers
+   print(answers)
    if #grads == 1 and grads[1].grad.type == Value.TABLE then
       -- This doesn't feel quite right, should be possible to unify this with the other path.
       out.write(grads[1].grad.source:symbolPath(symbols))
