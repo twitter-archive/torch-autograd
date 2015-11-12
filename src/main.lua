@@ -1,8 +1,9 @@
-local debug = require 'debug'
 local overload = require 'autograd.overload'
 local Node = require 'autograd.Node'
 local Value = require 'autograd.Value'
 local Source = require 'autograd.Source'
+local StringBuilder = require 'autograd.StringBuilder'
+local Debugger = require 'autograd.Debugger'
 
 local reusableFunctionsMap = {
    ["torch.tanh"] = true,
@@ -42,31 +43,16 @@ local reusableFunctionTransforms = {
    ["util.indexAdd"] = "util.indexAddInPlace",
 }
 
-local function stringBuilder()
-   local strs = { }
-   return {
-      write = function(...)
-         local arg = {...}
-         for i = 1, #arg do
-            strs[#strs + 1] = arg[i]
-         end
-      end,
-      finish = function()
-         return table.concat(strs, "")
-      end
-   }
-end
-
 local function canReuseOutput(node)
    return reusableFunctionsMap[node.forwardFn.name] ~= nil and #node.outputs == 1 and node.outputs[1].type == Value.TENSOR
 end
 
 local function canInline(node, outputNodes)
-   return #node.outputs == 1 and #node.outputTargets[1] == 1 and outputNodes[node] == nil
+   return #node.outputs == 1 and #node.outputTargets[1] == 1 and outputNodes[node] == nil and debugger == nil
 end
 
 local function writeExpr(state, node, depth)
-   local out = stringBuilder()
+   local out = StringBuilder()
    local inputSymbols = { }
    for k = 1, #node.inputs do
       local input = node.inputs[k]
@@ -128,6 +114,9 @@ local function nodeCompute(fn, gradFn, capture, ...)
    if not nodeDisabled and applyDepth == 1 and capture then
       local n = Node.new(fn, gradFn, inputs)
       local values = {n:evaluateForward()}
+      if debugger then
+         debugger.captureCallStack(n)
+      end
       applyDepth = applyDepth - 1
       return unpack(values)
    else
@@ -512,10 +501,16 @@ local function generateCode(fn, args, opt)
    local symbols, defined, constants, numLocals, numReusableLocals, reusableLocalMap = createSymbolTable(graph, execOrder, reuseLocals)
    local objects = collectObjects(execOrder)
 
-   local out = stringBuilder()
+   local out = StringBuilder()
    local outerArgNames = {"rlocals"}
    local outerArgs = { }
    outerArgs[#outerArgs + 1] = reuseLocals
+
+   if debugger then
+      debugger.setExecOrderAndSymbols(execOrder, symbols)
+      outerArgNames[#outerArgNames + 1] = "debugger"
+      outerArgs[#outerArgs + 1] = debugger
+   end
 
    for k, v in pairs(objects) do
       if v.ctor == nil then
@@ -601,6 +596,11 @@ local function generateCode(fn, args, opt)
          end
          out.write(writeExpr(state, node))
          out.write("\n")
+         if debugger then
+            for k = 1, #node.outputs do
+               debugger.generateValueCheck(node, k, outputSymbols[k], out)
+            end
+         end
       end
    end
    out.write("    ")
@@ -664,22 +664,20 @@ local function buildSignature(params, tensorDims)
    end
 end
 
-local function grad(fn, argnum)
-   argnum = argnum or 1
+local function grad(fn, argnum, opt)
+   opt = opt or { }
+   opt.argnum = argnum or 1
+   opt.reuseLocals = { }
+   debugger = Debugger(opt)
    local generatedFunctions = { }
-   local rlocals = { }
    local doGrad = function(...)
       local args = {...}
       local tensorDims = { }
       buildSignature(args, tensorDims)
       local signature = table.concat(tensorDims, "-")
       if generatedFunctions[signature] == nil then
-         local opt = {
-            argnum = 1,
-            reuseLocals = rlocals
-         }
          local code, outerArgs = generateCode(fn, args, opt)
-         --print(code)
+         print(code)
          --print("generated code for param signature " .. signature)
          local outer = loadstring(code)
          if outer == nil then
