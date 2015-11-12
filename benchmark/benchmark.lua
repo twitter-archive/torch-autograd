@@ -555,12 +555,12 @@ local tests = {
 
    ['mlp (nn, batched)'] = function()
       local tnn, tag
-      local x = tensor(32,100):normal()
+      local x = tensor(32,1000):normal()
       local y = tensor(32):uniform(1.5,10.5):floor()
 
       do
          local model = nn.Sequential()
-         model:add(nn.Linear(100,1000))
+         model:add(nn.Linear(1000,1000))
          model:add(nn.Tanh())
          model:add(nn.Linear(1000,10))
          model:add(nn.LogSoftMax())
@@ -587,7 +587,7 @@ local tests = {
       end
 
       do
-         local lin1 = d.nn.Linear(100,1000)
+         local lin1 = d.nn.Linear(1000,1000)
          local tanh = d.nn.Tanh()
          local lin2 = d.nn.Linear(1000,10)
          local lsm = d.nn.LogSoftMax()
@@ -601,7 +601,7 @@ local tests = {
             return loss
          end
          local params = {
-            W1 = tensor(1000, 100):normal(.01),
+            W1 = tensor(1000, 1000):normal(.01),
             b1 = tensor(1000):normal(.01),
             W2 = tensor(10, 1000):normal(.01),
             b2 = tensor(10):normal(.01),
