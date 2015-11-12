@@ -51,7 +51,8 @@ function util.dropout(state, dropout)
    dropout = dropout or 0
    local keep = 1 - dropout
    if keep == 1 then return state end
-   local keep = state.new(state:size()):bernoulli(keep):mul(1/keep)
+   local s = state.new(torch.size(state))
+   local keep = torch.mul(torch.bernoulli(s,keep), 1/keep)
    return torch.cmul(state, keep)
 end
 

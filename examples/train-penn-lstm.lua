@@ -193,11 +193,10 @@ for epoch = 1,opt.nEpochs do
             grad:mul( opt.maxGradNorm / norm )
          end
       end
-      params = tablex.copy(params)
-      grads = tablex.copy(grads)
+
       -- Update params:
-      for i,param in ipairs(_.flatten(params)) do
-         local g = _.flatten(grads)[i]
+      for i,param in ipairs(_.flatten(_.clone(params))) do
+         local g = _.flatten(_.clone(grads))[i]
          param:add(-lr, g)
       end
 

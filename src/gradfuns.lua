@@ -384,7 +384,10 @@ overload.module("torch", torch, function(module)
          return torch.typeAs(g, x)
       end
    })
-   module.dynamic("ne",  "ger", "new", "fill", "zeros", "zero", "cosh", "sign", "repeatTensor", "typeAs")
+   module.dynamic(
+      "ne",  "ger", "new", "fill", "zeros", "zero", "cosh", "sign", "repeatTensor", "typeAs",
+      "bernoulli", "uniform", "normal", "random"
+   )
    module.static("size", "isTensor", "nDimension", "nElement", "isSameSizeAs")
 end)
 
