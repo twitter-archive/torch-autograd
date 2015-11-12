@@ -1,7 +1,5 @@
 -- util
 local util = require 'autograd.util'
-local node = require 'autograd.node'
-local getValue = node.getValue
 
 return function(opt, params)
    -- options:
@@ -24,25 +22,24 @@ return function(opt, params)
    local f = function(params, x, prevState)
       -- dims:
       local p = params[1] or params
-      if x:dim() == 2 then
-         x = torch.view(x, 1, x:size(1), x:size(2))
+      if torch.nDimension(x) == 2 then
+         x = torch.view(x, 1, torch.size(x, 1), torch.size(x, 2))
       end
-      local batch = x:size(1)
-      local steps = x:size(2)
+      local batch = torch.size(x, 1)
+      local steps = torch.size(x, 2)
 
       -- hiddens:
       prevState = prevState or {}
       local hs = {}
       local cs = {}
-
       -- go over time:
       for t = 1,steps do
          -- xt
          local xt = torch.select(x,2,t)
 
          -- prev h and prev c
-         local hp = hs[t-1] or prevState.h or x.new(batch, hiddenFeatures):zero()
-         local cp = cs[t-1] or prevState.c or x.new(batch, hiddenFeatures):zero()
+         local hp = hs[t-1] or prevState.h or torch.zero(x.new(batch, hiddenFeatures))
+         local cp = cs[t-1] or prevState.c or torch.zero(x.new(batch, hiddenFeatures))
 
          -- pack all dot products:
          local dots = torch.cat(xt,hp,2) * p.W + torch.expand(p.b, batch, 4*hiddenFeatures)
@@ -80,7 +77,7 @@ return function(opt, params)
          for i in ipairs(hs) do
             hs[i] = torch.view(hs[i], batch,1,hiddenFeatures)
          end
-         return getValue(x).cat(hs,2), newState
+         return x.cat(hs, 2), newState
       end
    end
 

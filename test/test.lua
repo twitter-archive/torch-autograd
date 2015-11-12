@@ -1,9 +1,6 @@
 -- Tester:
 local totem = require 'totem'
 local autograd = require 'autograd'
-local node = require 'autograd.node'
-local Node = node.Node
-local isNode = node.isNode
 local gradcheck = require 'autograd.gradcheck'
 local tester = totem.Tester()
 
@@ -21,11 +18,10 @@ local tests = {
       end
       local mse = function(input, target)
          local buffer = input-target
-         return torch.sum( torch.cmul(buffer, buffer) ) / (input:dim() == 2 and input:size(1)*input:size(2) or input:size(1))
+         return torch.sum( torch.cmul(buffer, buffer) ) / (torch.nDimension(input) == 2 and torch.size(input, 1) * torch.size(input, 2) or torch.size(input, 1))
       end
 
       local inputSize, outputSize = torch.random(10,100), torch.random(100,1000)
-
 
       local model = nn.Sequential()
       local linear1 = nn.Linear(inputSize, outputSize)
@@ -154,7 +150,7 @@ local tests = {
 
       -- Function:
       local f = function(inputs)
-         local res = inputs.x.new(inputs.x:size())
+         local res = inputs.x.new(torch.size(inputs.x))
          local out1 = torch.copy( torch.select(res, 1,1), torch.select(inputs.x, 1, 1) * 10 )
          local out2 = torch.copy( torch.select(res, 1,2), torch.select(inputs.x, 1, 2) * 3 )
          return torch.sum(out1) + torch.sum(out2)
@@ -204,7 +200,7 @@ local tests = {
 
    Transpose = function()
       local fn = function(inputs)
-         return torch.sum(torch.t(inputs.x))
+         return torch.sum(torch.transpose(inputs.x))
       end
 
       -- Check grads:
@@ -378,7 +374,7 @@ local tests = {
    end,
 
    MinMax = function()
-      local fns = {torch.min,torch.max}
+      local fns = {"min", "max"}
       local preds = {{1,5},{2,10}}
 
       for i=1,2 do
@@ -387,10 +383,10 @@ local tests = {
          local fn = fns[i]
 
          local func1 = function(inputs)
-            return fn(inputs.W)
+            return torch[fn](inputs.W)
          end
          local func2 = function(inputs)
-            local minVal,indices = fn(inputs.W, 1)
+            local minVal,indices = torch[fn](inputs.W, 1)
             return torch.sum(minVal)
          end
 
@@ -590,22 +586,6 @@ local tests = {
       tester:asserteq(grads.W:size(2), 100, 'incorrect dims for gradients')
       tester:asserteq(grads.x:dim(), 1, 'incorrect dims for gradients')
       tester:asserteq(grads.x:size(1),100, 'incorrect dims for gradients')
-   end,
-
-   NodeClass = function()
-      -- Build nodes
-      local n = Node:init(3, nil, nil, nil, nil, { nextIndex = 1 })
-      local m = Node:init(torch.ones(10), nil, nil, nil, nil, { nextIndex = 1 })
-
-      -- Test we can identify nodes
-      tester:asserteq(isNode(n), true, "Did not detect class properly")
-      tester:asserteq(isNode(m), true, "Did not detect class properly")
-      tester:asserteq(isNode({42}), false, "Did not detect class properly")
-      tester:asserteq(isNode(3), false, "Did not detect class properly")
-      tester:asserteq(isNode("hey"), false, "Did not detect class properly")
-      tester:asserteq(isNode(torch.randn(10)), false, "Did not detect class properly")
-
-      -- TODO: more thorough testing of tables that contain nodes
    end,
 
    NNFunc_Basic = function()
@@ -854,7 +834,7 @@ local tests = {
       tester:asserteq(grads[2].b:dim(), 1, 'biases for layer 4 have incorrect dims')
 
       -- Gradcheck
-      tester:assert(gradcheck(function(params) return loss(params, i, t) end, params), 'incorrect gradients')
+      tester:assert(gradcheck(function(params, i, t) return loss(params, i, t) end, params, i, t), 'incorrect gradients')
    end,
 
    Models_SpatialNetwork = function()
@@ -897,7 +877,7 @@ local tests = {
       tester:asserteq(type(l), 'number', 'loss should be a scalar')
 
       -- Gradcheck:
-      tester:assert(gradcheck(function(params) return loss(params, i, t) end, params), 'incorrect gradients')
+      tester:assert(gradcheck(function(params, i, t) return loss(params, i, t) end, params, i, t), 'incorrect gradients')
    end,
 
    Models_RecurrentNetwork = function()
@@ -927,7 +907,7 @@ local tests = {
       tester:asserteq(type(g), 'table', 'gradients could not be computed')
 
       -- Gradcheck:
-      tester:assert(gradcheck(function(params) return loss(params, i) end, params), 'incorrect gradients')
+      tester:assert(gradcheck(function(params, i) return loss(params, i) end, params, i), 'incorrect gradients')
    end,
 
    Models_RecurrentLSTMNetwork = function()
@@ -957,7 +937,7 @@ local tests = {
       tester:asserteq(type(g), 'table', 'gradients could not be computed')
 
       -- Gradcheck:
-      tester:assert(gradcheck(function(params) return loss(params, i) end, params), 'incorrect gradients')
+      tester:assert(gradcheck(function(params, i) return loss(params, i) end, params, i), 'incorrect gradients')
 
       -- Define RNN with all states exposed:
       local f,params = autograd.model.RecurrentLSTMNetwork({

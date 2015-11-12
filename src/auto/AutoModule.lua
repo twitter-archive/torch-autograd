@@ -1,5 +1,5 @@
 local auto = require 'autograd.auto'
-local d = require 'autograd.main'
+local autograd = require 'autograd.main'
 
 -- This generates a new autograd.nn.[moduleName]
 -- that takes a suitable forward function executed in :updateOutput
@@ -17,35 +17,37 @@ return function(moduleName)
    -- end
    function module:__init(fn, weight, bias)
       parent.__init(self)
-
       self.fn = fn or error('An autograd function must be specified as input to AutoModule')
       self.weight,self.gradWeight = weight and weight, weight:clone()
       self.bias,self.gradBias = bias and bias, bias:clone()
-
-      self.backwardFn = function(params)
-         local input = params.input
-         self.output = self.fn(input, params.weight, params.bias)
-         return self.output
+      local fnWrapper = function(params)
+         return self.fn(params.input, params.weight, params.bias)
       end
+      self.f = autograd(fnWrapper, { withForward = true, withGradients = false })
+      self.b = autograd(fnWrapper, { withForward = false, withGradients = true, partialGrad = true })
+   end
+
+   function forward(self, input)
+      self.output = self.f(input)
+      return self.output
    end
 
    function module:updateOutput(input)
       self.grads = nil
-      self.arg, self.ans, self.tape, self.output = d.funOnly(self.backwardFn)(nil, {input=input, weight=self.weight, bias=self.bias})
+      self.output = self.f({input=input, weight=self.weight, bias=self.bias})
       return self.output
    end
 
    function module:updateGradInput(input, gradOutput)
-      self.grads = d.gradOnly(self.tape)(self.arg, self.ans, gradOutput)
+      self.grads = self.b({input=input, weight=self.weight, bias=self.bias}, gradOutput)
       self.gradInput = self.grads.input
       return self.gradInput
    end
 
    function module:accGradParameters(input, gradOutput, scale)
       if not self.grads then
-         self.grads = d.gradOnly(self.tape)(self.arg, self.ans, gradOutput)
+         self.grads = self.b({input=input, weight=self.weight, bias=self.bias}, gradOutput)
       end
-
       self.gradWeight:add(scale, self.grads.weight)
       self.gradBias:add(scale, self.grads.bias)
    end

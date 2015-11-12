@@ -27,9 +27,9 @@ end
 -- Libs
 local d = require 'autograd'
 local util = require 'autograd.util'
-local getValue = require 'autograd.node'.getValue
 local model = require 'autograd.model'
 local _ = require 'moses'
+local tablex = require('pl.tablex')
 
 -- Seed
 torch.manualSeed(1)
@@ -82,8 +82,8 @@ local lossf = d.nn.ClassNLLCriterion()
 -- Complete trainable function:
 local f = function(params, x, y, prevState, dropout)
    -- N elements:
-   local batchSize = x:size(1)
-   local bpropLength = x:size(2)
+   local batchSize = torch.size(x, 1)
+   local bpropLength = torch.size(x, 2)
    local nElements = batchSize * bpropLength
 
    -- Select word vectors
@@ -163,6 +163,8 @@ local lr = opt.learningRate
 local reportEvery = opt.reportEvery
 local valPerplexity = math.huge
 
+local df =  d(f)
+
 for epoch = 1,opt.nEpochs do
    -- Train:
    print('\nTraining Epoch #'..epoch)
@@ -178,7 +180,7 @@ for epoch = 1,opt.nEpochs do
       local y = trainData:narrow(2,i+1,opt.bpropLength):contiguous()
 
       -- Grads:
-      grads,loss,lstmState = d(f)(params, x, y, lstmState, opt.dropout)
+      grads,loss,lstmState = df(params, x, y, lstmState, opt.dropout)
 
       -- Cap gradient norms:
       local norm = 0
@@ -193,8 +195,8 @@ for epoch = 1,opt.nEpochs do
       end
 
       -- Update params:
-      for i,param in ipairs(_.flatten(params)) do
-         local g = _.flatten(grads)[i]
+      for i,param in ipairs(_.flatten(_.clone(params))) do
+         local g = _.flatten(_.clone(grads))[i]
          param:add(-lr, g)
       end
 
@@ -208,7 +210,7 @@ for epoch = 1,opt.nEpochs do
       end
 
       -- TODO: get rid of this once autograd allocates less
-      collectgarbage()
+      --collectgarbage()
    end
 
    -- Validate:

@@ -1,5 +1,5 @@
 local auto = require 'autograd.auto'
-local d = require 'autograd.main'
+local autograd = require 'autograd.main'
 
 -- This generates a new autograd.nn.[moduleName]
 -- that takes a suitable forward function executed in :updateOutput
@@ -16,13 +16,14 @@ return function(criterionName)
    function criterion:__init(fn)
       parent.__init(self)
       self.fn = fn or error('An autograd function must be specified as input to AutoCriterion')
-      self.fnWrapper = function(params, target)
+      local fnWrapper = function(params, target)
          return self.fn(params.input, target)
       end
+      self.f = autograd(fnWrapper, { withForward = true, withGradients = true })
    end
 
    function criterion:updateOutput(input,y)
-      self.gradInput, self.output, self.predictions = d(self.fnWrapper)({input=input}, y)
+      self.gradInput, self.output, self.predictions = self.f({input=input}, y)
       return self.output
    end
 

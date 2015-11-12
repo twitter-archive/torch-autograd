@@ -1,6 +1,6 @@
 local sequence = require 'autograd.model.common'.sequence
 
-local nn = require('autograd.nnwrapper')('nn')
+local nn = require('autograd.main').nn
 
 local function NeuralLayer(opt, params, layers, layer2params)
    -- options:

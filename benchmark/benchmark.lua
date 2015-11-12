@@ -75,11 +75,11 @@ end
 
 -- Test 1: logistic regression
 local tests = {
+
    ['logistic (ag)'] = function()
       local tnn, tag
       local x = tensor(1000,100):normal()
       local y = tensor(1000):uniform(1.5,10.5):floor()
-      local yOneHot = d.util.oneHot(y,10)
 
       do
          local model = nn.Sequential()
@@ -97,7 +97,7 @@ local tests = {
          model:backward(x[1], dloss_dyhat)
 
          tic()
-         for k = 1,20 do
+         for k = 1,40 do
             for i = 1,x:size(1) do
                model:zeroGradParameters()
                local yhat = model:forward(x[i])
@@ -112,7 +112,8 @@ local tests = {
       do
          local f = function(params, x, y)
             local wx = params.W * x + params.b
-            local loss, yhat = d.loss.crossEntropy(wx, y)
+            local yhat = d.util.logSoftMax(wx)
+            local loss = -torch.sum(torch.narrow(yhat,1,y,1))
             return loss
          end
          local params = {
@@ -121,12 +122,13 @@ local tests = {
          }
 
          -- force allocs
-         local grads = d(f)(params, x[1], yOneHot[1])
+         local df = d(f)
+         local grads = df(params, x[1], y[1])
 
          tic()
-         for k = 1,20 do
+         for k = 1,40 do
             for i = 1,x:size(1) do
-               local grads = d(f)(params, x[i], yOneHot[i])
+               local grads = df(params, x[i], y[i])
             end
          end
          tag = toc()
@@ -186,12 +188,13 @@ local tests = {
          }
 
          -- force allocs
-         local grads = d(f)(params, x[1], y[1])
+         local df = d(f)
+         local grads = df(params, x[1], y[1])
 
          tic()
          for k = 1,20 do
             for i = 1,x:size(1) do
-               local grads = d(f)(params, x[i], y[i])
+               local grads = df(params, x[i], y[i])
             end
          end
          tag = toc()
@@ -204,7 +207,6 @@ local tests = {
       local tnn, tag
       local x = tensor(2000,100):normal()
       local y = tensor(2000):uniform(1.5,10.5):floor()
-      local yOneHot = d.util.oneHot(y,10)
 
       do
          local model = nn.Sequential()
@@ -224,12 +226,14 @@ local tests = {
          model:backward(x[1], dloss_dyhat)
 
          tic()
-         for i = 1,x:size(1) do
-            model:zeroGradParameters()
-            local yhat = model:forward(x[i])
-            local loss = lossf:forward(yhat, y[i])
-            local dloss_dyhat = lossf:backward(yhat, y[i])
-            model:backward(x[i], dloss_dyhat)
+         for k = 1,10 do
+            for i = 1,x:size(1) do
+               model:zeroGradParameters()
+               local yhat = model:forward(x[i])
+               local loss = lossf:forward(yhat, y[i])
+               local dloss_dyhat = lossf:backward(yhat, y[i])
+               model:backward(x[i], dloss_dyhat)
+            end
          end
          tnn = toc()
       end
@@ -238,7 +242,8 @@ local tests = {
          local f = function(params, x, y)
             local h1 = torch.tanh( params.W1 * x + params.b1 )
             local h2 = params.W2 * h1 + params.b2
-            local loss, yhat = d.loss.crossEntropy(h2, y)
+            local yhat = d.util.logSoftMax(h2)
+            local loss = -torch.sum(torch.narrow(yhat,1,y,1))
             return loss
          end
          local params = {
@@ -249,11 +254,14 @@ local tests = {
          }
 
          -- force allocs
-         local grads = d(f)(params, x[1], yOneHot[1])
+         local df = d(f)
+         local grads = df(params, x[1], y[1])
 
          tic()
-         for i = 1,x:size(1) do
-            local grads = d(f)(params, x[i], yOneHot[i])
+         for k = 1,10 do
+            for i = 1,x:size(1) do
+               local grads = df(params, x[i], y[i])
+            end
          end
          tag = toc()
       end
@@ -265,7 +273,6 @@ local tests = {
       local tnn, tag
       local x = tensor(2000,100):normal()
       local y = tensor(2000):uniform(1.5,10.5):floor()
-      local yOneHot = d.util.oneHot(y,10)
 
       do
          local model = nn.Sequential()
@@ -285,12 +292,14 @@ local tests = {
          model:backward(x[1], dloss_dyhat)
 
          tic()
-         for i = 1,x:size(1) do
-            model:zeroGradParameters()
-            local yhat = model:forward(x[i])
-            local loss = lossf:forward(yhat, y[i])
-            local dloss_dyhat = lossf:backward(yhat, y[i])
-            model:backward(x[i], dloss_dyhat)
+         for k = 1,10 do
+            for i = 1,x:size(1) do
+               model:zeroGradParameters()
+               local yhat = model:forward(x[i])
+               local loss = lossf:forward(yhat, y[i])
+               local dloss_dyhat = lossf:backward(yhat, y[i])
+               model:backward(x[i], dloss_dyhat)
+            end
          end
          tnn = toc()
       end
@@ -305,7 +314,7 @@ local tests = {
             local h1 = tanh( lin1(x, params.W1, params.b1) )
             local h2 = lin2(h1, params.W2, params.b2)
             local yhat = lsm(h2)
-            local loss = -torch.sum(torch.cmul(yhat, y))
+            local loss = -torch.sum(torch.narrow(yhat, 1, y, 1))
             return loss
          end
          local params = {
@@ -316,11 +325,14 @@ local tests = {
          }
 
          -- force allocs
-         local grads = d(f)(params, x[1], yOneHot[1])
+         local df = d(f)
+         local grads = df(params, x[1], y[1])
 
          tic()
-         for i = 1,x:size(1) do
-            local grads = d(f)(params, x[i], yOneHot[i])
+         for k = 1,10 do
+            for i = 1,x:size(1) do
+               local grads = df(params, x[i], y[i])
+            end
          end
          tag = toc()
       end
@@ -351,12 +363,14 @@ local tests = {
          model:backward(x[1], dloss_dyhat)
 
          tic()
-         for i = 1,x:size(1) do
-            model:zeroGradParameters()
-            local yhat = model:forward(x[i])
-            local loss = lossf:forward(yhat, y[i])
-            local dloss_dyhat = lossf:backward(yhat, y[i])
-            model:backward(x[i], dloss_dyhat)
+         for k = 1,10 do
+            for i = 1,x:size(1) do
+               model:zeroGradParameters()
+               local yhat = model:forward(x[i])
+               local loss = lossf:forward(yhat, y[i])
+               local dloss_dyhat = lossf:backward(yhat, y[i])
+               model:backward(x[i], dloss_dyhat)
+            end
          end
          tnn = toc()
       end
@@ -383,71 +397,13 @@ local tests = {
          }
 
          -- force allocs
-         local grads = d(f)(params, x[1], y[1])
-
-         tic()
-         for i = 1,x:size(1) do
-            local grads = d(f)(params, x[i], y[i])
-         end
-         tag = toc()
-      end
-
-      return tnn, tag
-   end,
-
-   ['mlp (ag, fprop)'] = function()
-      local tnn, tag
-      local x = tensor(2000,100):normal()
-      local y = tensor(2000):uniform(1.5,10.5):floor()
-      local yOneHot = d.util.oneHot(y,10)
-
-      do
-         local model = nn.Sequential()
-         model:add(nn.Linear(100,1000))
-         model:add(nn.Tanh())
-         model:add(nn.Linear(1000,10))
-         model:add(nn.LogSoftMax())
-         model:type(ttype)
-         local lossf = nn.ClassNLLCriterion()
-         lossf:type(ttype)
-
-         -- force allocs
-         model:zeroGradParameters()
-         local yhat = model:forward(x[1])
-         local loss = lossf:forward(yhat, y[1])
+         local df = d(f)
+         local grads = df(params, x[1], y[1])
 
          tic()
          for k = 1,10 do
             for i = 1,x:size(1) do
-               model:zeroGradParameters()
-               local yhat = model:forward(x[i])
-               local loss = lossf:forward(yhat, y[i])
-            end
-         end
-         tnn = toc()
-      end
-
-      do
-         local f = function(params, x, y)
-            local h1 = torch.tanh( params.W1 * x + params.b1 )
-            local h2 = params.W2 * h1 + params.b2
-            local loss, yhat = d.loss.crossEntropy(h2, y)
-            return loss
-         end
-         local params = {
-            W1 = tensor(1000, 100):normal(.01),
-            b1 = tensor(1000):zero(),
-            W2 = tensor(10, 1000):normal(.01),
-            b2 = tensor(10):zero(),
-         }
-
-         -- force allocs
-         local grads = f(params, x[1], yOneHot[1])
-
-         tic()
-         for k = 1,10 do
-            for i = 1,x:size(1) do
-               local grads = f(params, x[i], yOneHot[i])
+               local grads = df(params, x[i], y[i])
             end
          end
          tag = toc()
@@ -483,7 +439,7 @@ local tests = {
          model:backward(x, dloss_dyhat)
 
          tic()
-         for i = 1,200 do
+         for i = 1,2000 do
             model:zeroGradParameters()
             local yhat = model:forward(x)
             local loss = lossf:forward(yhat, y)
@@ -495,17 +451,17 @@ local tests = {
 
       do
          local linear  = function(input, weight, bias)
-            local y = input * weight + torch.expand(bias, input:size(1), bias:size(2))
+            local y = input * weight + torch.expand(bias, torch.size(input, 1), torch.size(bias, 2))
             return y
          end
          local linearReLU  = function(input, weight, bias)
-            local y = input * weight + torch.expand(bias, input:size(1), bias:size(2))
+            local y = input * weight + torch.expand(bias, torch.size(input, 1), torch.size(bias, 2))
             local output = torch.mul( torch.abs( y ) + y, 0.5)
             return output
          end
          local mse = function(input, target)
             local buffer = input-target
-            return torch.sum( torch.cmul(buffer, buffer) ) / (input:dim() == 2 and input:size(1)*input:size(2) or input:size(1))
+            return torch.sum( torch.cmul(buffer, buffer) ) / (torch.nDimension(input) == 2 and torch.size(input, 1) * torch.size(input, 2) or torch.size(input, 1))
          end
          local autoModel = nn.Sequential()
          local autoLinear1ReLU = d.nn.AutoModule('AutoLinearReLU')(linearReLU, tensor(inputSize, outputSize), tensor(1,outputSize))
@@ -558,7 +514,7 @@ local tests = {
          model:backward(x, dloss_dyhat)
 
          tic()
-         for i = 1,200 do
+         for i = 1,2000 do
             model:zeroGradParameters()
             local yhat = model:forward(x)
             local loss = lossf:forward(yhat, y)
@@ -570,7 +526,7 @@ local tests = {
 
       do
          local f = function(params, x, y)
-            local N = x:size(1)
+            local N = torch.size(x, 1)
             local h1 = torch.tanh( x * params.W1 + torch.expand(params.b1, N,1000) )
             local h2 = h1 * params.W2 + torch.expand(params.b2, N,10)
             local loss, yhat = d.loss.crossEntropy(h2, y)
@@ -584,11 +540,12 @@ local tests = {
          }
 
          -- force allocs
-         local grads = d(f)(params, x, yOneHot)
+         local df = d(f)
+         local grads = df(params, x, yOneHot)
 
          tic()
-         for i = 1,200 do
-            local grads = d(f)(params, x, yOneHot)
+         for i = 1,2000 do
+            local grads = df(params, x, yOneHot)
          end
          tag = toc()
       end
@@ -598,12 +555,12 @@ local tests = {
 
    ['mlp (nn, batched)'] = function()
       local tnn, tag
-      local x = tensor(32,100):normal()
+      local x = tensor(32,1000):normal()
       local y = tensor(32):uniform(1.5,10.5):floor()
 
       do
          local model = nn.Sequential()
-         model:add(nn.Linear(100,1000))
+         model:add(nn.Linear(1000,1000))
          model:add(nn.Tanh())
          model:add(nn.Linear(1000,10))
          model:add(nn.LogSoftMax())
@@ -630,7 +587,7 @@ local tests = {
       end
 
       do
-         local lin1 = d.nn.Linear(100,1000)
+         local lin1 = d.nn.Linear(1000,1000)
          local tanh = d.nn.Tanh()
          local lin2 = d.nn.Linear(1000,10)
          local lsm = d.nn.LogSoftMax()
@@ -644,18 +601,19 @@ local tests = {
             return loss
          end
          local params = {
-            W1 = tensor(1000, 100):normal(.01),
+            W1 = tensor(1000, 1000):normal(.01),
             b1 = tensor(1000):normal(.01),
             W2 = tensor(10, 1000):normal(.01),
             b2 = tensor(10):normal(.01),
          }
 
          -- force allocs
-         local grads = d(f)(params, x, y)
+         local df = d(f)
+         local grads = df(params, x, y)
 
          tic()
-         for i = 1,200 do
-            local grads = d(f)(params, x, y)
+         for i = 1,2000 do
+            local grads = df(params, x, y)
          end
          tag = toc()
       end
@@ -731,11 +689,12 @@ local tests = {
          }
 
          -- force allocs
-         local grads = d(f)(params, x, y)
+         local df = d(f)
+         local grads = df(params, x, y)
 
          tic()
          for i = 1,10 do
-            local grads = d(f)(params, x, y)
+            local grads = df(params, x, y)
          end
          tag = toc()
       end
@@ -792,11 +751,12 @@ local tests = {
          end
 
          -- force allocs
-         local grads = d(f)(params, x, y)
+         local df = d(f)
+         local grads = df(params, x, y)
 
          tic()
          for i = 1,10 do
-            local grads = d(f)(params, x, y)
+            local grads = df(params, x, y)
          end
          tag = toc()
       end
@@ -837,7 +797,7 @@ local tests = {
          model:backward(x, dloss_dyhat)
 
          tic()
-         for i = 1,30 do
+         for i = 1,200 do
             model:zeroGradParameters()
             local yhat = model:forward(x)
             local loss = lossf:forward(yhat, y)
@@ -877,11 +837,12 @@ local tests = {
          end
 
          -- force allocs
-         local grads = d(f)(params, x, y)
+         local df = d(f)
+         local grads = df(params, x, y)
 
          tic()
-         for i = 1,30 do
-            local grads = d(f)(params, x, y)
+         for i = 1,200 do
+            local grads = df(params, x, y)
          end
          tag = toc()
       end
@@ -962,11 +923,12 @@ local tests = {
          end
 
          -- force allocs
-         local grads = d(f)(params, x, y)
+         local df = d(f)
+         local grads = df(params, x, y)
 
          tic()
          for i = 1,30 do
-            local grads = d(f)(params, x, y)
+            local grads = df(params, x, y)
          end
          tag = toc()
       end
