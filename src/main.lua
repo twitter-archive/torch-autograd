@@ -105,6 +105,14 @@ local function letterForType(val)
    end
 end
 
+
+local function defaultBool(b, db)
+   if b == nil then
+      return db
+   end
+   return b
+end
+
 local applyDepth = 0
 local nodeDisabled = true
 
@@ -195,6 +203,11 @@ local function convertOperators(execOrder)
                node.forwardFn = { name = "torch.mul" }
             elseif node.inputs[1].type == Value.NUMBER and node.inputs[2].type == Value.TENSOR then
                node.forwardFn = { name = "torch.mul" }
+               node.inputs[1].source:changeNodeTargetIndex(node, 1, 2)
+               node.inputs[2].source:changeNodeTargetIndex(node, 2, 1)
+               local t1 = node.inputs[1]
+               node.inputs[1] = node.inputs[2]
+               node.inputs[2] = t1
             end
          elseif op == "add" and #node.inputs == 2 then
             if node.inputs[1].type == Value.TENSOR and node.inputs[2].type == Value.TENSOR then
@@ -315,16 +328,20 @@ local function walkOutputRoots(val, execOrder, seen, outputNodes)
    return execOrder
 end
 
-local function execGraph(graph)
+local function execGraph(graph, withForward, withGradients)
    local seen = { }
    local grads = graph.grads
    local answers = graph.answers
    local execOrder = { }
    local outputNodes = { }
-   for i = 1, #grads do
-      walkOutputRoots(grads[i].grad, execOrder, seen, outputNodes)
+   if defaultBool(withGradients, true) then
+      for i = 1, #grads do
+         walkOutputRoots(grads[i].grad, execOrder, seen, outputNodes)
+      end
    end
-   walkOutputRoots(answers, execOrder, seen, outputNodes)
+   if defaultBool(withForward, true) then
+      walkOutputRoots(answers, execOrder, seen, outputNodes)
+   end
    return execOrder, outputNodes
 end
 
@@ -344,6 +361,8 @@ end
 
 local function createGraph(fn, args, opt)
    local argnum = opt.argnum or 1
+   local partialGrad = defaultBool(opt.partialGrad, false)
+   local withGradients = defaultBool(opt.withGradients, true)
    local values = { }
    local tensorDims = { }
    for i = 1, #args do
@@ -361,11 +380,21 @@ local function createGraph(fn, args, opt)
    -- Only walk from the answer we need to differentiate (usually the first).
    local forwardExecOrder = walkOutputRoots(answers[argnum])
 
-   -- Walk the execution order backwards, chaining derivatives.
-   answers[1].source.node.gradients[1] = Value.from(1, Source.gradient(1))
-   for i=#forwardExecOrder,1,-1 do
-      local node = forwardExecOrder[i]
-      node:evaluateBackward()
+   if withGradients then
+      -- Walk the execution order backwards, chaining derivatives.
+      if answers[1].type == Value.TENSOR and opt.partialGrad then
+         local tens = answers[1]:get()
+         answers[1].source.node.gradients[1] = Value.from(torch[tens:type():gsub("torch%.", "")](tens:size()):zero(), Source.gradient(1, tens:type(), tens:size()))
+      elseif answers[1].type == Value.NUMBER then
+         answers[1].source.node.gradients[1] = Value.from(1, Source.gradient(1))
+      else
+         error("invalid return value type from autograd function, autograd only supports scalar return values")
+      end
+
+      for i=#forwardExecOrder,1,-1 do
+         local node = forwardExecOrder[i]
+         node:evaluateBackward()
+      end
    end
 
    -- End recording.
@@ -489,6 +518,8 @@ end
 
 local function generateCode(fn, args, opt)
    local optimize = opt.optimize or true
+   local withForward = defaultBool(opt.withForward, true)
+   local withGradients = defaultBool(opt.withGradients, true)
    local reuseLocals = opt.reuseLocals or { }
 
    local graph = createGraph(fn, args, opt)
@@ -497,7 +528,7 @@ local function generateCode(fn, args, opt)
       optimizeGraph(graph)
    end
 
-   local execOrder, outputNodes = execGraph(graph)
+   local execOrder, outputNodes = execGraph(graph, withForward, withGradients)
    local symbols, defined, constants, numLocals, numReusableLocals, reusableLocalMap = createSymbolTable(graph, execOrder, reuseLocals)
    local objects = collectObjects(execOrder)
 
@@ -611,44 +642,51 @@ local function generateCode(fn, args, opt)
    out.write("    ")
    out.write("return ")
    local grads = graph.grads
-   print(grads)
    local answers = graph.answers
-   print(answers)
-   if #grads == 1 and grads[1].grad.type == Value.TABLE then
-      -- This doesn't feel quite right, should be possible to unify this with the other path.
-      out.write(grads[1].grad.source:symbolPath(symbols))
-   elseif #grads == 1 and grads[1].grad.type == Value.TENSOR and grads[1].param.source.type == Source.PARAM then
-      out.write(grads[1].grad.source:symbolPath(symbols))
-   else
-      local retTable = { }
-      for i = 1, #grads do
-         local valTable = retTable
-         local stack = grads[i].param.source:getParentsArray()
-         local gradSymbol = grads[i].grad.source:symbolPath(symbols)
-         for k = 1, #stack do
-            local ss = stack[k]
-            if ss.type == Source.TABLE then
-               if valTable[ss.key] == nil then
-                  if stack[k + 1] == nil then
-                     valTable[ss.key] = gradSymbol
-                  else
-                     local nextTable = { }
-                     valTable[ss.key] = nextTable
+   if withGradients then
+      if #grads == 1 and grads[1].grad.type == Value.TABLE then
+         -- This doesn't feel quite right, should be possible to unify this with the other path.
+         out.write(grads[1].grad.source:symbolPath(symbols))
+      elseif #grads == 1 and grads[1].grad.type == Value.TENSOR and grads[1].param.source.type == Source.PARAM then
+         out.write(grads[1].grad.source:symbolPath(symbols))
+      else
+         local retTable = { }
+         for i = 1, #grads do
+            local valTable = retTable
+            local stack = grads[i].param.source:getParentsArray()
+            local gradSymbol = grads[i].grad.source:symbolPath(symbols)
+            for k = 1, #stack do
+               local ss = stack[k]
+               if ss.type == Source.TABLE then
+                  if valTable[ss.key] == nil then
+                     if stack[k + 1] == nil then
+                        valTable[ss.key] = gradSymbol
+                     else
+                        local nextTable = { }
+                        valTable[ss.key] = nextTable
+                     end
                   end
+                  valTable = valTable[ss.key]
                end
-               valTable = valTable[ss.key]
             end
          end
+         writeLiteralTable(retTable, out, symbols, 2)
       end
-      writeLiteralTable(retTable, out, symbols, 2)
    end
-   for i = 1, #answers do
-      local answer = answers[i]
-      if Value.isValue(answer) then
-         out.write(", ", answers[i].source:symbolPath(symbols))
-      elseif type(answer) == "table" then
+   if withForward then
+      if withGradients then
          out.write(", ")
-         writeLiteralTable(answer, out, symbols, 2)
+      end
+      for i = 1, #answers do
+         if i ~= 1 then
+            out.write(", ")
+         end
+         local answer = answers[i]
+         if Value.isValue(answer) then
+            out.write(answers[i].source:symbolPath(symbols))
+         elseif type(answer) == "table" then
+            writeLiteralTable(answer, out, symbols, 2)
+         end
       end
    end
    out.write("\n")
@@ -671,11 +709,14 @@ local function buildSignature(params, tensorDims)
    end
 end
 
-local function grad(fn, argnum, opt)
-   opt = opt or { }
-   opt.argnum = argnum or 1
-   opt.reuseLocals = { }
-   debugger = Debugger(opt)
+local function grad(fn, gradOpt)
+   gradOpt = gradOpt or { }
+   debugger = Debugger(gradOpt)
+   local argNum = gradOpt.gradArg or 1
+   local withForward = defaultBool(gradOpt.withForward, true)
+   local withGradients = defaultBool(gradOpt.withGradients, true)
+   local partialGrad = defaultBool(gradOpt.partialGrad, false)
+   argnum = argnum or 1
    local generatedFunctions = { }
    local doGrad = function(...)
       local args = {...}
@@ -683,8 +724,15 @@ local function grad(fn, argnum, opt)
       buildSignature(args, tensorDims)
       local signature = table.concat(tensorDims, "-")
       if generatedFunctions[signature] == nil then
+         local opt = {
+            argnum = 1,
+            withForward = withForward,
+            withGradients = withGradients,
+            partialGrad = partialGrad,
+            reuseLocals = rlocals
+         }
          local code, outerArgs = generateCode(fn, args, opt)
-         print(code)
+         --print(code)
          --print("generated code for param signature " .. signature)
          local outer = loadstring(code)
          if outer == nil then

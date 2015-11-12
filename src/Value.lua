@@ -21,7 +21,9 @@ function Value:init(type, val, source)
 end
 
 function Value.from(v, source)
-	if Value.isValue(v) then
+	if v == nil then
+		error("nil parameter value")
+	elseif Value.isValue(v) then
 		return v
 	elseif type(v) == "table" then
 		local vcopy = { }

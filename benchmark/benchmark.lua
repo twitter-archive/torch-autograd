@@ -451,17 +451,17 @@ local tests = {
 
       do
          local linear  = function(input, weight, bias)
-            local y = input * weight + torch.expand(bias, input:size(1), bias:size(2))
+            local y = input * weight + torch.expand(bias, torch.size(input, 1), torch.size(bias, 2))
             return y
          end
          local linearReLU  = function(input, weight, bias)
-            local y = input * weight + torch.expand(bias, input:size(1), bias:size(2))
+            local y = input * weight + torch.expand(bias, torch.size(input, 1), torch.size(bias, 2))
             local output = torch.mul( torch.abs( y ) + y, 0.5)
             return output
          end
          local mse = function(input, target)
             local buffer = input-target
-            return torch.sum( torch.cmul(buffer, buffer) ) / (input:dim() == 2 and input:size(1)*input:size(2) or input:size(1))
+            return torch.sum( torch.cmul(buffer, buffer) ) / (torch.nDimension(input) == 2 and torch.size(input, 1) * torch.size(input, 2) or torch.size(input, 1))
          end
          local autoModel = nn.Sequential()
          local autoLinear1ReLU = d.nn.AutoModule('AutoLinearReLU')(linearReLU, tensor(inputSize, outputSize), tensor(1,outputSize))

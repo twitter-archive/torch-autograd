@@ -191,4 +191,13 @@ function Node:outputParamIndex(outputValue)
 	return 0
 end
 
+function Node:changeTargetIndex(param, target, currentIdx, newIdx)
+	for i = 1, #self.outputTargets[param] do
+		local ot = self.outputTargets[param][i]
+		if ot.node == self and ot.index == currentIdx then
+			out.index = newIdx
+		end
+	end
+end
+
 return Node
