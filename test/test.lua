@@ -678,7 +678,7 @@ local tests = {
       local grads = autograd(mlp)(params)
 
       -- Check grads:
-      tester:assert(gradcheck(mlp, params, x), 'incorrect gradients')
+      tester:assert(gradcheck(mlp, params), 'incorrect gradients')
    end,
 
    NNFunc_CNN = function()
@@ -834,7 +834,7 @@ local tests = {
       tester:asserteq(grads[2].b:dim(), 1, 'biases for layer 4 have incorrect dims')
 
       -- Gradcheck
-      tester:assert(gradcheck(function(params, i, t) return loss(params, i, t) end, params, i, t), 'incorrect gradients')
+      tester:assert(gradcheck(loss, params, i, t), 'incorrect gradients')
    end,
 
    Models_SpatialNetwork = function()
@@ -877,7 +877,7 @@ local tests = {
       tester:asserteq(type(l), 'number', 'loss should be a scalar')
 
       -- Gradcheck:
-      tester:assert(gradcheck(function(params, i, t) return loss(params, i, t) end, params, i, t), 'incorrect gradients')
+      tester:assert(gradcheck(loss, params, i, t), 'incorrect gradients')
    end,
 
    Models_RecurrentNetwork = function()
@@ -907,7 +907,7 @@ local tests = {
       tester:asserteq(type(g), 'table', 'gradients could not be computed')
 
       -- Gradcheck:
-      tester:assert(gradcheck(function(params, i) return loss(params, i) end, params, i), 'incorrect gradients')
+      tester:assert(gradcheck(loss, params, i), 'incorrect gradients')
    end,
 
    Models_RecurrentLSTMNetwork = function()
@@ -937,7 +937,7 @@ local tests = {
       tester:asserteq(type(g), 'table', 'gradients could not be computed')
 
       -- Gradcheck:
-      tester:assert(gradcheck(function(params, i) return loss(params, i) end, params, i), 'incorrect gradients')
+      tester:assert(gradcheck(loss, params, i), 'incorrect gradients')
 
       -- Define RNN with all states exposed:
       local f,params = autograd.model.RecurrentLSTMNetwork({
