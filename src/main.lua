@@ -350,15 +350,26 @@ local function execGraph(graph, withForward, withGradients)
    return execOrder, outputNodes
 end
 
-local function searchMatchingLocal(tensor, locals, usedLocals)
+local function searchMatchingTensorExact(tensor, availableTensors, locals)
    local ttype = tensor:type()
    local tdims = tensor:nDimension()
-   for i = 1, #locals do
-      local lt = locals[i]
-      if usedLocals[i] == nil then
+   for i = #availableTensors, 1, -1 do
+      local idx = availableTensors[i]
+      local lt = locals[idx]
          if lt:type() == ttype and lt:nDimension() == tdims and lt:isSameSizeAs(tensor) then
             return i
          end
+      end
+   return 0
+end
+
+local function searchMatchingTensorLargest(tensor, sortedTensors, locals)
+   local ttype = tensor:type()
+   for i = #sortedTensors, 1, -1 do
+      local idx = sortedTensors[i]
+      local lt = locals[idx]
+      if lt:type() == ttype then
+         return i
       end
    end
    return 0
@@ -444,31 +455,90 @@ local function createSymbolTable(graph, execOrder, reuseLocals)
    end
 
    local reusableLocalMap = { }
-   local reusedLocals = { }
    local nextReusableLocal = #reuseLocals + 1
    local reusableLocalStart = nextReusableLocal
    local nextLocal = 1
+   local availableTensors = { }
+   for i = 1, #reuseLocals do
+      availableTensors[i] = i
+   end
+
+   local tensorAllocations = { }
+   local partialMatchAllocations = { }
+   local unmatchedTensors = false
+
+   -- Exact matches first.
+   for i = #execOrder, 1, -1 do
+      local node = execOrder[i]
+      if #node.outputs == 1 then
+         if node.outputs[1].type == Value.TENSOR then
+            if canReuseOutput(node) then
+               local matchingIndex = searchMatchingTensorExact(node.outputs[1]:get(), availableTensors, reuseLocals)
+               if matchingIndex > 0 then
+                  local tensorIdx = availableTensors[matchingIndex]
+                  table.remove(availableTensors, matchingIndex) -- typically the last element (or close), since we iterate in reverse
+                  tensorAllocations[node.outputs[1]] = tensorIdx
+               else
+                  unmatchedTensors = true
+               end
+            end
+         end
+      end
+   end
+
+   if unmatchedTensors and #availableTensors > 0 then
+      function sortLocalSize(a, b)
+        return reuseLocals[a]:storage():size() < reuseLocals[b]:storage():size()
+      end
+
+      table.sort(availableTensors, sortLocalSize)
+
+      local remainingOutputs = { }
+   for i = 1, #execOrder do
+      local node = execOrder[i]
+      if #node.outputs == 1 then
+         if node.outputs[1].type == Value.TENSOR then
+               if canReuseOutput(node) and tensorAllocations[node.outputs[1]] == nil then
+                  remainingOutputs[#remainingOutputs + 1] = node.outputs[1]
+               end
+            end
+         end
+      end
+
+      function sortTensorSize(a, b)
+        return a:get():storage():size() < b:get():storage():size()
+      end
+
+      table.sort(remainingOutputs, sortTensorSize)
+
+      for i = #remainingOutputs, 1, -1 do
+         local output = remainingOutputs[i]
+         local matchingIndex = searchMatchingTensorLargest(output:get(), availableTensors, reuseLocals)
+                  if matchingIndex > 0 then
+            local tensorIdx = availableTensors[matchingIndex]
+            table.remove(availableTensors, matchingIndex) -- typically the last element
+            tensorAllocations[output] = tensorIdx
+            partialMatchAllocations[output] = tensorIdx
+         end
+                  end
+               end
 
    for i = 1, #execOrder do
       local node = execOrder[i]
       if #node.outputs == 1 then
          if node.outputs[1].type == Value.TENSOR then
             defined[node.outputs[1].source] = true
-
             if canReuseOutput(node) then
-               local index = nil
-               if reuseLocals ~= nil and canReuseOutput(node) then
-                  local matchingIndex = searchMatchingLocal(node.outputs[1]:get(), reuseLocals, reusedLocals)
-                  if matchingIndex > 0 then
-                     index = matchingIndex
-                     reusedLocals[matchingIndex] = true
-                  end
-               end
+               local index = tensorAllocations[node.outputs[1]]
                if index == nil then
                   index = nextReusableLocal
                   nextReusableLocal = nextReusableLocal + 1
                end
+               if partialMatchAllocations[node.outputs[1]] ~= nil then
+                  symbols[node.outputs[1].source] = "vlocals[" .. index .. "]"
+               else
                symbols[node.outputs[1].source] = "rlocals[" .. index .. "]"
+               end
                reusableLocalMap[index] = node.outputs[1]
             else
                symbols[node.outputs[1].source] = "locals[" .. nextLocal .. "]"
@@ -493,8 +563,7 @@ local function createSymbolTable(graph, execOrder, reuseLocals)
          end
       end
    end
-
-   return symbols, defined, constants, nextLocal - 1, nextReusableLocal - 1, reusableLocalMap
+   return symbols, defined, constants, nextLocal - 1, nextReusableLocal - 1, reusableLocalMap, partialMatchAllocations
 end
 
 local function collectObjects(execOrder)
@@ -540,7 +609,7 @@ local function generateCode(fn, args, opt)
    end
 
    local execOrder, outputNodes = execGraph(graph, withForward, withGradients)
-   local symbols, defined, constants, numLocals, numReusableLocals, reusableLocalMap = createSymbolTable(graph, execOrder, reuseLocals)
+   local symbols, defined, constants, numLocals, numReusableLocals, reusableLocalMap, partialMatchAllocations = createSymbolTable(graph, execOrder, reuseLocals)
    local objects = collectObjects(execOrder)
 
    local out = StringBuilder()
@@ -598,6 +667,7 @@ local function generateCode(fn, args, opt)
       out.write("\n")
    end
    out.write("local locals = { }")
+   out.write("local vlocals = { }")
    out.write("\n")
    out.write("for i = ", 1, ", ", numLocals, " do locals[i] = 0 end")
    out.write("\n")
@@ -611,7 +681,14 @@ local function generateCode(fn, args, opt)
          out.write("\n")
       end
    end
-
+   out.write("for i = ", 1, ", ", numReusableLocals, " do vlocals[i] = 0 end")
+   out.write("\n")
+   for k, v in pairs(partialMatchAllocations) do
+      local output = k
+      out.write(symbols[output.source], " = ", output:get():type(), ".new(rlocals[", v, "]):resize(", table.concat(output:get():size():totable(), ", "), ")")
+      out.write("\n")
+   end
+   out.write("\n")
    out.write("return function(")
    local paramSymbols = { }
    for i = 1, #graph.params do
