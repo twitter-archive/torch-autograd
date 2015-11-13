@@ -426,7 +426,14 @@ loss = loss.leastSquares(prediction, target)
 
 ### Debugging and fine-grain control
 
-Debugging hooks can be inserted when wrapping the function with `autograd`:
+Debugging hooks can be inserted when wrapping the function with `autograd`.
+The debugger will turn off any optimizations and insert NaN/Inf checks
+after every computation. If any of these trip the debugHook will be called
+with a message providing as much information as possible about the
+offending function, call stack and values. The debugHook also provides
+an interface to save or render a GraphViz dot file of the computation
+graph. We don't recommend leaving the debugHook installed all the time
+as your training speed will be significantly slower.
 
 ```lua
 grad(f, {
@@ -439,6 +446,35 @@ grad(f, {
    end
 })
 ```
+
+Consider this usage of autograd, it clearly contains a divide by zero.
+
+```lua
+local W = torch.Tensor(32,100):fill(.5)
+local x = torch.Tensor(100):fill(.5)
+local func = function(inputs)
+   return torch.sum(torch.div(inputs.W * inputs.x, 0))  -- DIV ZERO!
+end
+local dFunc = autograd(func, {
+   debugHook = function(debugger, msg)
+      debugger.showDot()
+      print(msg)
+      os.exit(0)
+   end
+})
+dFunc({W=W, x=x})
+```
+
+Will output:
+
+```
+autograd debugger detected a nan or inf value for locals[1]
+   1: fn@path/to/code/example.lua:4
+```
+
+And render in Safari as:
+
+<img src="DebuggerExample.svg">
 
 Finer-grain control over execution can also be achieved using these flags:
 

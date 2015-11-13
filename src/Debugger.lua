@@ -4,12 +4,7 @@ local StringBuilder = require 'autograd.StringBuilder'
 
 local function Debugger(opt)
    opt = opt or { }
-   if not opt.debugHook then
-      return nil
-   end
    local debugHook = opt.debugHook
-
-   local self
 
    local debugNodes = { }
    local function debugNode(node)
@@ -75,25 +70,169 @@ local function Debugger(opt)
       end
    end
 
-   local function valueCheck(value, raw, min, max)
+   local main
+   local function setMain(symbols, grads, answers)
+      main = {
+         symbols = symbols,
+         grads = grads,
+         answers = answers,
+      }
+   end
+
+   local function walkGraph(value, node, parentNode, callback)
+      callback(value, node, parentNode)
+      if node then
+         for i,input in ipairs(node.inputs) do
+            walkGraph(input, input.source.node, node, callback)
+         end
+      end
+   end
+
+   local function valueKey(value)
+      return 'x' .. value.source:symbolPath(main.symbols):gsub("[^a-zA-Z0-9]+", "_")
+   end
+
+   local function valueName(value)
+      for _,grad in pairs(main.grads) do
+         if grad.grad == value then
+            return "grad(" .. grad.param.source:symbolPath(main.symbols) .. ")", "trapezium"
+         end
+      end
+      for i,answer in ipairs(main.answers) do
+         if answer == value then
+            return "answer[" .. i .. "]", "octagon"
+         end
+      end
+      local shape = "ellipse"
+      if value.source.type ~= Source.COMPUTED then
+         shape = "invtrapezium"
+      end
+      return value.source:symbolPath(main.symbols), shape
+   end
+
+   local function generateDotValue(out, value)
+      local label, shape = valueName(value)
+      local parts = { label }
+      if torch.isTensor(value.raw) then
+         table.insert(parts, torch.typename(value.raw):sub(7) .. "(" .. table.concat(value.raw:size():totable(), ", ") .. ")")
+      elseif torch.isStorage(value.raw) then
+         table.insert(parts, torch.typename(value.raw):sub(7) .. "(" .. value.raw:size() .. ")")
+      end
+      local color = "black"
+      if value.debug and value.debug.min ~= nil then
+         table.insert(parts, "[" .. value.debug.min .. ", " .. value.debug.max .. "]")
+         if isNanOrInf(value.debug.min) or isNanOrInf(value.debug.max) then
+            color = "red"
+         end
+      end
+      out.write('\t' .. valueKey(value) .. ' [label=<' .. table.concat(parts, '<BR/>') .. '> color="' .. color .. '" shape="' .. shape .. '"];\n')
+   end
+
+   local function generateDotNode(out, node)
+      debugNode(node)
+      local label = node.forwardFn.name
+      color = "black"
+      for _,output in ipairs(node.outputs) do
+         if output.debug and (isNanOrInf(output.debug.min) or isNanOrInf(output.debug.max)) then
+            color = "red"
+            local forwardNode = rcsvFindCallStack(node)
+            if forwardNode then
+               for i,info in ipairs(forwardNode.debug.callStack) do
+                  label = label .. "<BR/>" .. i .. ": " .. tostring(info.name) .. info.source .. ":" .. info.currentline
+               end
+            end
+         end
+      end
+      out.write('\tnode' .. node.debug.index .. ' [label=<' .. label .. '> color="'..color..'" shape=box];\n')
+   end
+
+   local function generateEdge(out, node, value, reverse)
+      local color = (node.debug.isForward and 'green') or 'blue'
+      if reverse then
+         out.write('\t' .. valueKey(value) .. ' -> node' .. node.debug.index .. ' [color="'..color..'"];\n')
+      else
+         out.write('\tnode' .. node.debug.index .. ' -> ' .. valueKey(value) .. ' [color="'..color..'"];\n')
+      end
+   end
+
+   local function generateDot(fileName, value, node)
+      local out = StringBuilder(fileName)
+      out.write('digraph graphname {\n')
+      local seen = { }
+      local function callback(value, node, parentNode)
+         if value and not seen[value] then
+            seen[value] = true
+            generateDotValue(out, value)
+         end
+         if node and not seen[node] then
+            seen[node] = true
+            generateDotNode(out, node)
+         end
+         if node and value then
+            generateEdge(out, node, value)
+         end
+         if parentNode and value then
+            generateEdge(out, parentNode, value, true)
+         end
+      end
+      if value then
+         -- Walk from the provided root value and node
+         walkGraph(value, node, nil, callback)
+      else
+         -- Walk the entire graph
+         for _,grad in ipairs(main.grads) do
+            walkGraph(grad.grad, nil, nil, callback)
+         end
+         for _,answer in ipairs(main.answers) do
+            walkGraph(answer, nil, nil, callback)
+         end
+      end
+      out.write('}\n')
+      out.finish()
+   end
+
+   local function showDot(value, node)
+      if sys.uname() ~= 'macos' then
+         print('showDot() only implemented on OSX')
+         return
+      end
+      local fileName = os.tmpname()
+      generateDot(fileName, value, node)
+      os.execute('dot -O -Tsvg ' .. fileName)
+      os.remove(fileName)
+      os.execute('open -a Safari ' .. fileName ..'.svg')
+   end
+
+   local function valueCheck(value, raw, min, max, node)
       value.debug = value.debug or { }
       value.debug.min = (value.debug.min ~= nil and math.min(value.debug.min, min)) or min
       value.debug.max = (value.debug.max ~= nil and math.max(value.debug.max, max)) or max
       if isNanOrInf(value.debug.min) or isNanOrInf(value.debug.max) then
-         debugHook(self, "Detected NaN or Inf")
+         local debugger = {
+            generateDot = function(fileName) generateDot(fileName, value, node) end,
+            showDot = function() showDot(value, node) end,
+         }
+         local msg = "autograd debugger detected a nan or inf value for " .. valueName(value)
+         local forwardNode = rcsvFindCallStack(node)
+         if forwardNode then
+            for i,info in ipairs(forwardNode.debug.callStack) do
+               msg = msg .. "\n\t" .. i .. ": " .. tostring(info.name) .. info.source .. ":" .. info.currentline
+            end
+         end
+         debugHook(debugger, msg)
       end
    end
 
    local function outputCheckTensor(nodeIndex, outputIndex, raw)
       local node = debugNodes[nodeIndex]
       local value = node.outputs[outputIndex]
-      valueCheck(value, raw, raw:min(), raw:max())
+      valueCheck(value, raw, raw:min(), raw:max(), node)
    end
 
    local function outputCheckNumber(nodeIndex, outputIndex, raw)
       local node = debugNodes[nodeIndex]
       local value = node.outputs[outputIndex]
-      valueCheck(value, raw, raw, raw)
+      valueCheck(value, raw, raw, raw, node)
    end
 
    local function generateOutputCheck(node, outputIndex, symbol, out)
@@ -129,137 +268,18 @@ local function Debugger(opt)
       end
    end
 
-   local main
-   local function setMain(execOrder, symbols, grads, answers)
-      main = {
-         execOrder = execOrder,
-         symbols = symbols,
-         grads = grads,
-         answers = answers,
-      }
-   end
-
-   local function generateDot(fileName)
-      -- Figure out all the variables both supplied and intermediate
-      local vars = { }
-      local function varKey(io)
-         return 'x' .. io.source:symbolPath(main.symbols):gsub("[^a-zA-Z0-9]+", "_")
-      end
-      local function addVar(io)
-         local key = varKey(io)
-         if not vars[key] then
-            local parts = { }
-            local label
-            local shape = "ellipse"
-            for _,grad in pairs(main.grads) do
-               if grad.grad == io then
-                  label = "grad(" .. grad.param.source:symbolPath(main.symbols) .. ")"
-                  shape = "trapezium"
-                  break
-               end
-            end
-            for i,answer in ipairs(main.answers) do
-               if answer == io then
-                  label = "answer[" .. i .. "]"
-                  shape = "octagon"
-                  break
-               end
-            end
-            if label then
-               table.insert(parts, label)
-            elseif io.source.type ~= Source.COMPUTED then
-               table.insert(parts, io.source:symbolPath(main.symbols))
-               shape = "invtrapezium"
-            end
-            if torch.isTensor(io.raw) then
-               table.insert(parts, torch.typename(io.raw):sub(7) .. "(" .. table.concat(io.raw:size():totable(), ", ") .. ")")
-            elseif torch.isStorage(io.raw) then
-               table.insert(parts, torch.typename(io.raw):sub(7) .. "(" .. io.raw:size() .. ")")
-            end
-            local color = "black"
-            if io.debug and io.debug.min ~= nil then
-               table.insert(parts, "[" .. io.debug.min .. ", " .. io.debug.max .. "]")
-               if isNanOrInf(io.debug.min) or isNanOrInf(io.debug.max) then
-                  color = "red"
-               end
-            end
-            vars[key] = { label = table.concat(parts, '<BR/>'), color = color, shape = shape }
-         end
-      end
-      for i,node in ipairs(main.execOrder) do
-         for j,input in ipairs(node.inputs) do
-            addVar(input)
-         end
-         for j,output in ipairs(node.outputs) do
-            addVar(output)
-         end
-      end
-
-      -- Build a DOT
-      local out = StringBuilder(fileName)
-      out.write('digraph graphname {\n')
-      for key,var in pairs(vars) do
-         out.write('\t' .. key .. ' [label=<' .. var.label .. '> color="' .. var.color .. '" shape="' .. var.shape .. '"];\n')
-      end
-      local sawNan = false
-      for i,node in ipairs(main.execOrder) do
-         local label = node.forwardFn.name
-         color = "black"
-         for _,output in ipairs(node.outputs) do
-            if output.debug and (isNanOrInf(output.debug.min) or isNanOrInf(output.debug.max)) then
-               color = "red"
-               if not sawNan then
-                  local forwardNode = rcsvFindCallStack(node)
-                  if forwardNode then
-                     for i,info in ipairs(forwardNode.debug.callStack) do
-                        label = label .. "<BR/>" .. i .. ": " .. tostring(info.name) .. info.source .. ":" .. info.currentline
-                     end
-                     sawNan = true
-                  end
-               end
-            end
-         end
-         out.write('\tnode' .. i .. ' [label=<' .. label .. '> color="'..color..'" shape=box];\n')
-      end
-      for i,node in ipairs(main.execOrder) do
-         local color = (node.debug.isForward and 'green') or 'blue'
-         for j,input in ipairs(node.inputs) do
-            out.write('\t' .. varKey(input) .. ' -> ' .. 'node' .. i .. ' [color="'..color..'"];\n')
-         end
-         for j,output in ipairs(node.outputs) do
-            out.write('\tnode' .. i .. ' -> ' .. varKey(output) .. ' [color="'..color..'"];\n')
-         end
-      end
-      out.write('}\n')
-      out.finish()
-   end
-
-   local function showDot()
-      if sys.uname() ~= 'macos' then
-         print('showDow() only implemented on OSX')
-         return
-      end
-      local file = os.tmpname()
-      generateDot(file)
-      os.execute('dot -O -Tsvg ' .. file)
-      os.remove(file)
-      os.execute('open -a Safari ' .. file..'.svg')
-      -- TODO: gc that leaked svg
-   end
-
-   self = {
+   return {
       captureCallStack = captureCallStack,
+      setMain = setMain,
+      generateDot = generateDot,
+      showDot = showDot,
       outputCheckTensor = outputCheckTensor,
       outputCheckNumber = outputCheckNumber,
       generateOutputCheck = generateOutputCheck,
       inputCheckTensor = inputCheckTensor,
       inputCheckNumber = inputCheckNumber,
       generateInputCheck = generateInputCheck,
-      setMain = setMain,
-      generateDot = generateDot,
-      showDot = showDot,
    }
-   return self
 end
 
 return Debugger

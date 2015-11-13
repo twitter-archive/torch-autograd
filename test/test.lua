@@ -964,6 +964,35 @@ local tests = {
       -- Checks
       tester:asserteq(type(g), 'table', 'gradients could not be computed')
    end,
+
+   DebuggerDivZero = function()
+      -- Parameters:
+      local W = torch.Tensor(32,100):fill(.5)
+      local x = torch.Tensor(100):fill(.5)
+
+      -- Function:
+      local func = function(inputs)
+         return torch.sum(torch.div(inputs.W * inputs.x, 0))
+      end
+
+      -- Grads:
+      local sawHook = 0
+      local dFunc = autograd(func, {
+         debugHook = function(debugger, msg)
+            if sawHook == 0 then
+               --debugger.showDot()
+            end
+            sawHook = sawHook + 1
+         end
+      })
+
+      -- Compute func and grads:
+      local pred = func({W=W, x=x})
+      local grads = dFunc({W=W, x=x})
+
+      -- Tests:
+      tester:asserteq(sawHook, 5, 'debugHook should have tripped')
+   end,
 }
 
 -- Run tests:
