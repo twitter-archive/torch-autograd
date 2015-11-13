@@ -300,6 +300,13 @@ local function Debugger(opt)
 
    local function generateOutputCheck(node, outputIndex, symbol, out)
       debugNode(node)
+      if node.forwardFn.operator == nil then
+         local fnName = string.gsub(node.forwardFn.name, "%.", "_")
+         if fnName:sub(#fnName - 3, #fnName) == "_new" then
+            -- Don't check new memory as it contains random junk
+            return
+         end
+      end
       local output = node.outputs[outputIndex]
       if output.type == Value.TENSOR then
          out.write("    debugger.outputCheckTensor(" .. table.concat({ node.debug.index, outputIndex, symbol }, ", ") .. ")\n")
