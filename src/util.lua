@@ -35,14 +35,14 @@ function util.logSoftMax(array)
    return array - util.logSumExp(array)
 end
 
-function util.sigmoid(array,array2)
-   if array2 then
-      array:resizeAs(array2):copy(array2)
-      array:mul(-1):exp():add(1):pow(-1)
-      return array
-   else
-      return torch.pow(torch.exp(-array) + 1, -1)
-   end
+function util.sigmoid(array)
+   return torch.pow(torch.exp(-array) + 1, -1)
+end
+
+function util.sigmoidInPlace(output, input)
+   output:resizeAs(input):copy(input)
+   output:mul(-1):exp():add(1):pow(-1)
+   return output
 end
 
 function util.lookup(tble, indexes)

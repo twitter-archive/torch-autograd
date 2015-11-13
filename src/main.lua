@@ -21,7 +21,7 @@ local reusableFunctionsMap = {
    ["torch.expand"] = true,
    ["torch.cat"] = true,
    ["torch.log"] = true,
-   ["util.sigmoid"] = true,
+   ["util.sigmoidInPlace"] = true,
    ["util.narrowSliceCopyInPlace"] = true,
    ["util.selectSliceCopyInPlace"] = true,
    ["util.fillSameSizeAsInPlace"] = true,
@@ -42,6 +42,7 @@ local reusableFunctionTransforms = {
    ["util.narrowCopy"] = "util.narrowCopyInPlace",
    ["util.selectCopy"] = "util.selectCopyInPlace",
    ["util.indexAdd"] = "util.indexAddInPlace",
+   ["util.sigmoid"] = "util.sigmoidInPlace",
 }
 
 local function canReuseOutput(node)
