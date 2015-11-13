@@ -705,7 +705,11 @@ local function generateCode(fn, args, opt)
    out.write("\n")
    out.write("end")
    out.write("\n")
-   return out.finish(), outerArgs
+   local code = out.finish()
+   if debugger then
+      debugger.setCode(code)
+   end
+   return code, outerArgs
 end
 
 local function buildSignature(params, tensorDims)
