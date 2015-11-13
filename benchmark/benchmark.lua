@@ -439,7 +439,7 @@ local tests = {
          model:backward(x, dloss_dyhat)
 
          tic()
-         for i = 1,2000 do
+         for i = 1,200 do
             model:zeroGradParameters()
             local yhat = model:forward(x)
             local loss = lossf:forward(yhat, y)
@@ -612,7 +612,7 @@ local tests = {
          local grads = df(params, x, y)
 
          tic()
-         for i = 1,2000 do
+         for i = 1,200 do
             local grads = df(params, x, y)
          end
          tag = toc()
