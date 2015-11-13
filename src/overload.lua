@@ -148,7 +148,7 @@ local numberMetatable = {
       if type(a) == "number" and torch.isTensor(b) then
          return b + a
       elseif type(a) == "number" and type(b) == "table" then
-         return a + unwrapNumberValue(b)
+         return b + a
       else
          return a + b
       end
@@ -157,7 +157,7 @@ local numberMetatable = {
       if type(a) == "number" and torch.isTensor(b) then
          return -b + a
       elseif type(a) == "number" and type(b) == "table" then
-         return a - unwrapNumberValue(b)
+         return -b + a
       else
          return a - b
       end
@@ -166,7 +166,7 @@ local numberMetatable = {
       if type(a) == "number" and torch.isTensor(b) then
          return b * a
       elseif type(a) == "number" and type(b) == "table" then
-         return a * unwrapNumberValue(b)
+         return b * a
       else
          return a * b
       end
