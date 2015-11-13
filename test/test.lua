@@ -1,7 +1,8 @@
 -- Tester:
 local totem = require 'totem'
 local autograd = require 'autograd'
-local gradcheck = require 'autograd.gradcheck'
+local gradcheck = require 'autograd.gradcheck' {randomizeInput = true}
+local gradcheckConstant = require 'autograd.gradcheck' {randomizeInput = false}
 local tester = totem.Tester()
 
 -- List of tests:
@@ -320,7 +321,7 @@ local tests = {
       end
 
       -- Check grads:
-      tester:assert(gradcheck(func, {K=K}), 'incorrect gradients')
+      tester:assert(gradcheckConstant(func, {K=K}), 'incorrect gradients')
    end,
 
    Scale = function()

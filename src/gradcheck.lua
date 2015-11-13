@@ -58,9 +58,11 @@ local function jacobianFromFiniteDifferences(func, inputs, var)
    return grads
 end
 
-local function gradcheckvar(func, inputs, var)
+local function gradcheckvar(func, inputs, var, randomizeInput)
    -- Random input:
-   var:uniform(-1,1)
+   if randomizeInput then
+      var:uniform(-1,1)
+   end
 
    -- Estimate grads with fprop:
    local jacobian1 = jacobianFromFiniteDifferences(func, inputs, var)
@@ -80,16 +82,25 @@ local function gradcheckvar(func, inputs, var)
 end
 
 -- Test grads:
-local function gradcheck(func, ...)
-   local args = {...}
-   -- get all vars:
-   local vars = __.flatten(args[1])
-   local ok = true
-   for i,var in ipairs(vars) do
-      ok = ok and gradcheckvar(func, args, var)
+return function(opt)
+   -- Options
+   local randomizeInput = opt.randomizeInput
+   if randomizeInput == nil then
+      randomizeInput = true
    end
-   return ok
-end
 
--- Return package
-return gradcheck
+   -- Run grad check:
+   local function gradcheck(func, ...)
+      local args = {...}
+      -- get all vars:
+      local vars = __.flatten(args[1])
+      local ok = true
+      for i,var in ipairs(vars) do
+         ok = ok and gradcheckvar(func, args, var, randomizeInput)
+      end
+      return ok
+   end
+
+   -- Grad check fun:
+   return gradcheck
+end
