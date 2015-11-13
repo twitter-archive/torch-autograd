@@ -234,6 +234,19 @@ local function Debugger(opt)
       out.finish()
    end
 
+   local function showDot()
+      if sys.uname() ~= 'macos' then
+         print('showDow() only implemented on OSX')
+         return
+      end
+      local file = os.tmpname()
+      generateDot(file)
+      os.execute('dot -O -Tsvg ' .. file)
+      os.remove(file)
+      os.execute('open -a Safari ' .. file..'.svg')
+      -- TODO: gc that leaked svg
+   end
+
    self = {
       captureCallStack = captureCallStack,
       outputCheckTensor = outputCheckTensor,
@@ -244,6 +257,7 @@ local function Debugger(opt)
       generateInputCheck = generateInputCheck,
       setMain = setMain,
       generateDot = generateDot,
+      showDot = showDot,
    }
    return self
 end
