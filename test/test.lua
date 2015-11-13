@@ -977,9 +977,11 @@ local tests = {
 
       -- Grads:
       local sawHook = 0
+      local badline
       local dFunc = autograd(func, {
-         debugHook = function(debugger, msg)
+         debugHook = function(debugger, msg, gen)
             if sawHook == 0 then
+               badline = gen.source:split("\n")[gen.line]
                --debugger.showDot()
             end
             sawHook = sawHook + 1
@@ -992,6 +994,7 @@ local tests = {
 
       -- Tests:
       tester:asserteq(sawHook, 5, 'debugHook should have tripped')
+      tester:asserteq(badline, "    locals[1] = torch_div(rlocals[1], 0)", 'debugHook should have showed the bad line')
    end,
 }
 

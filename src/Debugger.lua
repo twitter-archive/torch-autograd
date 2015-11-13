@@ -79,6 +79,10 @@ local function Debugger(opt)
       }
    end
 
+   local function setCode(code)
+      main.code = code
+   end
+
    local function walkGraph(value, node, parentNode, callback)
       callback(value, node, parentNode)
       if node then
@@ -125,7 +129,7 @@ local function Debugger(opt)
             color = "red"
          end
       end
-      out.write('\t' .. valueKey(value) .. ' [label=<' .. table.concat(parts, '<BR/>') .. '> color="' .. color .. '" shape="' .. shape .. '"];\n')
+      out.write('\t' .. valueKey(value) .. ' [label="<' .. table.concat(parts, '<BR/>') .. '>" color="' .. color .. '" shape="' .. shape .. '"];\n')
    end
 
    local function generateDotNode(out, node)
@@ -143,7 +147,7 @@ local function Debugger(opt)
             end
          end
       end
-      out.write('\tnode' .. node.debug.index .. ' [label=<' .. label .. '> color="'..color..'" shape=box];\n')
+      out.write('\tnode' .. node.debug.index .. ' [label="<' .. label .. '>" color="'..color..'" shape="box"];\n')
    end
 
    local function generateEdge(out, node, value, reverse)
@@ -188,7 +192,61 @@ local function Debugger(opt)
          end
       end
       out.write('}\n')
-      out.finish()
+      return out.finish()
+   end
+
+   local function generateJson(fileName, value, node)
+      local dot = generateDot(nil, value, node)
+      local _,_,name,graph = dot:find('digraph%s*(%w*)%s*{(.*)}')
+      local elts = stringx.split(stringx.strip(graph),'\n')
+
+      local edges = {}
+      local nodes = {}
+
+      local function parseMeta(meta)
+         local rest = meta
+         local _,key,val
+         local elts = {}
+         while true do
+            _,_,key,val,rest = rest:find('(.-)%=%"(.-)%"%s*(.*)')
+            if not rest then break end
+            elts[key] = val
+         end
+         return elts
+      end
+
+      for i,elt in ipairs(elts) do
+         local elt = stringx.strip(elt)
+         local _,_,content,meta = elt:find('(.-)%[(.*)%];$')
+         meta = parseMeta(meta)
+         if content:find('%-') then
+            -- edge
+            local _,_,name1,edge,name2 = content:find('^(.-) (.-) (.*)$')
+            table.insert(edges, {
+               from = stringx.strip(name1),
+               to = stringx.strip(name2),
+               edge = edge,
+               meta = meta,
+            })
+         else
+            -- node
+            local name = stringx.strip(content)
+            nodes[name] = {
+               name = name,
+               meta = meta,
+            }
+         end
+      end
+
+      local graph = {
+         name = name,
+         nodes = nodes,
+         edges = edges,
+      }
+
+      local f = io.open(fileName, 'w')
+      f:write(require('cjson').encode(graph))
+      f:close()
    end
 
    local function showDot(value, node)
@@ -210,16 +268,21 @@ local function Debugger(opt)
       if isNanOrInf(value.debug.min) or isNanOrInf(value.debug.max) then
          local debugger = {
             generateDot = function(fileName) generateDot(fileName, value, node) end,
+            generateJson = function(fileName) generateJson(fileName, value, node) end,
             showDot = function() showDot(value, node) end,
          }
          local msg = "autograd debugger detected a nan or inf value for " .. valueName(value)
          local forwardNode = rcsvFindCallStack(node)
          if forwardNode then
             for i,info in ipairs(forwardNode.debug.callStack) do
-               msg = msg .. "\n\t" .. i .. ": " .. tostring(info.name) .. info.source .. ":" .. info.currentline
+               msg = msg .. "\n\t\t" .. i .. ": " .. tostring(info.name) .. info.source .. ":" .. info.currentline
             end
          end
-         debugHook(debugger, msg)
+         local info = debug.getinfo(3)
+         debugHook(debugger, msg, {
+            source = info.source,
+            line = info.currentline - 1
+         })
       end
    end
 
@@ -271,6 +334,7 @@ local function Debugger(opt)
    return {
       captureCallStack = captureCallStack,
       setMain = setMain,
+      setCode = setCode,
       generateDot = generateDot,
       showDot = showDot,
       outputCheckTensor = outputCheckTensor,
