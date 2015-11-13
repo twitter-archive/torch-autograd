@@ -968,7 +968,7 @@ for name,test in pairs(tests) do
          profi:writeReport(string.format("%s.profile.txt",name))
          profi:reset()
       end
-      print(c.blue(stringx.rjust(''..name..' => ', 28))
+      print(c.blue(stringx.rjust(''..name..' => ', 32))
          .. ' nn: ' .. fmt(tnn,'yellow') .. 's, autograd: ' .. fmt(tag,'red') .. 's, ratio: ' .. fmt(tag/tnn,'green') .. 'x')
       if opt.nodes ~= 'false' then
          local sortedKeys = keysSortedByValue(nodeTimes)
