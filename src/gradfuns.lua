@@ -225,9 +225,8 @@ overload.module("torch", torch, function(module)
    })
    module.gradient("tanh", {
       function(g, ans, x)
-         local cx = torch.cosh(x)
-         local cxx = torch.cmul(cx, cx)
-         return elemwiseDiv(g, cxx)
+         local mzz = 1 - torch.cmul(ans, ans)
+         return elemwiseMul(g, mzz)
       end
    })
    module.gradient("abs", {
