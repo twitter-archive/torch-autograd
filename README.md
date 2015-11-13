@@ -433,6 +433,9 @@ grad(f, {
    debugHook = function(debugger, msg)
       -- dump a dot representation of the graph:
       debugger.generateDot('result.dot')
+
+      -- or show it (OSX only, uses Safari):
+      debugger.showDot()
    end
 })
 ```
