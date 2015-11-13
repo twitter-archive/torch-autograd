@@ -397,6 +397,12 @@ overload.module("Value", Value, function(module)
 end)
 
 overload.module("util", util, function(module)
+   module.gradient("sigmoid", {
+      function(g, ans, x)
+         local p = torch.cmul(1 - ans, ans)
+         return torch.cmul(g, p)
+      end
+   })
    module.dynamic("setNotEqual", "fillSameSizeAs", "zerosLike", "narrowCopy", "selectCopy", "selectSliceCopy", "narrowSliceCopy", "makeContiguous", "indexAdd", "catTable")
 end)
 

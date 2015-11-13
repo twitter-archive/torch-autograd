@@ -21,6 +21,7 @@ local reusableFunctionsMap = {
    ["torch.expand"] = true,
    ["torch.cat"] = true,
    ["torch.log"] = true,
+   ["util.sigmoid"] = true,
    ["util.narrowSliceCopyInPlace"] = true,
    ["util.selectSliceCopyInPlace"] = true,
    ["util.fillSameSizeAsInPlace"] = true,

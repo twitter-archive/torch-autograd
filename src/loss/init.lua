@@ -26,7 +26,8 @@ function loss.crossEntropy(out, target)
 end
 
 function loss.binaryCrossEntropy(out, target)
-   local yhat = util.sigmoid(out, 1e-6)
+   local p = 1e-6
+   local yhat = util.sigmoid(out) * (1-p*2) + p
    return - torch.sum( torch.cmul(target, torch.log(yhat)) + torch.cmul((-target + 1), torch.log(-yhat + 1)) ), yhat
 end
 
