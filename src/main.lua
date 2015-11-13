@@ -790,6 +790,15 @@ local function generateCode(fn, args, opt)
    return code, outerArgs
 end
 
+local function execUncached(fn, args, opt)
+   local graph = createGraph(fn, args, opt, debugger)
+   local retValues = { graph.params[opt.argnum]:flattenGrads() }
+   for i = 1, #graph.answers do
+      retValues[#retValues + 1] = graph.answers[i]:flatten()
+   end
+   return unpack(retValues)
+end
+
 local function buildSignature(params, tensorDims)
    for k, v in pairs(params) do
       if torch.isTensor(v) then
@@ -811,20 +820,26 @@ local function grad(fn, gradOpt)
    local debugHook = gradOpt.debugHook
    local generatedFunctions = { }
    local cachedTensors = { }
+   local opt = {
+      argnum = argnum,
+      withForward = withForward,
+      withGradients = withGradients,
+      partialGrad = partialGrad,
+      debugHook = debugHook,
+      reuseLocals = cachedTensors
+   }
    local doGrad = function(...)
       local args = {...}
       local tensorDims = { }
-      buildSignature(args, tensorDims)
-      local signature = table.concat(tensorDims, "-")
+      local sigFun = gradOpt.signatureFn or function(params)
+         buildSignature(params, tensorDims)
+         return table.concat(tensorDims, "-")
+      end
+      local signature = sigFun(args)
+      if signature == nil then
+         return execUncached(fn, args, opt)
+      end
       if generatedFunctions[signature] == nil then
-         local opt = {
-            argnum = argnum,
-            withForward = withForward,
-            withGradients = withGradients,
-            partialGrad = partialGrad,
-            debugHook = debugHook,
-            reuseLocals = cachedTensors
-         }
          local code, outerArgs = generateCode(fn, args, opt)
          --print(code)
          --print("generated code for param signature " .. signature)

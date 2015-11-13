@@ -94,6 +94,21 @@ function Value:flatten()
 	end
 end
 
+function Value:flattenGrads()
+	if self.type == Value.TABLE then
+		local rawTable = { }
+		for k,v in pairs(self.raw) do
+			rawTable[k] = v:flattenGrads()
+		end
+		return rawTable
+	else
+		if self.source.gradients then
+			return self.source.gradients[1]:flatten()
+		end
+		return nil
+	end
+end
+
 -- These exist only to be overloaded and called with flattened tensor or number arguments
 
 function Value.__add(a, b)
