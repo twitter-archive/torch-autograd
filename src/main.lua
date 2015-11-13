@@ -48,17 +48,17 @@ local function canReuseOutput(node)
    return reusableFunctionsMap[node.forwardFn.name] ~= nil and #node.outputs == 1 and node.outputs[1].type == Value.TENSOR
 end
 
-local function canInline(node, outputNodes)
+local function canInline(node, outputNodes, debugger)
    return #node.outputs == 1 and #node.outputTargets[1] == 1 and outputNodes[node] == nil and debugger == nil
 end
 
-local function writeExpr(state, node, depth)
+local function writeExpr(state, node, debugger)
    local out = StringBuilder()
    local inputSymbols = { }
    for k = 1, #node.inputs do
       local input = node.inputs[k]
-      if input.source.type == Source.COMPUTED and canInline(input.source.node, state.outputNodes) then
-         local subExpr = writeExpr(state, input.source.node)
+      if input.source.type == Source.COMPUTED and canInline(input.source.node, state.outputNodes, debugger) then
+         local subExpr = writeExpr(state, input.source.node, debugger)
          inputSymbols[k] = "(" .. subExpr .. ")"
       else
          local symbol = input.source:symbolPath(state.symbols)
@@ -114,7 +114,7 @@ local function defaultBool(b, db)
    return b
 end
 
-local debugger
+local nodeDebugger
 local applyDepth = 0
 local nodeDisabled = true
 
@@ -124,8 +124,8 @@ local function nodeCompute(fn, gradFn, capture, ...)
    if not nodeDisabled and applyDepth == 1 and capture then
       local n = Node.new(fn, gradFn, inputs)
       local values = {n:evaluateForward()}
-      if debugger then
-         debugger.captureCallStack(n)
+      if nodeDebugger then
+         nodeDebugger.captureCallStack(n)
       end
       applyDepth = applyDepth - 1
       return unpack(values)
@@ -364,7 +364,7 @@ local function searchMatchingLocal(tensor, locals, usedLocals)
    return 0
 end
 
-local function createGraph(fn, args, opt)
+local function createGraph(fn, args, opt, debugger)
    local argnum = opt.argnum or 1
    local partialGrad = defaultBool(opt.partialGrad, false)
    local withGradients = defaultBool(opt.withGradients, true)
@@ -378,6 +378,7 @@ local function createGraph(fn, args, opt)
    -- Begin recording all torch operations.
    overload.install(nodeCompute)
    nodeDisabled = false
+   nodeDebugger = debugger
 
    -- Call user forward function.
    local answers = {fn(unpack(values))}
@@ -403,6 +404,7 @@ local function createGraph(fn, args, opt)
    end
 
    -- End recording.
+   nodeDebugger = nil
    nodeDisabled = true
    overload.uninstall()
 
@@ -526,8 +528,12 @@ local function generateCode(fn, args, opt)
    local withForward = defaultBool(opt.withForward, true)
    local withGradients = defaultBool(opt.withGradients, true)
    local reuseLocals = opt.reuseLocals or { }
+   local debugger
+   if opt.debugHook then
+      debugger = Debugger(opt)
+   end
 
-   local graph = createGraph(fn, args, opt)
+   local graph = createGraph(fn, args, opt, debugger)
 
    if optimize then
       optimizeGraph(graph)
@@ -543,7 +549,7 @@ local function generateCode(fn, args, opt)
    outerArgs[#outerArgs + 1] = reuseLocals
 
    if debugger then
-      debugger.setMain(execOrder, symbols, graph.grads, graph.answers)
+      debugger.setMain(symbols, graph.grads, graph.answers)
       outerArgNames[#outerArgNames + 1] = "debugger"
       outerArgs[#outerArgs + 1] = debugger
    end
@@ -625,7 +631,7 @@ local function generateCode(fn, args, opt)
       for k = 1, #node.outputs do
          outputSymbols[k] = symbols[node.outputs[k].source]
       end
-      if not canInline(node, outputNodes) then
+      if not canInline(node, outputNodes, debugger) then
          out.write("    ")
          if not canReuseOutput(node) then
             if #outputSymbols > 0 then
@@ -635,7 +641,7 @@ local function generateCode(fn, args, opt)
                out.write(table.concat(outputSymbols, ", "), " = ")
             end
          end
-         out.write(writeExpr(state, node))
+         out.write(writeExpr(state, node, debugger))
          out.write("\n")
          if debugger then
             for k = 1, #node.outputs do
@@ -716,12 +722,11 @@ end
 
 local function grad(fn, gradOpt)
    gradOpt = gradOpt or { }
-   debugger = Debugger(gradOpt)
-   local argNum = gradOpt.gradArg or 1
+   local argnum = gradOpt.gradArg or 1
    local withForward = defaultBool(gradOpt.withForward, true)
    local withGradients = defaultBool(gradOpt.withGradients, true)
    local partialGrad = defaultBool(gradOpt.partialGrad, false)
-   argnum = argnum or 1
+   local debugHook = gradOpt.debugHook
    local generatedFunctions = { }
    local cachedTensors = { }
    local doGrad = function(...)
@@ -731,10 +736,11 @@ local function grad(fn, gradOpt)
       local signature = table.concat(tensorDims, "-")
       if generatedFunctions[signature] == nil then
          local opt = {
-            argnum = 1,
+            argnum = argnum,
             withForward = withForward,
             withGradients = withGradients,
             partialGrad = partialGrad,
+            debugHook = debugHook,
             reuseLocals = cachedTensors
          }
          local code, outerArgs = generateCode(fn, args, opt)
