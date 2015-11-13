@@ -2,7 +2,7 @@ Autograd
 ========
 
 Autograd automatically differentiates native
-[Torch](https://github.com/torch/torch7) code. Ported to Lua from the
+[Torch](https://github.com/torch/torch7) code. Inspired by the
 [original Python version](https://www.github.com/hips/autograd).
 
 Scope
