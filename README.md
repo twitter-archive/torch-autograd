@@ -470,7 +470,7 @@ autograd debugger detected a nan or inf value for locals[1]
 
 And render in Safari as:
 
-<img src="DebuggerExample.png">
+<img src="doc/DebuggerExample.png">
 
 Finer-grain control over execution can also be achieved using these flags:
 
