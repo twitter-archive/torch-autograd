@@ -18,7 +18,6 @@ local reusableFunctionsMap = {
    ["torch.mm"]   = true,
    ["torch.mv"]   = true,
    ["torch.cosh"] = true,
-   ["torch.expand"] = true,
    ["torch.cat"] = true,
    ["torch.log"] = true,
    ["util.sigmoidInPlace"] = true,
@@ -495,10 +494,10 @@ local function createSymbolTable(graph, execOrder, reuseLocals)
       table.sort(availableTensors, sortLocalSize)
 
       local remainingOutputs = { }
-   for i = 1, #execOrder do
-      local node = execOrder[i]
-      if #node.outputs == 1 then
-         if node.outputs[1].type == Value.TENSOR then
+      for i = 1, #execOrder do
+         local node = execOrder[i]
+         if #node.outputs == 1 then
+            if node.outputs[1].type == Value.TENSOR then
                if canReuseOutput(node) and tensorAllocations[node.outputs[1]] == nil then
                   remainingOutputs[#remainingOutputs + 1] = node.outputs[1]
                end
@@ -515,14 +514,14 @@ local function createSymbolTable(graph, execOrder, reuseLocals)
       for i = #remainingOutputs, 1, -1 do
          local output = remainingOutputs[i]
          local matchingIndex = searchMatchingTensorLargest(output:get(), availableTensors, reuseLocals)
-                  if matchingIndex > 0 then
+         if matchingIndex > 0 then
             local tensorIdx = availableTensors[matchingIndex]
             table.remove(availableTensors, matchingIndex) -- typically the last element
             tensorAllocations[output] = tensorIdx
             partialMatchAllocations[output] = tensorIdx
          end
-                  end
-               end
+      end
+   end
 
    for i = 1, #execOrder do
       local node = execOrder[i]
@@ -668,10 +667,13 @@ local function generateCode(fn, args, opt)
       out.write("\n")
    end
    out.write("local locals = { }")
+   out.write("\n")
    out.write("local vlocals = { }")
    out.write("\n")
-   out.write("for i = ", 1, ", ", numLocals, " do locals[i] = 0 end")
-   out.write("\n")
+   out.write("local function cleanupLocals()", "\n")
+   out.write("for i = ", 1, ", ", numLocals, " do locals[i] = 0 end", "\n")
+   out.write("end", "\n")
+   out.write("cleanupLocals()", "\n")
    if numReusableLocals ~= #reuseLocals then
       out.write("for i = ", #reuseLocals + 1, ", ", numReusableLocals, " do rlocals[i] = 0 end")
       out.write("\n")
@@ -686,7 +688,7 @@ local function generateCode(fn, args, opt)
    out.write("\n")
    for k, v in pairs(partialMatchAllocations) do
       local output = k
-      out.write(symbols[output.source], " = ", output:get():type(), ".new(rlocals[", v, "]):resize(", table.concat(output:get():size():totable(), ", "), ")")
+      out.write(symbols[output.source], " = ", output:get():type(), ".new(rlocals[", v, "]:storage()):resize(", table.concat(output:get():size():totable(), ", "), ")")
       out.write("\n")
    end
    out.write("\n")
@@ -778,6 +780,7 @@ local function generateCode(fn, args, opt)
          end
       end
    end
+   out.write(", cleanupLocals()")
    out.write("\n")
    out.write("end")
    out.write("\n")

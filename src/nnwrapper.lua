@@ -47,13 +47,13 @@ local function functionalize(nodeApply)
                            return nnObject:backward(x, y)
                         end
 
+                        local mod = { }
+
                         local fn = function(x, W, b)
                            local backFnDesc = {
-                              package = input,
-                              ctor = modName,
-                              object = nnObject,
+                              object = mod,
                               method = "backward",
-                              name = modName .. "_backward",
+                              name = modName,
                               args = args,
                               fn = backward
                            }
@@ -67,21 +67,18 @@ local function functionalize(nodeApply)
                            }
                            local fnDesc = {
                               package = input,
-                              ctor = modName,
-                              object = nnObject,
+                              object = mod,
                               method = "forward",
-                              name = modName .. "_forward",
+                              name = modName,
                               args = args,
                               fn = forward
                            }
                            return nodeApply(fnDesc, gradFn, true, x, W, b)
                         end
 
-                        local mod = {
-                           entry = fn,
-                           forward = forward,
-                           backward = backward
-                        }
+                        mod.entry = fn
+                        mod.forward = forward
+                        mod.backward = backward
 
                         -- Shortcut:
                         setmetatable(mod, {
@@ -140,14 +137,14 @@ local function functionalize(nodeApply)
                            }
                         end
 
+                        local mod = {}
+
                         local fn = function(x, W, b)
                            local grads = nil
                            local backFnDesc = {
-                              package = input,
-                              ctor = modName,
-                              object = nnObject,
+                              object = mod,
                               method = "backward",
-                              name = modName .. "_backward",
+                              name = modName,
                               args = args,
                               fn = backward
                            }
@@ -173,22 +170,18 @@ local function functionalize(nodeApply)
                            }
                            local fnDesc = {
                               package = input,
-                              object = nnObject,
-                              ctor = modName,
-                              object = nnObject,
+                              object = mod,
                               method = "forward",
-                              name = modName .. "_forward",
+                              name = modName,
                               args = args,
                               fn = forward
                            }
                            return nodeApply(fnDesc, gradFn, true, x, W, b)
                         end
 
-                        local mod = {
-                           entry = fn,
-                           forward = forward,
-                           backward = backward
-                        }
+                        mod.entry = fn
+                        mod.forward = forward
+                        mod.backward = backward
 
                         -- Shortcut:
                         setmetatable(mod, {
