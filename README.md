@@ -21,6 +21,20 @@ Autograd has multiple goals:
   with multiple loss functions and/or inputs
 * enable gradients of gradients for transparent computation of Hessians, ...
 
+Updates
+-------
+
+Nov 16, 2015: major overhaul:
+
+* a compute DAG is now generated and cached based on input tensors's dimensions
+* the DAG is compiled into Lua code, with several optimizations
+* all intermediate states (tensors) are saved and re-used in a tensor pool
+* debugging facilities have been added: when debugging is enabled, a NaN of inf
+  will trigger a callback, that can be used to render a DOT representation of the
+  graph (see below)
+
+Nov 6, 2015: initial release.
+
 Install
 -------
 
