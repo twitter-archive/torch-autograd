@@ -33,7 +33,7 @@ version of an equivalent model (`nn` and `nngraph`).
 * a compute DAG is now generated and cached based on input tensors's dimensions
 * the DAG is compiled into Lua code, with several optimizations
 * all intermediate states (tensors) are saved and re-used in a tensor pool
-* debugging facilities have been added: when debugging is enabled, a NaN of inf
+* debugging facilities have been added: when debugging is enabled, a `nan` or `inf`
   will trigger a callback, that can be used to render a DOT representation of the
   graph (see [debugging](#debugging))
 * now restricting user code to the functional API of Torch (`a:add(b)` forbidden,
