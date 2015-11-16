@@ -87,7 +87,7 @@ local f = function(params, x, y, prevState, dropout)
    local nElements = batchSize * bpropLength
 
    -- Select word vectors
-   x = util.lookup(params.words, x)
+   x = util.lookup(params.words.W, x)
 
    -- Encode all inputs through LSTM layers:
    local h1,newState1 = lstm1(params[1], regularize(x,dropout), prevState[1])
@@ -140,7 +140,7 @@ else
    words = torch.FloatTensor(nTokens, opt.wordDim)
 end
 words:uniform(-opt.paramRange, opt.paramRange)
-params.words = words
+params.words = {W = words}
 
 -- Reformat training data for batches:
 local epochLength = math.floor(trainData:size(1) / opt.batchSize)
@@ -195,9 +195,10 @@ for epoch = 1,opt.nEpochs do
       end
 
       -- Update params:
-      for i,param in ipairs(_.flatten(_.clone(params))) do
-         local g = _.flatten(_.clone(grads))[i]
-         param:add(-lr, g)
+      for k,vs in pairs(grads) do
+         for kk,v in pairs(vs) do
+            params[k][kk]:add(-lr, grads[k][kk])
+         end
       end
 
       -- Loss: exponentiate nll gives perplexity
