@@ -17,7 +17,7 @@ function loss.logBCELoss(out, target, p)
       out = out + p
    end
 
-   return -torch.sum(torch.cmul(target, torch.log(out)) + torch.cmul(1-target, torch.log(1-out)))
+   return -torch.sum(torch.cmul(target, torch.log(out)) + torch.cmul(-target+1, torch.log(-out+1)))
 end
 
 function loss.crossEntropy(out, target)
