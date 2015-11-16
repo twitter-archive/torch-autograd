@@ -27,7 +27,7 @@ Updates
 Nov 16, 2015: major overhaul.
 
 Runtime performance was improved dramatically, as well as ease of use with
-better debugging tools. Performance is now withing 30% of a statically described
+better debugging tools. Performance is now within 30% of a statically described
 version of an equivalent model (`nn` and `nngraph`).
 
 * a compute DAG is now generated and cached based on input tensors's dimensions
