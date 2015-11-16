@@ -35,11 +35,11 @@ version of an equivalent model (`nn` and `nngraph`).
 * all intermediate states (tensors) are saved and re-used in a tensor pool
 * debugging facilities have been added: when debugging is enabled, a NaN of inf
   will trigger a callback, that can be used to render a DOT representation of the
-  graph (see below)
+  graph (see [debugging](#debugging))
 * now restricting user code to the functional API of Torch (`a:add(b)` forbidden,
   use `res = torch.add(a,b)` instead)
 * additional control flags can be passed to `d(f, {...})` to compute subparts of the
-  graph (fprop or bprop), useful to generate a compiled fprop
+  graph (fprop or bprop), useful to generate a compiled fprop (see [fine grained control](#finegrainedcontrol))
 
 Nov 6, 2015: initial release.
 
@@ -443,6 +443,7 @@ loss = loss.leastSquares(prediction, target)
 ```
 
 ### Debugging and fine-grain control
+<a name="debugging"/>
 
 Debugging hooks can be inserted when wrapping the function with `autograd`.
 The debugger will turn off any optimizations and insert NaN/Inf checks
@@ -495,6 +496,7 @@ And render in Safari as:
 <img src="doc/DebuggerExample.png">
 
 Finer-grain control over execution can also be achieved using these flags:
+<a name="finegrainedcontrol"/>
 
 ```lua
 -- All of these options default to true:
