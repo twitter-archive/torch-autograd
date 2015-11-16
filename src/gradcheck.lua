@@ -10,11 +10,12 @@ local threshold = 1e-5
 
 -- Find grad:
 local function findGrad(ref, x, dst)
-   ref = __.flatten(ref)
-   dst = __.flatten(dst)
-   for i,v in ipairs(ref) do
+   for k,v in pairs(ref) do
       if v == x then
-         return dst[i]
+         return dst[k]
+      elseif type(v) == 'table' then
+         local res = findGrad(ref[k], x, dst[k])
+         if res then return res end
       end
    end
 end
