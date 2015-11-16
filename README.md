@@ -442,8 +442,8 @@ loss = loss.binaryEntropy(prediction, target)
 loss = loss.leastSquares(prediction, target)
 ```
 
-### Debugging and fine-grain control
 <a name="debugging"/>
+### Debugging and fine-grain control
 
 Debugging hooks can be inserted when wrapping the function with `autograd`.
 The debugger will turn off any optimizations and insert NaN/Inf checks
@@ -495,8 +495,8 @@ And render in Safari as:
 
 <img src="doc/DebuggerExample.png">
 
-Finer-grain control over execution can also be achieved using these flags:
 <a name="finegrainedcontrol"/>
+Finer-grain control over execution can also be achieved using these flags:
 
 ```lua
 -- All of these options default to true:
