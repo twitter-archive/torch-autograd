@@ -210,7 +210,7 @@ local function functionalize(nodeApply)
          local lastType = ""
 
          local function forward(params, x)
-            local dataType = x:type()
+            local dataType = (params[1] or x):type()
             if lastType ~= dataType then
                lastType = dataType
                nnObject:type(dataType)
@@ -227,7 +227,7 @@ local function functionalize(nodeApply)
          end
 
          local function backward(g, params, x)
-            local dataType = x:type()
+            local dataType = (params[1] or x):type()
             if lastType ~= dataType then
                lastType = dataType
                nnObject:type(dataType)
