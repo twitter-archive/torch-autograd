@@ -3,7 +3,7 @@ local autograd = require 'autograd.main'
 
 -- Meta info
 autograd.VERSION = '0.1'
-autograd.LICENSE = 'MIT'
+autograd.LICENSE = 'Apache 2.0'
 
 -- Sub packages:
 autograd.nn.AutoModule = require 'autograd.auto.AutoModule'
