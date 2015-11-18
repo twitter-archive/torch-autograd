@@ -57,3 +57,29 @@ end
 torch.typeAs = function(A, B)
    return A:type(B:type())
 end
+
+local numberMetatable = {
+   __add = function(a,b)
+      if type(a) == "number"  then
+         return b + a
+      else
+         return a + b
+      end
+   end,
+   __sub = function(a,b)
+      if type(a) == "number"  then
+         return -b + a
+      else
+         return a - b
+      end
+   end,
+   __mul = function(a,b)
+      if type(a) == "number"  then
+         return b * a
+      else
+         return a * b
+      end
+   end
+}
+
+debug.setmetatable(1.0, numberMetatable)

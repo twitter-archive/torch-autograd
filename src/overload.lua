@@ -143,38 +143,8 @@ function unwrapNumberValue(v)
    end
 end
 
-local numberMetatable = {
-   __add = function(a,b)
-      if type(a) == "number" and torch.isTensor(b) then
-         return b + a
-      elseif type(a) == "number" and type(b) == "table" then
-         return b + a
-      else
-         return a + b
-      end
-   end,
-   __sub = function(a,b)
-      if type(a) == "number" and torch.isTensor(b) then
-         return -b + a
-      elseif type(a) == "number" and type(b) == "table" then
-         return -b + a
-      else
-         return a - b
-      end
-   end,
-   __mul = function(a,b)
-      if type(a) == "number" and torch.isTensor(b) then
-         return b * a
-      elseif type(a) == "number" and type(b) == "table" then
-         return b * a
-      else
-         return a * b
-      end
-   end
-}
 
 local function install(fn)
-   debug.setmetatable(1.0, numberMetatable)
    nodeApply = fn
    for i = 1, #overloads do
       local mm = overloads[i]
@@ -194,7 +164,6 @@ local function install(fn)
 end
 
 local function uninstall()
-   debug.setmetatable(1.0, nil)
    for i = 1, #overloads do
       local mm = overloads[i]
       for k = 1, #mm.functions do
