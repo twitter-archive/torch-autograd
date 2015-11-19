@@ -163,6 +163,20 @@ local function collectGradients(val, grads)
    return grads
 end
 
+local function flattenAnswer(val)
+   if Value.isValue(val) then
+      return val:flatten()
+   elseif type(val) == "table" then
+      local ft = { }
+      for k, v in pairs(val) do
+         ft[k] = flattenAnswer(v)
+      end
+      return ft
+   else
+      return val
+   end
+end
+
 local function writeLiteralTable(wtable, out, symbols, depth)
    depth = depth or 1
    out.write("{", "\n")
@@ -369,31 +383,6 @@ local function execGraph(graph, withForward, withGradients)
    return execOrder, outputNodes
 end
 
-local function searchMatchingTensorExact(tensor, availableTensors, locals)
-   local ttype = tensor:type()
-   local tdims = tensor:nDimension()
-   for i = #availableTensors, 1, -1 do
-      local idx = availableTensors[i]
-      local lt = locals[idx]
-         if lt:type() == ttype and lt:nDimension() == tdims and lt:isSameSizeAs(tensor) then
-            return i
-         end
-      end
-   return 0
-end
-
-local function searchMatchingTensorLargest(tensor, sortedTensors, locals)
-   local ttype = tensor:type()
-   for i = #sortedTensors, 1, -1 do
-      local idx = sortedTensors[i]
-      local lt = locals[idx]
-      if lt:type() == ttype then
-         return i
-      end
-   end
-   return 0
-end
-
 local function createGraph(fn, args, opt, debugger)
    local argnum = opt.argnum or 1
    local partialGrad = defaultBool(opt.partialGrad, false)
@@ -463,6 +452,22 @@ local function optimizeGraph(graph, opt)
    pruneOutputs(execOrder, outputNodes)
 end
 
+local function tensorSig(t)
+   return t:type() .. table.concat(t:size():totable(), ",")
+end
+
+local function searchMatchingTensorLargest(tensor, sortedTensors, locals)
+   local ttype = tensor:type()
+   for i = #sortedTensors, 1, -1 do
+      local idx = sortedTensors[i]
+      local lt = locals[idx]
+      if lt:type() == ttype then
+         return i
+      end
+   end
+   return 0
+end
+
 local function createSymbolTable(graph, execOrder, reuseLocals)
    -- Assign symbols to params, inputs, outputs.
    local symbols = { }
@@ -477,9 +482,20 @@ local function createSymbolTable(graph, execOrder, reuseLocals)
    local nextReusableLocal = #reuseLocals + 1
    local reusableLocalStart = nextReusableLocal
    local nextLocal = 1
-   local availableTensors = { }
+
+   local availableTensorMap = { }
+   local availableCount = 0
+   local tensorSigs = { }
    for i = 1, #reuseLocals do
-      availableTensors[i] = i
+      local tensor = reuseLocals[i]
+      local sig = tensorSig(tensor)
+      local list = availableTensorMap[sig]
+      if list == nil then
+         list = { }
+         availableTensorMap[sig] = list
+      end
+      list[#list + 1] = i
+      availableCount = availableCount + 1
    end
 
    local tensorAllocations = { }
@@ -492,11 +508,13 @@ local function createSymbolTable(graph, execOrder, reuseLocals)
       if #node.outputs == 1 then
          if node.outputs[1].type == Value.TENSOR then
             if canReuseOutput(node) then
-               local matchingIndex = searchMatchingTensorExact(node.outputs[1]:get(), availableTensors, reuseLocals)
-               if matchingIndex > 0 then
-                  local tensorIdx = availableTensors[matchingIndex]
-                  table.remove(availableTensors, matchingIndex) -- typically the last element (or close), since we iterate in reverse
+               local tensor = node.outputs[1]:get()
+               local sig = tensorSig(tensor)
+               local matchingList = availableTensorMap[sig]
+               if matchingList ~= nil and #matchingList > 0 then
+                  local tensorIdx = table.remove(matchingList, #matchingList)
                   tensorAllocations[node.outputs[1]] = tensorIdx
+                  availableCount = availableCount - 1
                else
                   unmatchedTensors = true
                end
@@ -505,7 +523,15 @@ local function createSymbolTable(graph, execOrder, reuseLocals)
       end
    end
 
-   if unmatchedTensors and #availableTensors > 0 then
+   if unmatchedTensors and availableCount > 0 then
+
+      local availableTensors = { }
+      for k, v in pairs(availableTensorMap) do
+         for i = 1, #v do
+            availableTensors[#availableTensors + 1] = v[i]
+         end
+      end
+
       function sortLocalSize(a, b)
         return reuseLocals[a]:storage():size() < reuseLocals[b]:storage():size()
       end
@@ -652,7 +678,7 @@ local function generateCode(fn, args, opt)
    local functionRemap = { }
    for i = 1, #execOrder do
       local node = execOrder[i]
-      if node.forwardFn.operator == nil then
+      if node.forwardFn.operator == nil and functionRemap[node.forwardFn.name] == nil then
          functionRemap[node.forwardFn.name] = string.gsub(node.forwardFn.name, "%.", "_")
       end
    end
@@ -809,14 +835,18 @@ local function generateCode(fn, args, opt)
    if debugger then
       debugger.setCode(code)
    end
-   return code, outerArgs
+   local retValues = { graph.params[opt.argnum]:flattenGrads() }
+   for i = 1, #graph.answers do
+      retValues[#retValues + 1] = flattenAnswer(graph.answers[i])
+   end
+   return code, outerArgs, retValues
 end
 
 local function execUncached(fn, args, opt)
    local graph = createGraph(fn, args, opt, debugger)
    local retValues = { graph.params[opt.argnum]:flattenGrads() }
    for i = 1, #graph.answers do
-      retValues[#retValues + 1] = graph.answers[i]:flatten()
+      retValues[#retValues + 1] = flattenAnswer(graph.answers[i])
    end
    return unpack(retValues)
 end
@@ -870,7 +900,7 @@ local function grad(fn, gradOpt)
             return execUncached(fn, args, opt)
          end
          if generatedFunctions[signature] == nil then
-            local code, outerArgs = generateCode(fn, args, opt)
+            local code, outerArgs, retValues = generateCode(fn, args, opt)
             --print(code)
             --print("generated code for param signature " .. signature)
             local outer = loadstring(code)
@@ -878,6 +908,10 @@ local function grad(fn, gradOpt)
                error("failed to parse generated code")
             end
             generatedFunctions[signature] = outer()(unpack(outerArgs))
+            -- We already have the answers, don't run it all over again.
+            if withGradients and withForward and not debugHook then
+               return unpack(retValues)
+            end
          end
          return generatedFunctions[signature](unpack(args))
       end
