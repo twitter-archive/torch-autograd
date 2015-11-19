@@ -125,6 +125,29 @@ for i,sample in datasetIterator() do
 end
 ```
 
+### Optimization
+
+To enable the optimizer, which produces optimized representations of your loss and gradient functions (as generated lua code):
+
+```lua
+grad = require 'autograd'
+grad.optimize(true) -- global
+local df = grad(f, { optimize = true }) -- for this function only
+local grads = df(params)
+```
+
+Benefits:
+
+* Intermediate tensors are re-used between invocations of df(), dramatically reducing the amount of garbage produced.
+* Zero overhead from autograd itself, once the code for computing your gradients has been generated.
+* On average, a 2-3x overall performance improvement.
+
+Caveats:
+
+* The generated code is cached based on the dimensions of the input tensors. If your problem is such that you have thousands of unique tensors configurations, you won't see any benefit.
+* Each invocation of grad(f) produces a new context for caching, so be sure to only call this once.
+
+
 ### Wrapping nn modules
 
 The [nn](https://github.com/torch/nn) library provides with all sorts of very optimized

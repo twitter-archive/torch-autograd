@@ -999,5 +999,20 @@ local tests = {
    end,
 }
 
+local function prefixTests(pf, t, skip)
+   local nt = { }
+   for k, v in pairs(t) do
+      if not skip[k] then
+         nt[pf .. k] = v
+      end
+   end
+   return nt
+end
+
 -- Run tests:
-tester:add(tests):run()
+autograd.optimize(true)
+tester:add(prefixTests("Optimized_", tests, { })):run()
+autograd.optimize(false)
+tester = totem.Tester()
+tester:add(prefixTests("Direct_", tests, { AutoModule = true, DebuggerDivZero = true })):run()
+

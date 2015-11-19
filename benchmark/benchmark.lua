@@ -6,6 +6,7 @@ Options:
    --type    (default float)    can be: double | float | cuda
    --nodes   (default false)
    --profile (default false)    requires profi to be installed (luarocks install profi)
+   --nooptimize (default false)
 ]]
 
 -- benchmark of common models
@@ -13,6 +14,8 @@ local d = require 'autograd'
 local nn = require 'nn'
 local c = require 'trepl.colorize'
 local haveProfi,profi = pcall(require,'ProFi')
+
+d.optimize(opt.nooptimize == 'false')
 
 -- tic/toc
 local tic,toc

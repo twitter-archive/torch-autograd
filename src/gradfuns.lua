@@ -1,13 +1,15 @@
 local Value = require 'autograd.Value'
+local DirectNode = require 'autograd.direct.DirectNode'
 local util = require 'autograd.util'
 local overload = require 'autograd.overload'
 
-local function newTensor(t, s)
-   if Value.isValue(t) then
-      local cc = t:get().new(s)
-      return cc
+function getValue(v)
+   if Value.isValue(v) then
+      return v:get()
+   elseif DirectNode.isNode(v) then
+      return DirectNode.getValue(v)
    else
-      return t.new(s)
+      return v
    end
 end
 
@@ -87,7 +89,7 @@ local function repeatToMatchShape(x,axis)
    if not axis then
       return function(g) return util.fillSameSizeAs(x, _sum(g)) end, torch.nElement(x)
    else
-      axis = axis:get()
+      axis = getValue(axis)
       local size = torch.size(x):fill(1)
       size[axis] = torch.size(x, axis)
       return function(g)
@@ -391,6 +393,12 @@ overload.module("torch", torch, function(module)
 end)
 
 overload.module("Value", Value, function(module)
+   for k, v in pairs(operators) do
+      module.operator(k, v)
+   end
+end)
+
+overload.module("DirectNode", DirectNode, function(module)
    for k, v in pairs(operators) do
       module.operator(k, v)
    end

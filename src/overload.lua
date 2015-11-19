@@ -1,5 +1,6 @@
 local overloads = { }
 local nodeApply = nil
+local nnwrapper = require 'autograd.nnwrapper'
 
 local function module(name, table, fn)
    local mm = {
@@ -145,6 +146,7 @@ end
 
 
 local function install(fn)
+   nnwrapper.setApplyFn(fn)
    nodeApply = fn
    for i = 1, #overloads do
       local mm = overloads[i]
@@ -164,6 +166,7 @@ local function install(fn)
 end
 
 local function uninstall()
+   nnwrapper.setApplyFn(nil)
    for i = 1, #overloads do
       local mm = overloads[i]
       for k = 1, #mm.functions do

@@ -31,6 +31,8 @@ local model = require 'autograd.model'
 local _ = require 'moses'
 local tablex = require('pl.tablex')
 
+d.optimize(true)
+
 -- Seed
 torch.manualSeed(1)
 
@@ -163,7 +165,7 @@ local lr = opt.learningRate
 local reportEvery = opt.reportEvery
 local valPerplexity = math.huge
 
-local df =  d(f)
+local df =  d(f, { optimize = true })
 
 for epoch = 1,opt.nEpochs do
    -- Train:

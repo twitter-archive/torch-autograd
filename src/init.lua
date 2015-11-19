@@ -6,6 +6,9 @@ autograd.VERSION = '0.1'
 autograd.LICENSE = 'MIT'
 
 -- Sub packages:
+autograd.nnwrapper = require 'autograd.nnwrapper'
+autograd.functionalize = autograd.nnwrapper.functionalize
+autograd.nn = autograd.functionalize('nn')
 autograd.nn.AutoModule = require 'autograd.auto.AutoModule'
 autograd.nn.AutoCriterion = require 'autograd.auto.AutoCriterion'
 autograd.auto = require 'autograd.auto'

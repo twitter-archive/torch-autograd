@@ -4,6 +4,8 @@ local util = require 'autograd.util'
 local lossFuns = require 'autograd.loss'
 local optim = require 'optim'
 
+grad.optimize(true)
+
 -- Load in MNIST
 local trainData, testData, classes = require('./get-mnist.lua')()
 local inputSize = trainData.x[1]:nElement()
@@ -40,7 +42,7 @@ params = {
 }
 
 -- Get the gradients closure magically:
-local df = grad(f)
+local df = grad(f, { optimize = true })
 
 -- Train a neural network
 for epoch = 1,100 do
