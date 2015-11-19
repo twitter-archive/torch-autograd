@@ -123,6 +123,14 @@ function DirectNode.newStartNode(val, tape)
    end
 end
 
+function DirectNode:__index(i)
+   local value = rawget(self, "value")
+   if torch.isTensor(value) and value[i] ~= nil then
+      return value[i]
+   end
+   return rawget(DirectNode, i)
+end
+
 -- These exist only to be overloaded and called with flattened tensor or number arguments
 
 function DirectNode.__add(a, b)
