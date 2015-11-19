@@ -9,6 +9,8 @@ local Value = require 'autograd.Value'
 local gradcheck = require 'autograd.gradcheck'
 local optim = require 'optim'
 
+grad.optimize(true)
+
 -- Load in MNIST
 local trainData, testData, classes = require('./get-mnist.lua')()
 trainData.x = trainData.x:view(trainData.x:size(1), -1):double()
@@ -45,7 +47,7 @@ function f(params, input, l2Lambda)
 end
 
 -- Get the gradients closure magically:
-local df = grad(f)
+local df = grad(f, { optimize = true })
 
 sizes = {}
 sizes['input'] = inputSize

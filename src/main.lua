@@ -4,6 +4,7 @@ local Value = require 'autograd.Value'
 local Source = require 'autograd.Source'
 local StringBuilder = require 'autograd.StringBuilder'
 local Debugger = require 'autograd.Debugger'
+local DirectTape = require 'autograd.direct.DirectTape'
 
 local reusableFunctionsMap = {
    ["torch.tanh"] = true,
@@ -165,7 +166,25 @@ end
 local function writeLiteralTable(wtable, out, symbols, depth)
    depth = depth or 1
    out.write("{", "\n")
+   local keys = { }
+   local numeric = true
    for k, v in pairs(wtable) do
+      if type(k) ~= 'number' then
+         numeric = false
+      end
+      keys[#keys + 1] = k
+   end
+   local si = #keys
+   local ei = 1
+   local di = -1
+   if numeric then
+      si = 1
+      ei = #keys
+      di = 1
+   end
+   for i = si, ei, di do
+      local k = keys[i]
+      local v = wtable[k]
       out.write(string.rep(" ", depth * 4))
       if type(k) == 'number' or tostring(tonumber(k)) == k then
          out.write("[", tostring(k), "]")
@@ -814,9 +833,16 @@ local function buildSignature(params, tensorDims)
    end
 end
 
+local defaultOptimize = false
+
+local function optimize(opt)
+   defaultOptimize = opt
+end
+
 local function grad(fn, gradOpt)
    gradOpt = gradOpt or { }
    local argnum = gradOpt.gradArg or 1
+   local optimize = defaultBool(gradOpt.optimize, defaultOptimize)
    local withForward = defaultBool(gradOpt.withForward, true)
    local withGradients = defaultBool(gradOpt.withGradients, true)
    local partialGrad = defaultBool(gradOpt.partialGrad, false)
@@ -831,30 +857,48 @@ local function grad(fn, gradOpt)
       debugHook = debugHook,
       reuseLocals = cachedTensors
    }
-   local doGrad = function(...)
-      local args = {...}
-      local tensorDims = { }
-      local sigFun = gradOpt.signatureFn or function(params)
-         buildSignature(params, tensorDims)
-         return table.concat(tensorDims, "-")
-      end
-      local signature = sigFun(args)
-      if signature == nil then
-         return execUncached(fn, args, opt)
-      end
-      if generatedFunctions[signature] == nil then
-         local code, outerArgs = generateCode(fn, args, opt)
-         --print(code)
-         --print("generated code for param signature " .. signature)
-         local outer = loadstring(code)
-         if outer == nil then
-            error("failed to parse generated code")
+   if optimize then
+      local doGrad = function(...)
+         local args = {...}
+         local tensorDims = { }
+         local sigFun = gradOpt.signatureFn or function(params)
+            buildSignature(params, tensorDims)
+            return table.concat(tensorDims, "-")
          end
-         generatedFunctions[signature] = outer()(unpack(outerArgs))
+         local signature = sigFun(args)
+         if signature == nil then
+            return execUncached(fn, args, opt)
+         end
+         if generatedFunctions[signature] == nil then
+            local code, outerArgs = generateCode(fn, args, opt)
+            --print(code)
+            --print("generated code for param signature " .. signature)
+            local outer = loadstring(code)
+            if outer == nil then
+               error("failed to parse generated code")
+            end
+            generatedFunctions[signature] = outer()(unpack(outerArgs))
+         end
+         return generatedFunctions[signature](unpack(args))
       end
-      return generatedFunctions[signature](unpack(args))
+      return doGrad
+   else
+      if withForward and withGradients then
+         return function(...)
+            return DirectTape.grad(fn, argnum, nil, ...)
+         end
+      elseif withForward then
+         return function(...)
+            return fn(...)
+         end
+      elseif withGradients then
+         return function(...)
+            local args = {...}
+            local partialGrad = table.remove(args, #args)
+            return DirectTape.grad(fn, argnum, partialGrad, unpack(args))
+         end
+      end
    end
-   return doGrad
 end
 
 -- Support functions
@@ -863,16 +907,11 @@ include 'support.lua'
 -- Standard overloaded functions with gradients
 include 'gradfuns.lua'
 
--- Sub packages:
-local functionalize = (require 'autograd.nnwrapper')(nodeCompute)
-local nn = require('autograd.nnwrapper')(nodeCompute)('nn')
-
 -- Main functions:
 local autograd = {
    grad = grad,
    overload = overload,
-   functionalize = functionalize,
-   nn = nn
+   optimize = optimize
 }
 
 -- Shortcut:
