@@ -22,7 +22,7 @@ function Node:init(forwardFn, gradientFn, inputs)
 		else
 			if torch.isTensor(input) then
 				if torch.nDimension(input) > 1 then
-					error("constant tensor with more than one dimension")
+					error("constant tensor with more than one dimension. is this an upvalue that should be a function argument?")
 				end
 			end
 			self.inputs[i] = Value.from(input, Source.constant(input))
