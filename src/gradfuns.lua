@@ -242,6 +242,19 @@ overload.module("torch", torch, function(module)
          end
       end
    })
+   module.gradient("clamp", {
+      function(g, ans, x, minVal, maxVal)
+         -- NOTE: could do a casting and then multiply for 2nd order divs. This is more efficient for now.
+         local mask = torch.typeAs(torch.eq(torch.ne(ans,minVal),torch.ne(ans,maxVal)), g)
+         return torch.cmul(g, mask)
+      end,
+      function(g, ans, x, minVal, maxVal)
+         error("Gradient not implemented w.r.t. min and max values of torch.clamp")
+      end,
+      function(g, ans, x, minVal, maxVal)
+         error("Gradient not implemented w.r.t. min and max values of torch.clamp")
+      end
+   })
    module.gradient("contiguous", {
       function(g,ans,x)
          return g
@@ -387,7 +400,7 @@ overload.module("torch", torch, function(module)
    })
    module.dynamic(
       "ne",  "ger", "new", "fill", "zeros", "zero", "cosh", "sign", "repeatTensor", "typeAs",
-      "bernoulli", "uniform", "normal", "random"
+      "bernoulli", "uniform", "normal", "random", "eq"
    )
    module.static("size", "isTensor", "nDimension", "nElement", "isSameSizeAs")
 end)

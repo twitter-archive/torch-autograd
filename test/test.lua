@@ -132,7 +132,14 @@ local tests = {
       tester:assert(gradcheck(NarrowFn1D, {W=W,x=x1}), "Incorrect gradient")
       tester:assert(gradcheck(NarrowFn2D, {W=W,x=x2}), "Incorrect gradient")
    end,
-
+   Clamp = function()
+      local W = torch.Tensor(5,25):normal()
+      local clampFn = function(inputs)
+         return torch.sum(torch.clamp(inputs.W,0,math.huge))
+      end
+      tester:assert(clampFn({W=W})>0, "Basic sanity check failed")
+      tester:assert(gradcheck(clampFn,{W=W}), "Incorrect gradient")
+   end,
    Clone = function()
       local x = torch.Tensor(2,25):normal()
 
