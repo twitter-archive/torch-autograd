@@ -14,6 +14,7 @@ local reusableFunctionsMap = {
    ["torch.pow"]  = true,
    ["torch.add"]  = true,
    ["torch.mul"]  = true,
+   ["torch.div"] = true,
    ["torch.neg"]  = true,
    ["torch.ger"]  = true,
    ["torch.mm"]   = true,
@@ -31,6 +32,7 @@ local reusableFunctionsMap = {
    ["util.narrowCopyInPlace"] = true,
    ["util.selectCopyInPlace"] = true,
    ["util.indexAddInPlace"] = true,
+   ["util.newTensorLikeInPlace"] = true,
 }
 
 local reusableFunctionTransforms = {
@@ -43,6 +45,7 @@ local reusableFunctionTransforms = {
    ["util.selectCopy"] = "util.selectCopyInPlace",
    ["util.indexAdd"] = "util.indexAddInPlace",
    ["util.sigmoid"] = "util.sigmoidInPlace",
+   ["util.newTensorLike"] = "util.newTensorLikeInPlace",
 }
 
 local function canReuseOutput(node)
@@ -468,26 +471,25 @@ local function searchMatchingTensorLargest(tensor, sortedTensors, locals)
    return 0
 end
 
-local function createSymbolTable(graph, execOrder, reuseLocals)
+local function createSymbolTable(graph, execOrder, tensorPool, tensorLocals)
    -- Assign symbols to params, inputs, outputs.
    local symbols = { }
-   local defined = { }
+   local undefined = { }
    local constants = { }
 
    for i = 1, #graph.params do
       symbols[graph.params[i].source] = "p" .. i
    end
 
-   local reusableLocalMap = { }
-   local nextReusableLocal = #reuseLocals + 1
-   local reusableLocalStart = nextReusableLocal
-   local nextLocal = 1
+   local constantTensorMap = { }
+
+   local tensorPoolViews = { }
 
    local availableTensorMap = { }
    local availableCount = 0
    local tensorSigs = { }
-   for i = 1, #reuseLocals do
-      local tensor = reuseLocals[i]
+   for i = #tensorPool, 1, -1 do
+      local tensor = tensorPool[i]
       local sig = tensorSig(tensor)
       local list = availableTensorMap[sig]
       if list == nil then
@@ -498,117 +500,134 @@ local function createSymbolTable(graph, execOrder, reuseLocals)
       availableCount = availableCount + 1
    end
 
-   local tensorAllocations = { }
-   local partialMatchAllocations = { }
-   local unmatchedTensors = false
+   local remainingOutputs = { }
+
+   local localCount = 0
 
    -- Exact matches first.
-   for i = #execOrder, 1, -1 do
-      local node = execOrder[i]
-      if #node.outputs == 1 then
-         if node.outputs[1].type == Value.TENSOR then
-            if canReuseOutput(node) then
-               local tensor = node.outputs[1]:get()
-               local sig = tensorSig(tensor)
-               local matchingList = availableTensorMap[sig]
-               if matchingList ~= nil and #matchingList > 0 then
-                  local tensorIdx = table.remove(matchingList, #matchingList)
-                  tensorAllocations[node.outputs[1]] = tensorIdx
-                  availableCount = availableCount - 1
-               else
-                  unmatchedTensors = true
-               end
-            end
-         end
-      end
-   end
-
-   if unmatchedTensors and availableCount > 0 then
-
-      local availableTensors = { }
-      for k, v in pairs(availableTensorMap) do
-         for i = 1, #v do
-            availableTensors[#availableTensors + 1] = v[i]
-         end
-      end
-
-      function sortLocalSize(a, b)
-        return reuseLocals[a]:storage():size() < reuseLocals[b]:storage():size()
-      end
-
-      table.sort(availableTensors, sortLocalSize)
-
-      local remainingOutputs = { }
-      for i = 1, #execOrder do
-         local node = execOrder[i]
-         if #node.outputs == 1 then
-            if node.outputs[1].type == Value.TENSOR then
-               if canReuseOutput(node) and tensorAllocations[node.outputs[1]] == nil then
-                  remainingOutputs[#remainingOutputs + 1] = node.outputs[1]
-               end
-            end
-         end
-      end
-
-      function sortTensorSize(a, b)
-        return a:get():storage():size() < b:get():storage():size()
-      end
-
-      table.sort(remainingOutputs, sortTensorSize)
-
-      for i = #remainingOutputs, 1, -1 do
-         local output = remainingOutputs[i]
-         local matchingIndex = searchMatchingTensorLargest(output:get(), availableTensors, reuseLocals)
-         if matchingIndex > 0 then
-            local tensorIdx = availableTensors[matchingIndex]
-            table.remove(availableTensors, matchingIndex) -- typically the last element
-            tensorAllocations[output] = tensorIdx
-            partialMatchAllocations[output] = tensorIdx
-         end
-      end
-   end
-
    for i = 1, #execOrder do
       local node = execOrder[i]
       if #node.outputs == 1 then
+         local output = node.outputs[1]
          if node.outputs[1].type == Value.TENSOR then
-            defined[node.outputs[1].source] = true
             if canReuseOutput(node) then
-               local index = tensorAllocations[node.outputs[1]]
-               if index == nil then
-                  index = nextReusableLocal
-                  nextReusableLocal = nextReusableLocal + 1
-               end
-               if partialMatchAllocations[node.outputs[1]] ~= nil then
-                  symbols[node.outputs[1].source] = "vlocals[" .. index .. "]"
+               local tensor = output:get()
+               local sig = tensorSig(tensor)
+               local matchingList = availableTensorMap[sig]
+               local tensorIdx = nil
+               if matchingList ~= nil and #matchingList > 0 then
+                  -- Map to tensor pool.
+                  tensorIdx = table.remove(matchingList, #matchingList)
+                  availableCount = availableCount - 1
                else
-               symbols[node.outputs[1].source] = "rlocals[" .. index .. "]"
+                  if availableCount > 0 then
+                     -- There are tensors remaining, so keep track for possible later inexact allocation.
+                     remainingOutputs[#remainingOutputs + 1] = i
+                  else
+                     -- No available tensors, so just go ahead and allocate a slot for this one now.
+                     tensorIdx = #tensorPool + 1
+                     tensorPool[tensorIdx] = tensor.new(tensor:size())
+                  end
                end
-               reusableLocalMap[index] = node.outputs[1]
+               if tensorIdx ~= nil then
+                  symbols[output.source] = "rlocals[" .. tensorIdx .. "]"
+               end
             else
-               symbols[node.outputs[1].source] = "locals[" .. nextLocal .. "]"
-               nextLocal = nextLocal + 1
+               -- Non-reusable local.
+               localCount = localCount + 1
+               tensorLocals[localCount] = 0
+               symbols[output.source] = "locals[" .. localCount .. "]"
             end
-
          else
-            symbols[node.outputs[1].source] = letterForType(node.outputs[1]) .. i
+            -- One output, not a tensor.
+            undefined[output.source] = true
+            symbols[output.source] = letterForType(node.outputs[1]) .. i
          end
       else
+         -- More than one output.
+         -- TODO, currently uncached.
          for k = 1, #node.outputs do
             local output = node.outputs[k]
+            undefined[output.source] = true
             symbols[node.outputs[k].source] = letterForType(node.outputs[k]) .. i .. "_" .. k
          end
       end
+
+      -- Find constant inputs.
       for k = 1, #node.inputs do
          local input = node.inputs[k]
          local source = input.source:getRoot()
          if source.type == Source.CONSTANT and symbols[source] == nil and torch.isTensor(source.val) then
-            constants[#constants + 1] = source
-            symbols[source] = "c" .. #constants
+            local index = constantTensorMap[source.val]
+            if index == nil then
+               index = #constants + 1
+               constantTensorMap[source.val] = index
+               constants[index] = source
+            end
+            symbols[source] = "c" .. index
          end
       end
    end
-   return symbols, defined, constants, nextLocal - 1, nextReusableLocal - 1, reusableLocalMap, partialMatchAllocations
+
+   -- Did we fail to find a spot for any tensors? Try an inexact mapping that requires a view.
+
+   local availableTensors = { }
+
+   if availableCount > 0 then
+      -- Only bother sorting the two lists by size if we're actually going to use them.
+      local availableTensorSizes = { }
+      for k, v in pairs(availableTensorMap) do
+         for i = 1, #v do
+            local idx = v[i]
+            availableTensors[#availableTensors + 1] = idx
+            availableTensorSizes[idx] = tensorPool[idx]:storage():size()
+         end
+      end
+
+      function sortLocalSize(a, b)
+        return availableTensorSizes[a] < availableTensorSizes[b]
+      end
+
+      table.sort(availableTensors, sortLocalSize)
+
+      local remainingOutputSizes = { }
+      for i = 1, #remainingOutputs do
+         local idx = remainingOutputs[i]
+         local output = execOrder[idx].outputs[1]
+         remainingOutputSizes[idx] = output:get():storage():size()
+      end
+
+      function sortTensorSize(a, b)
+        return remainingOutputSizes[a] < remainingOutputSizes[b]
+      end
+
+      table.sort(remainingOutputs, sortTensorSize)
+   end
+
+   for i = #remainingOutputs, 1, -1 do
+      local output = execOrder[remainingOutputs[i]].outputs[1]
+      local outputTensor = output:get()
+      local matchingIndex = searchMatchingTensorLargest(outputTensor, availableTensors, tensorPool)
+      if matchingIndex > 0 then
+         local tensorIdx = availableTensors[matchingIndex]
+         local poolTensor = tensorPool[tensorIdx]
+         table.remove(availableTensors, matchingIndex) -- typically the last element
+         symbols[output.source] = "vlocals[" .. tensorIdx .. "]"
+         local t0 = sys.clock()
+         local poolStorage = poolTensor:storage()
+         if outputTensor:storage():size() > poolStorage:size() then
+            -- We don't care about the data in the pool tensor, so resize it to zero before growing to avoid a realloc/copy.
+            poolStorage:resize(0)
+         end
+         tensorPoolViews[#tensorPoolViews + 1] = outputTensor.new(poolStorage):resize(outputTensor:size())
+      else
+         -- No match anywhere, allocate new slot in the tensor pool.
+         local tensorIdx = #tensorPool + 1
+         tensorPool[tensorIdx] = outputTensor.new(outputTensor:size())
+         symbols[output.source] = "rlocals[" .. tensorIdx .. "]"
+      end
+   end
+   return symbols, undefined, constants, tensorPoolViews
 end
 
 local function collectObjects(execOrder)
@@ -641,7 +660,8 @@ local function generateCode(fn, args, opt)
    local optimize = opt.optimize or true
    local withForward = defaultBool(opt.withForward, true)
    local withGradients = defaultBool(opt.withGradients, true)
-   local reuseLocals = opt.reuseLocals or { }
+   local tensorPool = opt.tensorPool or { }
+   local tensorLocals = opt.tensorLocals or { }
    local debugger
    if opt.debugHook then
       debugger = Debugger(opt)
@@ -654,13 +674,12 @@ local function generateCode(fn, args, opt)
    end
 
    local execOrder, outputNodes = execGraph(graph, withForward, withGradients)
-   local symbols, defined, constants, numLocals, numReusableLocals, reusableLocalMap, partialMatchAllocations = createSymbolTable(graph, execOrder, reuseLocals)
+   local symbols, undefined, constants, tensorPoolViews = createSymbolTable(graph, execOrder, tensorPool, tensorLocals)
    local objects = collectObjects(execOrder)
 
    local out = StringBuilder()
-   local outerArgNames = {"rlocals"}
-   local outerArgs = { }
-   outerArgs[#outerArgs + 1] = reuseLocals
+   local outerArgNames = {"locals", "rlocals", "vlocals"}
+   local outerArgs = { tensorLocals, tensorPool, tensorPoolViews }
 
    if debugger then
       debugger.setMain(symbols, graph.grads, graph.answers)
@@ -711,32 +730,6 @@ local function generateCode(fn, args, opt)
       out.write("local ", constants[i]:symbolPath(symbols), " = ", constants[i]:symbolPath({}))
       out.write("\n")
    end
-   out.write("local locals = { }")
-   out.write("\n")
-   out.write("local vlocals = { }")
-   out.write("\n")
-   out.write("local function cleanupLocals()", "\n")
-   out.write("for i = ", 1, ", ", numLocals, " do locals[i] = 0 end", "\n")
-   out.write("end", "\n")
-   out.write("cleanupLocals()", "\n")
-   if numReusableLocals ~= #reuseLocals then
-      out.write("for i = ", #reuseLocals + 1, ", ", numReusableLocals, " do rlocals[i] = 0 end")
-      out.write("\n")
-      for i = #reuseLocals + 1, numReusableLocals do
-         local output = reusableLocalMap[i]
-         local tensor = output:get()
-         out.write(symbols[output.source], " = ", tensor:type(), "(", table.concat(tensor:size():totable(), ", "), ")")
-         out.write("\n")
-      end
-   end
-   out.write("for i = ", 1, ", ", numReusableLocals, " do vlocals[i] = 0 end")
-   out.write("\n")
-   for k, v in pairs(partialMatchAllocations) do
-      local output = k
-      out.write(symbols[output.source], " = ", output:get():type(), ".new(rlocals[", v, "]:storage()):resize(", table.concat(output:get():size():totable(), ", "), ")")
-      out.write("\n")
-   end
-   out.write("\n")
    out.write("return function(")
    local paramSymbols = { }
    for i = 1, #graph.params do
@@ -760,7 +753,7 @@ local function generateCode(fn, args, opt)
          out.write("    ")
          if not canReuseOutput(node) then
             if #outputSymbols > 0 then
-               if not defined[node.outputs[1].source] then
+               if undefined[node.outputs[1].source] then
                   out.write("local ")
                end
                out.write(table.concat(outputSymbols, ", "), " = ")
@@ -825,7 +818,6 @@ local function generateCode(fn, args, opt)
          end
       end
    end
-   out.write(", cleanupLocals()")
    out.write("\n")
    out.write("end")
    out.write("\n")
@@ -869,6 +861,15 @@ local function optimize(opt)
    defaultOptimize = opt
 end
 
+local function printPoolStats(tensorPool)
+   local size = 0
+   for i = 1, #tensorPool do
+      local tensor = tensorPool[i]
+      size = size + tensor:storage():size() * 4
+   end
+   print("tensor pool size: " .. (size / (1024 * 1024)) .. " MB")
+end
+
 local function grad(fn, gradOpt)
    gradOpt = gradOpt or { }
    local argnum = gradOpt.gradArg or 1
@@ -878,14 +879,16 @@ local function grad(fn, gradOpt)
    local partialGrad = defaultBool(gradOpt.partialGrad, false)
    local debugHook = gradOpt.debugHook
    local generatedFunctions = { }
-   local cachedTensors = { }
+   local tensorPool = { }
+   local localTensors = { }
    local opt = {
       argnum = argnum,
       withForward = withForward,
       withGradients = withGradients,
       partialGrad = partialGrad,
       debugHook = debugHook,
-      reuseLocals = cachedTensors
+      tensorPool = tensorPool,
+      tensorLocals = tensorLocals
    }
    if optimize then
       local doGrad = function(...)
@@ -901,10 +904,12 @@ local function grad(fn, gradOpt)
          end
          if generatedFunctions[signature] == nil then
             local code, outerArgs, retValues = generateCode(fn, args, opt)
+            --printPoolStats(tensorPool)
             --print(code)
             --print("generated code for param signature " .. signature)
             local outer = loadstring(code)
             if outer == nil then
+               print(code)
                error("failed to parse generated code")
             end
             generatedFunctions[signature] = outer()(unpack(outerArgs))

@@ -17,14 +17,6 @@ function util.oneHot(labels, n)
    return out
 end
 
-function unwrapTensorValue(v)
-   if type(v) == "table" then
-      return v.raw
-   else
-      return v
-   end
-end
-
 -- Helpers:
 function util.logSumExp(array)
    local max = torch.max(array)
@@ -56,8 +48,8 @@ function util.dropout(state, dropout)
    dropout = dropout or 0
    local keep = 1 - dropout
    if keep == 1 then return state end
-   local s = state.new(torch.size(state))
-   local keep = torch.mul(torch.bernoulli(s,keep), 1/keep)
+   local s = util.newTensorLike(state)
+   local keep = torch.mul(torch.bernoulli(s, keep), 1 / keep)
    return torch.cmul(state, keep)
 end
 
@@ -73,6 +65,14 @@ function util.setNotEqualInPlace(o, a, b, c, v)
    local copy = o:copy(v)
    copy[mask] = 0
    return copy
+end
+
+function util.newTensorLike(a)
+   return a.new(a:size())
+end
+
+function util.newTensorLikeInPlace(o, a)
+   return o
 end
 
 function util.fillSameSizeAs(a, b)

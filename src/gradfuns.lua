@@ -411,7 +411,7 @@ overload.module("util", util, function(module)
          return torch.cmul(g, p)
       end
    })
-   module.dynamic("setNotEqual", "fillSameSizeAs", "zerosLike", "narrowCopy", "selectCopy", "selectSliceCopy", "narrowSliceCopy", "makeContiguous", "indexAdd", "catTable")
+   module.dynamic("setNotEqual", "fillSameSizeAs", "newTensorLike", "zerosLike", "narrowCopy", "selectCopy", "selectSliceCopy", "narrowSliceCopy", "makeContiguous", "indexAdd", "catTable")
 end)
 
 

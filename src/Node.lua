@@ -86,21 +86,37 @@ function Node:evaluateBackward()
 			local input = self.inputs[i]
 			local source = input.source
 			if source:differentiable() then
-				if self.gradients[o] == nil then
-					if output.type == Value.TENSOR then
-						local tens = output:get()
-						self.gradients[o] = Value.from(torch[tens:type():gsub("torch%.", "")](tens:size()):zero(), Source.gradient(0, tens:type(), tens:size()))
-					elseif output.type == Value.NUMBER then
-						self.gradients[o] = Value.from(0.0, Source.gradient(0))
+				if self.gradientFn ~= nil and self.gradientFn[i] ~= nil then
+					if self.gradients[o] == nil then
+						if output.type == Value.TENSOR then
+							local tens = output:get()
+							self.gradients[o] = Value.from(torch[tens:type():gsub("torch%.", "")](tens:size()):zero(), Source.gradient(0, tens:type(), tens:size()))
+						elseif output.type == Value.NUMBER then
+							self.gradients[o] = Value.from(0.0, Source.gradient(0))
+						end
 					end
-				end
-				if input.type == Value.TABLE then
-					local gradUpdates = (self.gradientFn[i])(self.gradients[o], output, unpack(self.inputs))
-					if gradUpdates then
-						for k, v in pairs(input:get()) do
-							local gradUpdate = gradUpdates[k]
-							local subArg = v
-							local source = subArg.source
+					if input.type == Value.TABLE then
+						local gradUpdates = (self.gradientFn[i])(self.gradients[o], output, unpack(self.inputs))
+						if gradUpdates then
+							for k, v in pairs(input:get()) do
+								local gradUpdate = gradUpdates[k]
+								local subArg = v
+								local source = subArg.source
+								local sourceIndex = source.index or 1
+								local gradSource = source.node or source
+								if gradSource.gradients == nil then
+									gradSource.gradients = { }
+								end
+								if gradSource.gradients[sourceIndex] == nil or gradSource.gradients[sourceIndex] == 0 then
+									gradSource.gradients[sourceIndex] = gradUpdate
+								else
+									gradSource.gradients[sourceIndex] = gradSource.gradients[sourceIndex] + gradUpdate
+								end
+							end
+						end
+					else
+						local gradUpdate = (self.gradientFn[i])(self.gradients[o], output, unpack(self.inputs))
+						if gradUpdate then
 							local sourceIndex = source.index or 1
 							local gradSource = source.node or source
 							if gradSource.gradients == nil then
@@ -111,20 +127,6 @@ function Node:evaluateBackward()
 							else
 								gradSource.gradients[sourceIndex] = gradSource.gradients[sourceIndex] + gradUpdate
 							end
-						end
-					end
-				else
-					local gradUpdate = (self.gradientFn[i])(self.gradients[o], output, unpack(self.inputs))
-					if gradUpdate then
-						local sourceIndex = source.index or 1
-						local gradSource = source.node or source
-						if gradSource.gradients == nil then
-							gradSource.gradients = { }
-						end
-						if gradSource.gradients[sourceIndex] == nil or gradSource.gradients[sourceIndex] == 0 then
-							gradSource.gradients[sourceIndex] = gradUpdate
-						else
-							gradSource.gradients[sourceIndex] = gradSource.gradients[sourceIndex] + gradUpdate
 						end
 					end
 				end
