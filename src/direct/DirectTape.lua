@@ -52,15 +52,17 @@ function DirectTape.gradOnly(tape, arg, argnum, allAns, gradOutput)
                   node.outgrad = 0.0
                end
             end
-            local gradUpdate = (node.gradFun[iarg])(node.outgrad, node.value, unpack(node.argValues))
-            if gradUpdate then
-               if thisArg.outgrad == nil or thisArg.outgrad == 0 then
-                  thisArg.outgrad = gradUpdate
-               else
-                  thisArg.outgrad = thisArg.outgrad + gradUpdate
+            local gf = node.gradFun[iarg]
+            if gf ~= nil then
+               local gradUpdate = (gf)(node.outgrad, node.value, unpack(node.argValues))
+               if gradUpdate then
+                  if thisArg.outgrad == nil or thisArg.outgrad == 0 then
+                     thisArg.outgrad = gradUpdate
+                  else
+                     thisArg.outgrad = thisArg.outgrad + gradUpdate
+                  end
                end
             end
-
          -- Special-casing table-valued arguments that contain nodes
          -- right now, this is just torch.cat
          elseif type(thisArg) == "table" and getmetatable(thisArg[1]) == DirectNode then

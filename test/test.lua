@@ -995,7 +995,7 @@ local tests = {
 
       -- Tests:
       tester:asserteq(sawHook, 5, 'debugHook should have tripped')
-      tester:asserteq(badline, "    locals[1] = torch_div(rlocals[1], 0)", 'debugHook should have showed the bad line')
+      tester:asserteq(badline, "    torch_div(rlocals[2], rlocals[1], 0)", 'debugHook should have showed the bad line')
    end,
 }
 
