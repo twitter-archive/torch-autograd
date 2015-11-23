@@ -10,6 +10,8 @@ local function setApplyFn(fn)
    nodeApply = fn or directApply
 end
 
+setApplyFn()
+
 -- Generic auto-wrapper of every function exposed in given
 -- package + arbitary instantiated nn container/module:
 local function functionalize(input)
