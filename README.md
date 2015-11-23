@@ -19,6 +19,8 @@ Autograd has multiple goals:
 * the ability to define any new nn compliant Module with automatic differentiation
 * represent complex evaluation graphs, which is very useful to describe models
   with multiple loss functions and/or inputs
+* graphs are dynamic, i.e. can be different at each function call: for loops,
+  or conditional, can depend on intermediate results, or on input parameters
 * enable gradients of gradients for transparent computation of Hessians, ...
 
 Updates
