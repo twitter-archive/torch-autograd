@@ -132,7 +132,7 @@ local function nodeCompute(fn, gradFn, capture, ...)
          nodeDebugger.captureCallStack(n)
       end
       applyDepth = applyDepth - 1
-      return unpack(values)
+      return table.unpack(values)
    else
       local evalArgs = { }
       for i = 1, #inputs do
@@ -142,9 +142,9 @@ local function nodeCompute(fn, gradFn, capture, ...)
             evalArgs[i] = inputs[i]
          end
       end
-      local values = {fn.fn(unpack(evalArgs))}
+      local values = {fn.fn(table.unpack(evalArgs))}
       applyDepth = applyDepth - 1
-      return unpack(values)
+      return table.unpack(values)
    end
 end
 
@@ -403,7 +403,7 @@ local function createGraph(fn, args, opt, debugger)
    nodeDebugger = debugger
 
    -- Call user forward function.
-   local answers = {fn(unpack(values))}
+   local answers = {fn(table.unpack(values))}
 
    -- Figure out forward graph traversal order.
    -- Only walk from the answer we need to differentiate (usually the first).
@@ -840,7 +840,7 @@ local function execUncached(fn, args, opt)
    for i = 1, #graph.answers do
       retValues[#retValues + 1] = flattenAnswer(graph.answers[i])
    end
-   return unpack(retValues)
+   return table.unpack(retValues)
 end
 
 local function buildSignature(params, tensorDims)
@@ -912,13 +912,13 @@ local function grad(fn, gradOpt)
                print(code)
                error("failed to parse generated code")
             end
-            generatedFunctions[signature] = outer()(unpack(outerArgs))
+            generatedFunctions[signature] = outer()(table.unpack(outerArgs))
             -- We already have the answers, don't run it all over again.
             if withGradients and withForward and not debugHook then
-               return unpack(retValues)
+               return table.unpack(retValues)
             end
          end
-         return generatedFunctions[signature](unpack(args))
+         return generatedFunctions[signature](table.unpack(args))
       end
       return doGrad
    else
@@ -934,7 +934,7 @@ local function grad(fn, gradOpt)
          return function(...)
             local args = {...}
             local partialGrad = table.remove(args, #args)
-            return DirectTape.grad(fn, argnum, partialGrad, unpack(args))
+            return DirectTape.grad(fn, argnum, partialGrad, table.unpack(args))
          end
       end
    end
