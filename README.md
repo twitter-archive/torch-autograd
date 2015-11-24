@@ -1,6 +1,8 @@
 Autograd
 ========
 
+[![Build Status](https://travis-ci.org/twitter/torch-autograd.svg)](https://travis-ci.org/twitter/torch-autograd)
+
 Autograd automatically differentiates native
 [Torch](https://github.com/torch/torch7) code. Inspired by the
 [original Python version](https://www.github.com/hips/autograd).
