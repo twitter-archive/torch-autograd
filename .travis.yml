@@ -25,9 +25,6 @@ addons:
     - cmake
     - libreadline-dev
     - git-core
-    - libqt4-core
-    - libqt4-gui
-    - libqt4-dev
     - libjpeg-dev
     - libpng-dev
     - ncurses-dev
