@@ -1,3 +1,6 @@
+-- Deps
+require 'trepl'
+
 -- Base package
 local autograd = require 'autograd.main'
 
