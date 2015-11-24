@@ -941,7 +941,7 @@ local function grad(fn, gradOpt)
             --printPoolStats(tensorPool)
             --print(code)
             --print("generated code for param signature " .. signature)
-            local outer = loadstring(code)
+            local outer = (loadstring or load)(code)
             if outer == nil then
                print(code)
                error("failed to parse generated code")
