@@ -938,7 +938,7 @@ local function grad(fn, gradOpt)
          end
          if generatedFunctions[signature] == nil then
             local code, outerArgs, retValues = generateCode(fn, args, opt)
-            printPoolStats(tensorPool)
+            --printPoolStats(tensorPool)
             --print(code)
             --print("generated code for param signature " .. signature)
             local outer = loadstring(code)
