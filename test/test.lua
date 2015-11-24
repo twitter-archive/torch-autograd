@@ -4,6 +4,7 @@ local autograd = require 'autograd'
 local gradcheck = require 'autograd.gradcheck' {randomizeInput = true}
 local gradcheckConstant = require 'autograd.gradcheck' {randomizeInput = false}
 local tester = totem.Tester()
+local stringx = require 'pl.stringx'
 
 -- List of tests:
 local tests = {
@@ -989,7 +990,7 @@ local tests = {
       local dFunc = autograd(func, {
          debugHook = function(debugger, msg, gen)
             if sawHook == 0 then
-               badline = gen.source:split("\n")[gen.line]
+               badline = stringx.split(gen.source, "\n")[gen.line]
                --debugger.showDot()
             end
             sawHook = sawHook + 1

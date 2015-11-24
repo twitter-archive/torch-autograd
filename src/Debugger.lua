@@ -1,6 +1,7 @@
 local Source = require 'autograd.Source'
 local Value = require 'autograd.Value'
 local StringBuilder = require 'autograd.StringBuilder'
+local stringx = require 'pl.stringx'
 
 local function Debugger(opt)
    opt = opt or { }
@@ -27,7 +28,7 @@ local function Debugger(opt)
       local tb = debug.traceback()
       if not tb:match("'evaluateBackward'") then
          node.debug.isForward = true
-         local lines = tb:split("\n")
+         local lines = stringx.split(tb, "\n")
          table.remove(lines, 1) -- Remove the header line
          local infos = { }
          for i,line in ipairs(lines) do
