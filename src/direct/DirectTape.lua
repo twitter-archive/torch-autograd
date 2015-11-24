@@ -15,7 +15,7 @@ function DirectTape.funOnly(fun, tape, argnum, ...)
 
    overload.install(DirectNode.nodeApply)
 
-   local allAns = {fun(unpack(arg))}
+   local allAns = {fun(table.unpack(arg))}
 
    overload.uninstall()
 
@@ -34,7 +34,7 @@ function DirectTape.funOnly(fun, tape, argnum, ...)
    else
       out[1] = ansVal
    end
-   return arg, allAns, tape, unpack(out)
+   return arg, allAns, tape, table.unpack(out)
 end
 
 function DirectTape.gradOnly(tape, arg, argnum, allAns, gradOutput)
@@ -54,7 +54,7 @@ function DirectTape.gradOnly(tape, arg, argnum, allAns, gradOutput)
             end
             local gf = node.gradFun[iarg]
             if gf ~= nil then
-               local gradUpdate = (gf)(node.outgrad, node.value, unpack(node.argValues))
+               local gradUpdate = (gf)(node.outgrad, node.value, table.unpack(node.argValues))
                if gradUpdate then
                   if thisArg.outgrad == nil or thisArg.outgrad == 0 then
                      thisArg.outgrad = gradUpdate
@@ -73,7 +73,7 @@ function DirectTape.gradOnly(tape, arg, argnum, allAns, gradOutput)
                   node.outgrad = 0.0
                end
             end
-            local gradUpdate = (node.gradFun[iarg])(node.outgrad, node.value, unpack(node.argValues))
+            local gradUpdate = (node.gradFun[iarg])(node.outgrad, node.value, table.unpack(node.argValues))
             local la = #thisArg
             for isubArg=1,la do
                if gradUpdate[isubArg] then
@@ -118,7 +118,7 @@ function DirectTape.grad(fun, argnum, partialGrad, ...)
    else
       fout[2] = ansVal
    end
-   return unpack(fout)
+   return table.unpack(fout)
 end
 
 return DirectTape

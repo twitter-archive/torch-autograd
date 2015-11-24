@@ -36,7 +36,7 @@ local function functionalize(input)
                   map[modName] = function(...)
                      local args = {...}
                      -- Construct object:
-                     local nnObject = v(unpack(args))
+                     local nnObject = v(table.unpack(args))
                      local lastType = ""
 
                      local function forward(x, y)
@@ -105,7 +105,7 @@ local function functionalize(input)
                   map[modName] = function(...)
                      -- Construct object:
                      local args = {...}
-                     local nnObject = v(unpack(args))
+                     local nnObject = v(table.unpack(args))
                      local lastType = ""
 
                      local function forward(x, W, b)

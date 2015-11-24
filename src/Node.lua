@@ -69,12 +69,12 @@ function Node:evaluateForward()
 	end
 	self.outputs = { }
 	self.outputTargets = { }
-	local outputs = {self.forwardFn.fn(unpack(evalArgs))}
+	local outputs = {self.forwardFn.fn(table.unpack(evalArgs))}
 	for i = 1, #outputs do
 		self.outputs[i] = Value.from(outputs[i], Source.computed(self, i))
 		self.outputTargets[i] = { }
 	end
-	return unpack(self.outputs)
+	return table.unpack(self.outputs)
 end
 
 function Node:evaluateBackward()
@@ -96,7 +96,7 @@ function Node:evaluateBackward()
 						end
 					end
 					if input.type == Value.TABLE then
-						local gradUpdates = (self.gradientFn[i])(self.gradients[o], output, unpack(self.inputs))
+						local gradUpdates = (self.gradientFn[i])(self.gradients[o], output, table.unpack(self.inputs))
 						if gradUpdates then
 							for k, v in pairs(input:get()) do
 								local gradUpdate = gradUpdates[k]
@@ -115,7 +115,7 @@ function Node:evaluateBackward()
 							end
 						end
 					else
-						local gradUpdate = (self.gradientFn[i])(self.gradients[o], output, unpack(self.inputs))
+						local gradUpdate = (self.gradientFn[i])(self.gradients[o], output, table.unpack(self.inputs))
 						if gradUpdate then
 							local sourceIndex = source.index or 1
 							local gradSource = source.node or source
