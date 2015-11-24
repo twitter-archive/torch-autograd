@@ -20,7 +20,7 @@ function Value:init(type, val, source)
 	self.source = source
 end
 
-function Value.from(v, source)
+function Value.from(v, source, skipWrapTables)
 	if v == nil then
 		error("nil parameter value")
 	elseif Value.isValue(v) then
@@ -31,10 +31,14 @@ function Value.from(v, source)
 			if Value.isValue(v) then
 				vcopy[k] = v
 			else
-				vcopy[k] = Value.from(v, Source.table(source, k))
+				vcopy[k] = Value.from(v, Source.table(source, k), skipWrapTables)
 			end
 		end
-		return Value.create(Value.TABLE, vcopy, source)
+		if skipWrapTables then
+			return vcopy
+		else
+			return Value.create(Value.TABLE, vcopy, source)
+		end
 	elseif torch.isTensor(v) then
 		return Value.create(Value.TENSOR, v, source)
 	elseif type(v) == "number" then
@@ -82,28 +86,36 @@ function Value:__len()
 	return #self.raw
 end
 
-function Value:flatten()
-	if self.type == Value.TABLE then
-		local rawTable = { }
-		for k,v in pairs(self.raw) do
-			rawTable[k] = v:flatten()
+function Value.flatten(v)
+	if not Value.isValue(v) then
+		if type(v) == "table" then
+			local rawTable = { }
+			for k,v in pairs(v) do
+				rawTable[k] = Value.flatten(v)
+			end
+			return rawTable
 		end
-		return rawTable
+	elseif v.type == Value.TABLE then
+		return Value.flatten(v.raw)
 	else
-		return self.raw
+		return v.raw
 	end
 end
 
-function Value:flattenGrads()
-	if self.type == Value.TABLE then
-		local rawTable = { }
-		for k,v in pairs(self.raw) do
-			rawTable[k] = v:flattenGrads()
+function Value.flattenGrads(v)
+	if not Value.isValue(v) then
+		if type(v) == "table" then
+			local rawTable = { }
+			for k,v in pairs(v) do
+				rawTable[k] = Value.flattenGrads(v)
+			end
+			return rawTable
 		end
-		return rawTable
+	elseif v.type == Value.TABLE then
+		return Value.flattenGrads(v.raw)
 	else
-		if self.source.gradients then
-			return self.source.gradients[1]:flatten()
+		if v.source.gradients then
+			return v.source.gradients[1]:flatten()
 		end
 		return nil
 	end
