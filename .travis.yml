@@ -56,5 +56,6 @@ script:
 - ${INSTALL_PREFIX}/bin/luarocks make
 - export PATH=${INSTALL_PREFIX}/bin:$PATH
 - export TESTLUA=$(which luajit lua | head -n 1)
+- export OMP_NUM_THREADS=1
 - ${TESTLUA} test/test.lua
 - ${TESTLUA} benchmark/benchmark.lua
