@@ -48,6 +48,7 @@ before_script:
 - ${INSTALL_PREFIX}/bin/luarocks install penlight
 - ${INSTALL_PREFIX}/bin/luarocks install moses
 - ${INSTALL_PREFIX}/bin/luarocks install trepl
+- ${INSTALL_PREFIX}/bin/luarocks install nn
 - if [[ $TORCH_LUA_VERSION != 'LUAJIT21' && $TORCH_LUA_VERSION != 'LUAJIT20' ]]; then ${INSTALL_PREFIX}/bin/luarocks install luaffi; fi
 - cd $ROOT_TRAVIS_DIR
 - export LD_LIBRARY_PATH=${INSTALL_PREFIX}/lib:$LD_LIBRARY_PATH
@@ -55,5 +56,5 @@ script:
 - ${INSTALL_PREFIX}/bin/luarocks make
 - export PATH=${INSTALL_PREFIX}/bin:$PATH
 - export TESTLUA=$(which luajit lua | head -n 1)
-- cd test
-- ${TESTLUA} test.lua
+- ${TESTLUA} test/test.lua
+- ${TESTLUA} benchmark/benchmark.lua
