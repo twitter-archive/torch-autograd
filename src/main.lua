@@ -306,6 +306,24 @@ local function removeIdentityOperators(execOrder, outputNodes)
    end
 end
 
+local function convertSubtract(execOrder)
+   for i = 1, #execOrder do
+      local node = execOrder[i]
+      local op = node.forwardFn.operator
+      if op  ~= nil then
+         if op == "sub" and #node.inputs == 2 then
+            local unmNode = Node.new({ fn = function(a) return -a end, operator = "unm" }, nil, { node.inputs[2] })
+            local unmOutput = unmNode:evaluateForward()
+            local addNode = Node.new({ fn = function(a, b) return a + b end, operator = "add" }, nil, { node.inputs[1], unmOutput })
+            local addOutput = addNode:evaluateForward()
+            replaceNode(node.outputs[1], addOutput)
+            execOrder[i] = addNode
+            table.insert(execOrder, i, unmNode)
+         end
+      end
+   end
+end
+
 local function changeToReuseFunctions(execOrder)
    for i = 1, #execOrder do
       local node = execOrder[i]
@@ -457,6 +475,7 @@ end
 
 local function optimizeGraph(graph, opt)
    local execOrder, outputNodes = execGraph(graph)
+   convertSubtract(execOrder)
    removeIdentityOperators(execOrder, outputNodes)
    convertOperators(execOrder)
    changeToReuseFunctions(execOrder)
