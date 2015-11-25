@@ -51,6 +51,9 @@ function Source:symbolPath(rootSymbols)
 			end
 			return "{" .. table.concat(elements, ", ") .. "}"
 		else
+			if self.val == math.huge then
+				return "math.huge"
+			end
 			return tostring(self.val)
 		end
 	elseif self.type == Source.GRADIENT then

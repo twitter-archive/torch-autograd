@@ -398,7 +398,11 @@ local function createGraph(fn, args, opt, debugger)
    local tensorDims = { }
 
    for i = 1, #args do
-      values[i] = Value.from(args[i], Source.param(i, i == argnum), false)
+      -- Don't wrap the outer tables in Values, since it would interfere with the use of the # operator.
+      -- This creates some problems when referring to an entire param table in the generated code - it'll
+      -- be represented as a new literal table, but it's a good tradeoff until we move entirely to Lua 5.2
+      -- and can overload # on Value.
+      values[i] = Value.from(args[i], Source.param(i, i == argnum), true)
    end
 
    -- Begin recording all torch operations.
