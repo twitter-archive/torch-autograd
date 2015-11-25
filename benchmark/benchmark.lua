@@ -1,3 +1,5 @@
+require 'trepl'
+
 -- Options
 local opt = lapp [[
 Run benchmarks.
