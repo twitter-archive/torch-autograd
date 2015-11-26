@@ -76,6 +76,17 @@ local tests = {
       tester:asserteq((model.modules[3].bias - autoModel.modules[2].bias):abs():max() < 1e-6, true, "gradient accumulation must be the same.")
    end,
 
+   NNWrapperTableInput = function()
+      local A = torch.eye(10)
+      local B = torch.eye(10):mul(3)
+      local mmModule = nn.MM()
+      local mmFn = autograd.nn.MM()
+      -- print(mmModule({A,B}))
+
+      print(mmFn({A,B}))
+
+   end,
+
    Select = function()
       local W = torch.Tensor(5,25):normal()
       local x = torch.Tensor(1,25):normal()
