@@ -82,9 +82,12 @@ local tests = {
       local B = torch.eye(10):mul(3)
       local mmModule = nn.MM()
       local mmFn = autograd.nn.MM()
-      -- print(mmModule({A,B}))
 
-      print(mmFn({A,B}))
+      local fn = function(inputs)
+         return torch.sum(mmFn({inputs.A,inputs.B}))
+      end
+
+      tester:assert(gradcheck(fn,{A=A,B=B}), "Incorrect gradient")
 
    end,
 
