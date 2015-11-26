@@ -109,7 +109,17 @@ local function functionalize(input)
                      local lastType = ""
 
                      local function forward(x, W, b)
-                        local dataType = (W or x):type()
+                        local dataType
+                        if torch.isTensor(x) then
+                           dataType = (W or x):type()
+                        elseif type(x) == "table" then
+                           if x[1] then
+                              dataType = (W or x[1]):type()
+                           else
+                              error("X is neither a Tensor, nor a table array")
+                           end
+                        end
+
                         if lastType ~= dataType then
                            lastType = dataType
                            nnObject:type(dataType)
@@ -122,7 +132,17 @@ local function functionalize(input)
                      end
 
                      local function backward(g, x, W, b)
-                        local dataType = (W or x):type()
+                        local dataType
+                        if torch.isTensor(x) then
+                           dataType = (W or x):type()
+                        elseif type(x) == "table" then
+                           if x[1] then
+                              dataType = (W or x[1]):type()
+                           else
+                              error("X is neither a Tensor, nor a table array")
+                           end
+                        end
+
                         if lastType ~= dataType then
                            lastType = dataType
                            nnObject:type(dataType)
