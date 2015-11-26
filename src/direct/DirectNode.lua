@@ -70,7 +70,7 @@ function DirectNode.nodeApply(fun, gradFun, capture, ...)
       end
    end
    if capture and parent ~= nil then
-      local value = fun(unpack(values))
+      local value = fun(table.unpack(values))
       local node = nil
       local tape = parent.tape
       local o = tape[tape.nextIndex]
@@ -87,7 +87,7 @@ function DirectNode.nodeApply(fun, gradFun, capture, ...)
       end
       return DirectNode:init(value, fun, gradFun, arg, values, tape)
    else
-      return fun(unpack(values))
+      return fun(table.unpack(values))
    end
 end
 

@@ -1,0 +1,61 @@
+language: c
+compiler:
+  - gcc
+  - clang
+cache:
+  directories:
+  - $HOME/OpenBlasInstall
+sudo: false
+env:
+  - TORCH_LUA_VERSION=LUAJIT21
+  - TORCH_LUA_VERSION=LUA51
+  - TORCH_LUA_VERSION=LUA52
+addons:
+  apt:
+    packages:
+    - cmake
+    - gfortran
+    - gcc-multilib
+    - gfortran-multilib
+    - liblapack-dev
+    - build-essential
+    - gcc
+    - g++
+    - curl
+    - cmake
+    - libreadline-dev
+    - git-core
+    - libjpeg-dev
+    - libpng-dev
+    - ncurses-dev
+    - imagemagick
+    - libzmq3-dev
+    - gfortran
+    - unzip
+    - gnuplot
+    - gnuplot-x11
+before_script:
+- export ROOT_TRAVIS_DIR=$(pwd)
+- export INSTALL_PREFIX=~/torch/install
+-  ls $HOME/OpenBlasInstall/lib || (cd /tmp/ && git clone https://github.com/xianyi/OpenBLAS.git -b master && cd OpenBLAS && make clean && (make USE_THREAD=0 USE_THREADS=0 USE_OPENMP=0 NO_AFFINITY=1 -j$(getconf _NPROCESSORS_ONLN) 2>/dev/null >/dev/null) && make USE_THREAD=0 USE_THREADS=0 USE_OPENMP=1 NO_AFFINITY=0 PREFIX=$HOME/OpenBlasInstall install)
+- git clone https://github.com/torch/distro.git ~/torch --recursive
+- cd ~/torch && git submodule update --init --recursive
+- mkdir build && cd build
+- export CMAKE_LIBRARY_PATH=$HOME/OpenBlasInstall/include:$HOME/OpenBlasInstall/lib:$CMAKE_LIBRARY_PATH
+- cmake .. -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" -DCMAKE_BUILD_TYPE=Release -DWITH_${TORCH_LUA_VERSION}=ON
+- make && make install
+- ${INSTALL_PREFIX}/bin/luarocks install totem
+- ${INSTALL_PREFIX}/bin/luarocks install penlight
+- ${INSTALL_PREFIX}/bin/luarocks install moses
+- ${INSTALL_PREFIX}/bin/luarocks install trepl
+- ${INSTALL_PREFIX}/bin/luarocks install nn
+- if [[ $TORCH_LUA_VERSION != 'LUAJIT21' && $TORCH_LUA_VERSION != 'LUAJIT20' ]]; then ${INSTALL_PREFIX}/bin/luarocks install luaffi; fi
+- cd $ROOT_TRAVIS_DIR
+- export LD_LIBRARY_PATH=${INSTALL_PREFIX}/lib:$LD_LIBRARY_PATH
+script:
+- ${INSTALL_PREFIX}/bin/luarocks make
+- export PATH=${INSTALL_PREFIX}/bin:$PATH
+- export TESTLUA=$(which luajit lua | head -n 1)
+- export OMP_NUM_THREADS=1
+- ${TESTLUA} test/test.lua
+- ${TESTLUA} benchmark/benchmark.lua

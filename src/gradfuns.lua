@@ -44,7 +44,7 @@ local function unbroadcast(g,ans,x)
             thisSize = torch.totable(torch.size(grad))
          if size[i] == 1 then
                thisSize[i] = 1
-               grad = torch.view(torch.sum(grad,i),unpack(thisSize))
+               grad = torch.view(torch.sum(grad,i),table.unpack(thisSize))
             end
          end
          return grad

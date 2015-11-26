@@ -132,7 +132,7 @@ local function nodeCompute(fn, gradFn, capture, ...)
          nodeDebugger.captureCallStack(n)
       end
       applyDepth = applyDepth - 1
-      return unpack(values)
+      return table.unpack(values)
    else
       local evalArgs = { }
       for i = 1, #inputs do
@@ -142,24 +142,28 @@ local function nodeCompute(fn, gradFn, capture, ...)
             evalArgs[i] = inputs[i]
          end
       end
-      local values = {fn.fn(unpack(evalArgs))}
+      local values = {fn.fn(table.unpack(evalArgs))}
       applyDepth = applyDepth - 1
-      return unpack(values)
+      return table.unpack(values)
    end
 end
 
 local function collectGradients(val, grads)
    grads = grads or { }
-   if val.source.gradients ~= nil then
-      for i = 1, #val.source.gradients do
-         grads[#grads + 1] = {
-            param = val,
-            grad = val.source.gradients[i]
-         }
+   if Value.isValue(val) then
+      if val.source.gradients ~= nil then
+         for i = 1, #val.source.gradients do
+            grads[#grads + 1] = {
+               param = val,
+               grad = val.source.gradients[i]
+            }
+         end
       end
-   end
-   if val.type == Value.TABLE then
-      for k, v in pairs(val:get()) do
+      if val.type == Value.TABLE then
+         collectGradients(val:get(), grads)
+      end
+   elseif type(val) == "table" then
+      for k, v in pairs(val) do
          collectGradients(v, grads)
       end
    end
@@ -302,6 +306,24 @@ local function removeIdentityOperators(execOrder, outputNodes)
    end
 end
 
+local function convertSubtract(execOrder)
+   for i = 1, #execOrder do
+      local node = execOrder[i]
+      local op = node.forwardFn.operator
+      if op  ~= nil then
+         if op == "sub" and #node.inputs == 2 then
+            local unmNode = Node.new({ fn = function(a) return -a end, operator = "unm" }, nil, { node.inputs[2] })
+            local unmOutput = unmNode:evaluateForward()
+            local addNode = Node.new({ fn = function(a, b) return a + b end, operator = "add" }, nil, { node.inputs[1], unmOutput })
+            local addOutput = addNode:evaluateForward()
+            replaceNode(node.outputs[1], addOutput)
+            execOrder[i] = addNode
+            table.insert(execOrder, i, unmNode)
+         end
+      end
+   end
+end
+
 local function changeToReuseFunctions(execOrder)
    for i = 1, #execOrder do
       local node = execOrder[i]
@@ -394,7 +416,11 @@ local function createGraph(fn, args, opt, debugger)
    local tensorDims = { }
 
    for i = 1, #args do
-      values[i] = Value.from(args[i], Source.param(i, i == argnum))
+      -- Don't wrap the outer tables in Values, since it would interfere with the use of the # operator.
+      -- This creates some problems when referring to an entire param table in the generated code - it'll
+      -- be represented as a new literal table, but it's a good tradeoff until we move entirely to Lua 5.2
+      -- and can overload # on Value.
+      values[i] = Value.from(args[i], Source.param(i, i == argnum), true)
    end
 
    -- Begin recording all torch operations.
@@ -403,7 +429,7 @@ local function createGraph(fn, args, opt, debugger)
    nodeDebugger = debugger
 
    -- Call user forward function.
-   local answers = {fn(unpack(values))}
+   local answers = {fn(table.unpack(values))}
 
    -- Figure out forward graph traversal order.
    -- Only walk from the answer we need to differentiate (usually the first).
@@ -449,6 +475,7 @@ end
 
 local function optimizeGraph(graph, opt)
    local execOrder, outputNodes = execGraph(graph)
+   convertSubtract(execOrder)
    removeIdentityOperators(execOrder, outputNodes)
    convertOperators(execOrder)
    changeToReuseFunctions(execOrder)
@@ -471,14 +498,43 @@ local function searchMatchingTensorLargest(tensor, sortedTensors, locals)
    return 0
 end
 
-local function createSymbolTable(graph, execOrder, tensorPool, tensorLocals)
+local function collectParams(val, params, seen)
+   params = params or { }
+   seen = seen or { }
+   if Value.isValue(val) then
+      local rootSource = val.source:getRoot()
+      if rootSource.type == Source.PARAM then
+         if seen[rootSource] ~= nil then
+            return
+         end
+         seen[rootSource] = true
+         params[#params + 1] = rootSource
+      else
+         if val.type == Value.TABLE then
+            for k, v in pairs(val:get()) do
+               collectParams(v, params, seen)
+            end
+         end
+      end
+   else
+      if type(val) == "table" then
+         for k, v in pairs(val) do
+            collectParams(v, params, seen)
+         end
+      end
+   end
+   return params
+end
+
+
+local function createSymbolTable(graph, execOrder, params, tensorPool, tensorLocals)
    -- Assign symbols to params, inputs, outputs.
    local symbols = { }
    local undefined = { }
    local constants = { }
 
-   for i = 1, #graph.params do
-      symbols[graph.params[i].source] = "p" .. i
+   for i = 1, #params do
+      symbols[params[i]] = "p" .. i
    end
 
    local constantTensorMap = { }
@@ -612,14 +668,14 @@ local function createSymbolTable(graph, execOrder, tensorPool, tensorLocals)
          local tensorIdx = availableTensors[matchingIndex]
          local poolTensor = tensorPool[tensorIdx]
          table.remove(availableTensors, matchingIndex) -- typically the last element
-         symbols[output.source] = "vlocals[" .. tensorIdx .. "]"
-         local t0 = sys.clock()
          local poolStorage = poolTensor:storage()
          if outputTensor:storage():size() > poolStorage:size() then
             -- We don't care about the data in the pool tensor, so resize it to zero before growing to avoid a realloc/copy.
             poolStorage:resize(0)
          end
-         tensorPoolViews[#tensorPoolViews + 1] = outputTensor.new(poolStorage):resize(outputTensor:size())
+         local viewIdx = #tensorPoolViews + 1
+         symbols[output.source] = "vlocals[" .. viewIdx .. "]"
+         tensorPoolViews[viewIdx] = outputTensor.new(poolStorage):resize(outputTensor:size())
       else
          -- No match anywhere, allocate new slot in the tensor pool.
          local tensorIdx = #tensorPool + 1
@@ -674,7 +730,8 @@ local function generateCode(fn, args, opt)
    end
 
    local execOrder, outputNodes = execGraph(graph, withForward, withGradients)
-   local symbols, undefined, constants, tensorPoolViews = createSymbolTable(graph, execOrder, tensorPool, tensorLocals)
+   local params = collectParams(graph.params)
+   local symbols, undefined, constants, tensorPoolViews = createSymbolTable(graph, execOrder, params, tensorPool, tensorLocals)
    local objects = collectObjects(execOrder)
 
    local out = StringBuilder()
@@ -732,8 +789,8 @@ local function generateCode(fn, args, opt)
    end
    out.write("return function(")
    local paramSymbols = { }
-   for i = 1, #graph.params do
-      paramSymbols[i] = symbols[graph.params[i].source]
+   for i = 1, #params do
+      paramSymbols[i] = symbols[params[i]]
    end
    out.write(table.concat(paramSymbols, ", "))
    out.write(")")
@@ -827,7 +884,7 @@ local function generateCode(fn, args, opt)
    if debugger then
       debugger.setCode(code)
    end
-   local retValues = { graph.params[opt.argnum]:flattenGrads() }
+   local retValues = { Value.flattenGrads(graph.params[opt.argnum]) }
    for i = 1, #graph.answers do
       retValues[#retValues + 1] = flattenAnswer(graph.answers[i])
    end
@@ -836,11 +893,11 @@ end
 
 local function execUncached(fn, args, opt)
    local graph = createGraph(fn, args, opt, debugger)
-   local retValues = { graph.params[opt.argnum]:flattenGrads() }
+   local retValues = { Value.flattenGrads(graph.params[opt.argnum]) }
    for i = 1, #graph.answers do
       retValues[#retValues + 1] = flattenAnswer(graph.answers[i])
    end
-   return unpack(retValues)
+   return table.unpack(retValues)
 end
 
 local function buildSignature(params, tensorDims)
@@ -880,7 +937,7 @@ local function grad(fn, gradOpt)
    local debugHook = gradOpt.debugHook
    local generatedFunctions = { }
    local tensorPool = { }
-   local localTensors = { }
+   local tensorLocals = { }
    local opt = {
       argnum = argnum,
       withForward = withForward,
@@ -907,18 +964,18 @@ local function grad(fn, gradOpt)
             --printPoolStats(tensorPool)
             --print(code)
             --print("generated code for param signature " .. signature)
-            local outer = loadstring(code)
+            local outer = (loadstring or load)(code)
             if outer == nil then
                print(code)
                error("failed to parse generated code")
             end
-            generatedFunctions[signature] = outer()(unpack(outerArgs))
+            generatedFunctions[signature] = outer()(table.unpack(outerArgs))
             -- We already have the answers, don't run it all over again.
             if withGradients and withForward and not debugHook then
-               return unpack(retValues)
+               return table.unpack(retValues)
             end
          end
-         return generatedFunctions[signature](unpack(args))
+         return generatedFunctions[signature](table.unpack(args))
       end
       return doGrad
    else
@@ -934,7 +991,7 @@ local function grad(fn, gradOpt)
          return function(...)
             local args = {...}
             local partialGrad = table.remove(args, #args)
-            return DirectTape.grad(fn, argnum, partialGrad, unpack(args))
+            return DirectTape.grad(fn, argnum, partialGrad, table.unpack(args))
          end
       end
    end

@@ -4,6 +4,7 @@ local autograd = require 'autograd'
 local gradcheck = require 'autograd.gradcheck' {randomizeInput = true}
 local gradcheckConstant = require 'autograd.gradcheck' {randomizeInput = false}
 local tester = totem.Tester()
+local stringx = require 'pl.stringx'
 
 -- List of tests:
 local tests = {
@@ -1000,7 +1001,7 @@ local tests = {
       local dFunc = autograd(func, {
          debugHook = function(debugger, msg, gen)
             if sawHook == 0 then
-               badline = gen.source:split("\n")[gen.line]
+               badline = stringx.split(gen.source, "\n")[gen.line]
                --debugger.showDot()
             end
             sawHook = sawHook + 1
@@ -1014,6 +1015,21 @@ local tests = {
       -- Tests:
       tester:asserteq(sawHook, 5, 'debugHook should have tripped')
       tester:asserteq(badline, "    torch_div(rlocals[2], rlocals[1], 0)", 'debugHook should have showed the bad line')
+   end,
+
+   ParamLen = function()
+      local params = {torch.Tensor(100):fill(1), torch.Tensor(100):fill(1)}
+      -- Function:
+      local func = function(params)
+         return torch.sum(params[1] + params[2] * #params)
+      end
+
+      local df = autograd(func)
+      local grads = df(params)
+
+      -- Tests:
+      tester:assert(gradcheck(func, params, 1), 'incorrect gradients')
+
    end,
 }
 

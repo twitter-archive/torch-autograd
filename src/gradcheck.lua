@@ -23,10 +23,18 @@ end
 -- Compute grads with bprop:
 local function jacobianFromAutograd(func, inputs, var)
    -- Autograd:
-   local grads = autograd(func)(unpack(inputs))
+   local df = autograd(func)
+   local grads = df(table.unpack(inputs))
+   local gradsVerify = df(table.unpack(inputs))
 
    -- Find grad:
    local g = findGrad(inputs[1], var, grads)
+   local gVerify = findGrad(inputs[1], var, gradsVerify)
+   local err = (g - gVerify):abs():max()
+
+   if err ~= 0 then
+      error("autograd gradient not deterministic")
+   end
 
    -- Return grads:
    return g:contiguous():view(-1):clone()
@@ -47,9 +55,9 @@ local function jacobianFromFiniteDifferences(func, inputs, var)
 
       -- Perturbate:
       view[i] = val - perturbation/2
-      local pred1 = func(unpack(inputs))
+      local pred1 = func(table.unpack(inputs))
       view[i] = val + perturbation/2
-      local pred2 = func(unpack(inputs))
+      local pred2 = func(table.unpack(inputs))
       view[i] = val
 
       -- Finite diff:

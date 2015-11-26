@@ -1,3 +1,5 @@
+require 'trepl'
+
 -- Options
 local opt = lapp [[
 Run benchmarks.
@@ -21,7 +23,6 @@ d.optimize(opt.nooptimize == 'false')
 local tic,toc
 local tm = torch.Timer()
 if opt.type == 'cuda' then
-   local tm
    tic = function()
       cutorch.synchronize()
       tm:reset()

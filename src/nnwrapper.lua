@@ -10,6 +10,8 @@ local function setApplyFn(fn)
    nodeApply = fn or directApply
 end
 
+setApplyFn()
+
 -- Generic auto-wrapper of every function exposed in given
 -- package + arbitary instantiated nn container/module:
 local function functionalize(input)
@@ -34,7 +36,7 @@ local function functionalize(input)
                   map[modName] = function(...)
                      local args = {...}
                      -- Construct object:
-                     local nnObject = v(unpack(args))
+                     local nnObject = v(table.unpack(args))
                      local lastType = ""
 
                      local function forward(x, y)
@@ -103,7 +105,7 @@ local function functionalize(input)
                   map[modName] = function(...)
                      -- Construct object:
                      local args = {...}
-                     local nnObject = v(unpack(args))
+                     local nnObject = v(table.unpack(args))
                      local lastType = ""
 
                      local function forward(x, W, b)
