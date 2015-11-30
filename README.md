@@ -253,8 +253,9 @@ end
 ### Creating auto-differentiated nn modules
 
 For those who have a training pipeline that heavily relies on the torch/nn API,
-torch-autograd defines the `autograd.nn.AutoModule` and `autograd.nn.AutoCriterion` and  function. When given a `name`, it will create
+torch-autograd defines the `autograd.nn.AutoModule` and `autograd.nn.AutoCriterion` functions. When given a `name`, it will create
 a new class locally under autograd.auto.name. This class can be instantiated by providing a function, a weight, and a bias.
+They are also clonable, savable and loadable.
 Here we show an example of writing a 2-layer fully-connected module and an MSE criterion using `AutoModule` and `AutoCriterion`:
 
 Here we rewrite the neural net example from above, but this time relying on a mix of
