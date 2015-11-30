@@ -318,7 +318,6 @@ for i=1,n do
    -- Backward
    local gradOutput = autoMseCriterion:backward(output, target)
    local gradInput = autoModel:backward(input, gradOutput)
-   autoModel:accGradParameters(input, gradOutput)
    for i=1,#autoParams do
       autoParams[i]:add(-lr, autoGradParams[i])
    end
