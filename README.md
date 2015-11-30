@@ -483,12 +483,15 @@ as your training speed will be significantly slower.
 
 ```lua
 grad(f, {
-   debugHook = function(debugger, msg)
+   debugHook = function(debugger, msg, gen)
       -- dump a dot representation of the graph:
       debugger.generateDot('result.dot')
 
       -- or show it (OSX only, uses Safari):
       debugger.showDot()
+
+      -- print the generated source line that caused the inf/nan
+      print(string.split(gen.source, "\n")[gen.line])
    end
 })
 ```
