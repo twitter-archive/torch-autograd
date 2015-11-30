@@ -247,9 +247,11 @@ local function functionalize(input)
          end
 
          local modelParams = nnObject:parameters()
-         for i,p in ipairs(modelParams) do
-            if p ~= params[i] then
-               p:view(params[i], params[i]:size())
+         if modelParams then
+            for i,p in ipairs(modelParams) do
+               if p ~= params[i] then
+                  p:view(params[i], params[i]:size())
+               end
             end
          end
 
@@ -264,9 +266,11 @@ local function functionalize(input)
          end
 
          local modelParams,modelGradParams = nnObject:parameters()
-         for i,p in ipairs(modelParams) do
-            if p ~= params[i] then
-               p:view(params[i], params[i]:size())
+         if modelParams then
+            for i,p in ipairs(modelParams) do
+               if p ~= params[i] then
+                  p:view(params[i], params[i]:size())
+               end
             end
          end
 
