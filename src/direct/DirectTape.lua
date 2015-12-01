@@ -66,23 +66,34 @@ function DirectTape.gradOnly(tape, arg, argnum, allAns, gradOutput)
             end
          -- Special-casing table-valued arguments that contain nodes
          -- right now, this is just torch.cat
-         elseif type(thisArg) == "table" and getmetatable(thisArg[1]) == DirectNode then
-            if node.outgrad == nil then
-               if isTensor(node.value) then
-                  node.outgrad = node.value.new(node.value:size()):zero()
-               elseif type(node.value) == "number" then
-                  node.outgrad = 0.0
+         elseif type(thisArg) == "table" then
+            local hasNode = false
+            for k, v in pairs(thisArg) do
+               if getmetatable(v) == DirectNode then
+                  hasNode = true
+                  break
                end
             end
-            local gradUpdate = (node.gradFun[iarg])(node.outgrad, node.value, table.unpack(node.argValues))
-            local la = #thisArg
-            for isubArg=1,la do
-               if gradUpdate[isubArg] then
-                  local thisSubArg = thisArg[isubArg]
-                  if thisSubArg.outgrad == nil or thisSubArg.outgrad == 0 then
-                     thisSubArg.outgrad = gradUpdate[isubArg]
-                  else
-                     thisSubArg.outgrad = thisSubArg.outgrad + gradUpdate[isubArg]
+            if hasNode then
+               if node.outgrad == nil then
+                  if isTensor(node.value) then
+                     node.outgrad = node.value.new(node.value:size()):zero()
+                  elseif type(node.value) == "number" then
+                     node.outgrad = 0.0
+                  end
+               end
+               local gradUpdate = (node.gradFun[iarg])(node.outgrad, node.value, table.unpack(node.argValues))
+               local la = #thisArg
+               for isubArg=1,la do
+                  if gradUpdate[isubArg] then
+                     local thisSubArg = thisArg[isubArg]
+                     if getmetatable(thisSubArg) == DirectNode then
+                        if thisSubArg.outgrad == nil or thisSubArg.outgrad == 0 then
+                           thisSubArg.outgrad = gradUpdate[isubArg]
+                        else
+                           thisSubArg.outgrad = thisSubArg.outgrad + gradUpdate[isubArg]
+                        end
+                     end
                   end
                end
             end

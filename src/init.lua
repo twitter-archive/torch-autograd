@@ -1,8 +1,4 @@
--- Deps
-require 'trepl'
-
 -- Base package
-require 'trepl'
 local autograd = require 'autograd.main'
 
 -- Meta info
