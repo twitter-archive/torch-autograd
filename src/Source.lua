@@ -101,6 +101,18 @@ function Source:getRoot()
 	end
 end
 
+function Source:changeRoot(newRoot)
+	if self.type == Source.TABLE then
+		if self.parent.type ~= Source.TABLE then
+			self.parent = newRoot
+		else
+			return self.parent:changeRoot(newRoot)
+		end
+	else
+		return newRoot
+	end
+end
+
 function Source:getParentsArray(arr)
 	arr = arr or { }
 	if self.type == Source.TABLE then
