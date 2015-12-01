@@ -686,12 +686,12 @@ local tests = {
       -- Define our parameters
       -- [-1/sqrt(#output), 1/sqrt(#output)]
       torch.manualSeed(0)
-      local W1 = torch.FloatTensor(inputSize,50):uniform(-1/math.sqrt(50),1/math.sqrt(50))
-      local B1 = torch.FloatTensor(50):fill(0)
-      local W2 = torch.FloatTensor(50,50):uniform(-1/math.sqrt(50),1/math.sqrt(50))
-      local B2 = torch.FloatTensor(50):fill(0)
-      local W3 = torch.FloatTensor(50,#classes):uniform(-1/math.sqrt(#classes),1/math.sqrt(#classes))
-      local B3 = torch.FloatTensor(#classes):fill(0)
+      local W1 = torch.Tensor(inputSize,50):uniform(-1/math.sqrt(50),1/math.sqrt(50))
+      local B1 = torch.Tensor(50):fill(0)
+      local W2 = torch.Tensor(50,50):uniform(-1/math.sqrt(50),1/math.sqrt(50))
+      local B2 = torch.Tensor(50):fill(0)
+      local W3 = torch.Tensor(50,#classes):uniform(-1/math.sqrt(#classes),1/math.sqrt(#classes))
+      local B3 = torch.Tensor(#classes):fill(0)
 
       -- Trainable parameters:
       params = {
@@ -699,8 +699,8 @@ local tests = {
          B = {B1, B2, B3},
       }
 
-      input = torch.randn(1,1024):float()
-      target = torch.zeros(1,10):float()
+      input = torch.randn(1,1024)
+      target = torch.zeros(1,10)
       target[1][3] = 1
 
       p = {W=params.W,B=params.B, input=input, target=target}
