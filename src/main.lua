@@ -513,34 +513,30 @@ local function searchMatchingTensorLargest(tensor, sortedTensors, locals)
    return 0
 end
 
-local function collectParams(val, params, seen)
-   params = params or { }
-   seen = seen or { }
+local function findParamSource(val)
    if Value.isValue(val) then
       local rootSource = val.source:getRoot()
       if rootSource.type == Source.PARAM then
-         if seen[rootSource] ~= nil then
-            return
-         end
-         seen[rootSource] = true
-         params[#params + 1] = rootSource
-      else
-         if val.type == Value.TABLE then
-            for k, v in pairs(val:get()) do
-               collectParams(v, params, seen)
-            end
-         end
+         return rootSource
       end
-   else
-      if type(val) == "table" then
-         for k, v in pairs(val) do
-            collectParams(v, params, seen)
+   elseif type(val) == "table" then
+      for k, v in pairs(val) do
+         local paramSource = findParamSource(v, params, seen, whichParam)
+         if paramSource ~= nil then
+            return paramSource
          end
       end
    end
-   return params
 end
 
+local function collectParams(val, params, seen, depth)
+   params = params or { }
+   for k, v in pairs(val) do
+      local paramSource = findParamSource(v)
+      params[k] = paramSource or Source.param(k)
+   end
+   return params
+end
 
 local function createSymbolTable(graph, execOrder, params, tensorPool, tensorLocals)
    -- Assign symbols to params, inputs, outputs.
@@ -922,6 +918,7 @@ local function buildSignature(params, tensorDims)
       elseif type(v) == 'number' then
          tensorDims[#tensorDims + 1] = "n"
       elseif type(v) == 'table' then
+         tensorDims[#tensorDims + 1] = "t" .. #v
          buildSignature(v, tensorDims)
       end
    end
