@@ -268,7 +268,7 @@ local function convertOperators(execOrder)
    end
 end
 
-local function replaceNode(nodeValue, withNodeValue)
+local function replaceNode(nodeValue, withNodeValue, outputNodes)
    local node = nodeValue.source.node
    node:unlinkInputs()
    local toRemove = { }
@@ -280,6 +280,18 @@ local function replaceNode(nodeValue, withNodeValue)
    for i = 1, #toRemove do
       toRemove[i]:replaceInput(nodeValue, withNodeValue)
    end
+   local rootValues = outputNodes[node]
+   if rootValues ~= nil then
+      for i = 1, #rootValues do
+         if rootValues[i].source.type == Source.TABLE then
+            rootValues[i].source:changeRoot(withNodeValue.source)
+         else
+            rootValues[i].source = withNodeValue.source
+         end
+      end
+      outputNodes[replaceNode] = rootValues
+      outputNodes[node] = { }
+   end
 end
 
 local function removeIdentityOperators(execOrder, outputNodes)
@@ -290,15 +302,15 @@ local function removeIdentityOperators(execOrder, outputNodes)
          if node.forwardFn.operator ~= nil then
             if op == "mul" then
                if node.inputs[1].source.type == Source.CONSTANT and node.inputs[1]:get() == 1 then
-                  replaceNode(node.outputs[1], node.inputs[2])
+                  replaceNode(node.outputs[1], node.inputs[2], outputNodes)
                elseif node.inputs[2].source.type == Source.CONSTANT and node.inputs[2]:get() == 1 then
-                  replaceNode(node.outputs[1], node.inputs[1])
+                  replaceNode(node.outputs[1], node.inputs[1], outputNodes)
                end
             elseif op == "add" or op == "sub" then
                if node.inputs[1].source.type == Source.CONSTANT and node.inputs[1]:get() == 0 then
-                  replaceNode(node.outputs[1], node.inputs[2])
+                  replaceNode(node.outputs[1], node.inputs[2], outputNodes)
                elseif node.inputs[2].source.type == Source.CONSTANT and node.inputs[2]:get() == 0 then
-                  replaceNode(node.outputs[1], node.inputs[1])
+                  replaceNode(node.outputs[1], node.inputs[1], outputNodes)
                end
             end
          end
@@ -306,20 +318,18 @@ local function removeIdentityOperators(execOrder, outputNodes)
    end
 end
 
-local function convertSubtract(execOrder)
+local function convertSubtract(execOrder, outputNodes)
    for i = 1, #execOrder do
       local node = execOrder[i]
       local op = node.forwardFn.operator
-      if op  ~= nil then
-         if op == "sub" and #node.inputs == 2 then
-            local unmNode = Node.new({ fn = function(a) return -a end, operator = "unm" }, nil, { node.inputs[2] })
-            local unmOutput = unmNode:evaluateForward()
-            local addNode = Node.new({ fn = function(a, b) return a + b end, operator = "add" }, nil, { node.inputs[1], unmOutput })
-            local addOutput = addNode:evaluateForward()
-            replaceNode(node.outputs[1], addOutput)
-            execOrder[i] = addNode
-            table.insert(execOrder, i, unmNode)
-         end
+      if op == "sub" and #node.inputs == 2 then
+         local unmNode = Node.new({ fn = function(a) return -a end, operator = "unm", name = "op.unm" }, nil, { node.inputs[2] })
+         local unmOutput = unmNode:evaluateForward()
+         local addNode = Node.new({ fn = function(a, b) return a + b end, operator = "add", name = "op.add" }, nil, { node.inputs[1], unmOutput })
+         local addOutput = addNode:evaluateForward()
+         replaceNode(node.outputs[1], addOutput, outputNodes)
+         execOrder[i] = addNode
+         table.insert(execOrder, i, unmNode)
       end
    end
 end
@@ -379,7 +389,12 @@ local function walkOutputRoots(val, execOrder, seen, outputNodes)
       local root = val.source:getRoot()
       if root.type == Source.COMPUTED then
          if outputNodes ~= nil then
-            outputNodes[val.source:getRoot().node] = true
+            local valueList = outputNodes[root.node]
+            if outputNodes[root.node] == nil then
+               valueList = { }
+               outputNodes[root.node] = valueList
+            end
+            valueList[#valueList + 1] = val
          end
          walkNode(val.source:getRoot().node, execOrder, seen)
       end
@@ -475,7 +490,7 @@ end
 
 local function optimizeGraph(graph, opt)
    local execOrder, outputNodes = execGraph(graph)
-   convertSubtract(execOrder)
+   convertSubtract(execOrder, outputNodes)
    removeIdentityOperators(execOrder, outputNodes)
    convertOperators(execOrder)
    changeToReuseFunctions(execOrder)
@@ -498,34 +513,30 @@ local function searchMatchingTensorLargest(tensor, sortedTensors, locals)
    return 0
 end
 
-local function collectParams(val, params, seen)
-   params = params or { }
-   seen = seen or { }
+local function findParamSource(val)
    if Value.isValue(val) then
       local rootSource = val.source:getRoot()
       if rootSource.type == Source.PARAM then
-         if seen[rootSource] ~= nil then
-            return
-         end
-         seen[rootSource] = true
-         params[#params + 1] = rootSource
-      else
-         if val.type == Value.TABLE then
-            for k, v in pairs(val:get()) do
-               collectParams(v, params, seen)
-            end
-         end
+         return rootSource
       end
-   else
-      if type(val) == "table" then
-         for k, v in pairs(val) do
-            collectParams(v, params, seen)
+   elseif type(val) == "table" then
+      for k, v in pairs(val) do
+         local paramSource = findParamSource(v, params, seen, whichParam)
+         if paramSource ~= nil then
+            return paramSource
          end
       end
    end
-   return params
 end
 
+local function collectParams(val, params, seen, depth)
+   params = params or { }
+   for k, v in pairs(val) do
+      local paramSource = findParamSource(v)
+      params[k] = paramSource or Source.param(k)
+   end
+   return params
+end
 
 local function createSymbolTable(graph, execOrder, params, tensorPool, tensorLocals)
    -- Assign symbols to params, inputs, outputs.
@@ -907,6 +918,7 @@ local function buildSignature(params, tensorDims)
       elseif type(v) == 'number' then
          tensorDims[#tensorDims + 1] = "n"
       elseif type(v) == 'table' then
+         tensorDims[#tensorDims + 1] = "t" .. #v
          buildSignature(v, tensorDims)
       end
    end
