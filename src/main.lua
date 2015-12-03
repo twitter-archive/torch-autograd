@@ -440,36 +440,47 @@ local function createGraph(fn, args, opt, debugger)
 
    -- Begin recording all torch operations.
    overload.install(nodeCompute)
+   applyDepth = 0
    nodeDisabled = false
    nodeDebugger = debugger
 
    -- Call user forward function.
-   local answers = {fn(table.unpack(values))}
+   local answers = nil
 
-   -- Figure out forward graph traversal order.
-   -- Only walk from the answer we need to differentiate (usually the first).
-   local forwardExecOrder = walkOutputRoots(answers[argnum])
+   local protectedFn = function()
+      answers = {fn(table.unpack(values))}
 
-   if withGradients then
-      -- Walk the execution order backwards, chaining derivatives.
-      if answers[1].type == Value.TENSOR and opt.partialGrad then
-         answers[1].source.node.gradients[1] = values[#values]
-      elseif answers[1].type == Value.NUMBER then
-         answers[1].source.node.gradients[1] = Value.from(1, Source.gradient(1))
-      else
-         error("invalid return value type from autograd function, autograd only supports scalar return values")
-      end
+      -- Figure out forward graph traversal order.
+      -- Only walk from the answer we need to differentiate (usually the first).
+      local forwardExecOrder = walkOutputRoots(answers[argnum])
 
-      for i=#forwardExecOrder,1,-1 do
-         local node = forwardExecOrder[i]
-         node:evaluateBackward()
+      if withGradients then
+         -- Walk the execution order backwards, chaining derivatives.
+         if answers[1].type == Value.TENSOR and opt.partialGrad then
+            answers[1].source.node.gradients[1] = values[#values]
+         elseif answers[1].type == Value.NUMBER then
+            answers[1].source.node.gradients[1] = Value.from(1, Source.gradient(1))
+         else
+            error("invalid return value type from autograd function, autograd only supports scalar return values")
+         end
+
+         for i=#forwardExecOrder,1,-1 do
+            local node = forwardExecOrder[i]
+            node:evaluateBackward()
+         end
       end
    end
+
+   local ok, msg = pcall(protectedFn)
 
    -- End recording.
    nodeDebugger = nil
    nodeDisabled = true
    overload.uninstall()
+
+   if not ok then
+      error(msg)
+   end
 
    -- Now we have the full graph, forward and backward, determine final traversal order.
    local execOrder = { }
@@ -974,7 +985,7 @@ local function grad(fn, gradOpt)
          if generatedFunctions[signature] == nil then
             local code, outerArgs, retValues = generateCode(fn, args, opt)
             --printPoolStats(tensorPool)
-            --print(code)
+            ---print(code)
             --print("generated code for param signature " .. signature)
             local outer = (loadstring or load)(code)
             if outer == nil then

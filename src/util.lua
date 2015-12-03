@@ -47,7 +47,6 @@ end
 function util.dropout(state, dropout)
    dropout = dropout or 0
    local keep = 1 - dropout
-   if keep == 1 then return state end
    local s = util.newTensorLike(state)
    local keep = torch.mul(torch.bernoulli(s, keep), 1 / keep)
    return torch.cmul(state, keep)
@@ -170,6 +169,10 @@ function util.makeContiguous(g)
       g = g:contiguous()
    end
    return g
+end
+
+function util.equals(a, b)
+   return a == b
 end
 
 return util

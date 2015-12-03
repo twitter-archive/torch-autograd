@@ -398,10 +398,8 @@ overload.module("torch", torch, function(module)
          return torch.typeAs(g, x)
       end
    })
-   module.dynamic(
-      "ne",  "ger", "new", "fill", "zeros", "zero", "cosh", "sign", "repeatTensor", "typeAs",
-      "bernoulli", "uniform", "normal", "random", "eq"
-   )
+   module.initializer("bernoulli", "uniform", "normal", "random", "zeros", "zero")
+   module.dynamic("ne",  "ger", "new", "fill",  "cosh", "sign", "repeatTensor", "typeAs", "eq")
    module.static("size", "isTensor", "nDimension", "nElement", "isSameSizeAs")
 end)
 
@@ -424,7 +422,9 @@ overload.module("util", util, function(module)
          return torch.cmul(g, p)
       end
    })
-   module.dynamic("setNotEqual", "fillSameSizeAs", "newTensorLike", "zerosLike", "narrowCopy", "selectCopy", "selectSliceCopy", "narrowSliceCopy", "makeContiguous", "indexAdd", "catTable")
+   module.initializer("newTensorLike", "zerosLike")
+   module.dynamic("setNotEqual", "fillSameSizeAs", "narrowCopy", "selectCopy", "selectSliceCopy", "narrowSliceCopy", "makeContiguous", "indexAdd", "catTable")
+   module.static("equals")
 end)
 
 

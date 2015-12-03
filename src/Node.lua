@@ -35,10 +35,12 @@ end
 
 function Node:differentiable()
 	if self.__differentiable == nil then
-		for i = 1, #self.inputs do
-			if self.inputs[i].source:differentiable() then
-				self.__differentiable = true
-				return true
+		if self.gradientFn or self.forwardFn.differentiable then
+			for i = 1, #self.inputs do
+				if self.inputs[i].source:differentiable() then
+					self.__differentiable = true
+					return true
+				end
 			end
 		end
 		self.__differentiable = false
@@ -129,6 +131,8 @@ function Node:evaluateBackward()
 							end
 						end
 					end
+				elseif self.forwardFn.differentiable then
+					error("missing gradient for function " .. self.forwardFn.name)
 				end
 			end
 		end

@@ -53,7 +53,7 @@ function DirectTape.gradOnly(tape, arg, argnum, allAns, gradOutput)
                   node.outgrad = 0.0
                end
             end
-            local gf = node.gradFun[iarg]
+            local gf = (node.gradFun or {})[iarg]
             if gf ~= nil then
                local gradUpdate = (gf)(node.outgrad, node.value, table.unpack(node.argValues))
                if gradUpdate then
@@ -63,6 +63,8 @@ function DirectTape.gradOnly(tape, arg, argnum, allAns, gradOutput)
                      thisArg.outgrad = thisArg.outgrad + gradUpdate
                   end
                end
+            elseif node.fun.differentiable then
+               error("missing gradient for function " .. node.fun.name)
             end
          -- Special-casing table-valued arguments that contain nodes
          -- right now, this is just torch.cat

@@ -44,7 +44,6 @@ end
 -- that we unpack the value in those nodes, apply the function
 -- to the underlying value, and then wrap the value in a node
 function DirectNode.nodeApply(fun, gradFun, capture, ...)
-   fun = fun.fn
    local arg = {...}
    local parent = nil
    local values = { }
@@ -70,7 +69,7 @@ function DirectNode.nodeApply(fun, gradFun, capture, ...)
       end
    end
    if capture and parent ~= nil then
-      local value = fun(table.unpack(values))
+      local value = fun.fn(table.unpack(values))
       local node = nil
       local tape = parent.tape
       local o = tape[tape.nextIndex]
@@ -87,7 +86,7 @@ function DirectNode.nodeApply(fun, gradFun, capture, ...)
       end
       return DirectNode:init(value, fun, gradFun, arg, values, tape)
    else
-      return fun(table.unpack(values))
+      return fun.fn(table.unpack(values))
    end
 end
 

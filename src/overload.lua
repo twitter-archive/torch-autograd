@@ -12,11 +12,12 @@ local function module(name, table, fn)
          functions = { },
          classes = { }
       }
-      local overload = function(table, fnName, gradFn, capture)
+      local overload = function(table, fnName, gradFn, capture, differentiable)
          local old = table[fnName]
          if old ~= nil then
             local fnDesc = {
                name = name .. "." .. fnName,
+               differentiable = differentiable,
                fn = old
             }
             local newFn = function(...)
@@ -34,6 +35,7 @@ local function module(name, table, fn)
          if old ~= nil then
             local fnDesc = {
                name = name .. "." .. className .. "." .. fnName,
+               differentiable = true,
                fn = old
             }
             local newFn = function(...)
@@ -53,6 +55,7 @@ local function module(name, table, fn)
             local fnDesc = {
                name = "op." .. fnName,
                operator = opName,
+               differentiable = true,
                fn = old
             }
             local newFn
@@ -74,14 +77,22 @@ local function module(name, table, fn)
       end
       local moduleFns = {
          gradient = function(fnName, gradFn)
-            local fn = overload(table, fnName, gradFn, true)
+            local fn = overload(table, fnName, gradFn, true, true)
             mm.functions[#mm.functions + 1] = fn
          end,
          dynamic = function(...)
             local arg = {...}
             for i = 1, #arg do
                local fnName = arg[i]
-               local fn = overload(table, fnName, nil, true)
+               local fn = overload(table, fnName, nil, true, true)
+               mm.functions[#mm.functions + 1] = fn
+            end
+         end,
+         initializer = function(...)
+            local arg = {...}
+            for i = 1, #arg do
+               local fnName = arg[i]
+               local fn = overload(table, fnName, nil, true, false)
                mm.functions[#mm.functions + 1] = fn
             end
          end,
@@ -89,7 +100,7 @@ local function module(name, table, fn)
             local arg = {...}
             for i = 1, #arg do
                local fnName = arg[i]
-               local fn = overload(table, fnName, nil, false)
+               local fn = overload(table, fnName, nil, false, false)
                mm.functions[#mm.functions + 1] = fn
             end
          end,

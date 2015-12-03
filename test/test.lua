@@ -1136,6 +1136,22 @@ local tests = {
       tester:assert(gradcheck(func, params, 1), 'incorrect gradients')
 
    end,
+
+   MissingGradient = function()
+
+      -- Function:
+      local func = function(W)
+         return torch.sum(torch.repeatTensor(W, 1, 1))
+      end
+
+      local test = function()
+         return autograd(func)(torch.FloatTensor(5, 5))
+      end
+
+      --test()
+      local _, msg = pcall(test)
+      tester:assert(string.find(msg, "missing gradient for function"), "missing gradient not reported")
+   end,
 }
 
 local function prefixTests(pf, t, skip)
