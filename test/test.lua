@@ -1152,6 +1152,57 @@ local tests = {
       local _, msg = pcall(test)
       tester:assert(string.find(msg, "missing gradient for function"), "missing gradient not reported")
    end,
+   
+   Optim = function()
+      local moses = require 'moses'
+      local tablex = require 'pl.tablex'
+
+      local f = function(p, x, y)
+         local h1 = torch.tanh(x * p.W[1] + p.b[1])
+         return torch.sqrt(torch.sum(torch.pow(y - h1, 2)))
+      end
+
+      local df = autograd(f)
+
+      local nData = 5000
+      local xs = torch.randn(nData, 10)
+      local ys = torch.Tensor(nData, 1)
+      for i=1, nData do ys[i][1] = math.tanh(xs[i]:sum()) end
+
+      local learningRate = 1e-3
+      local params = {
+         W = { torch.randn(10, 1) },
+         b = { torch.randn(1) }
+      }
+      local params3 = {
+         W = { params.W[1]:clone() },
+         b = { params.b[1]:clone() }
+      }
+
+      local loss1
+      for e=1, 5 do
+         loss1 = 0
+         for i=1,nData  do
+            local grads, l = df(params, xs:narrow(1, i, 1), ys:narrow(1, i, 1))
+            loss1 = loss1 + l / nData
+            params.W[1]:add(-learningRate, grads.W[1])
+            params.b[1]:add(-learningRate, grads.b[1])
+         end
+      end
+
+      local state = { learningRate = learningRate }
+      local loss3
+      for e=1, 5 do
+         local optimfn, states = autograd.optim.sgd(df, state, params3)
+         loss3 = 0
+         for i=1,nData do
+            local l = optimfn(xs:narrow(1, i, 1), ys:narrow(1, i, 1))
+            loss3 = loss3 + l / nData
+         end
+      end
+
+      tester:asserteq(loss1, loss3, 'sgd wrapper should produce same loss')
+   end
 }
 
 local function prefixTests(pf, t, skip)

@@ -28,6 +28,7 @@ autograd.auto = require 'autograd.auto'
 autograd.model = require 'autograd.model'
 autograd.loss = require 'autograd.loss'
 autograd.util = require 'autograd.util'
+autograd.optim = require 'autograd.optim'
 
 -- Return package
 return autograd
