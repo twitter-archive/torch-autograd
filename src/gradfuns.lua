@@ -395,7 +395,6 @@ overload.module("torch", torch, function(module)
    })
    module.gradient("long", {
       function(g, ans, x)
-        error("wtf")
          return torch.typeAs(g, x)
       end
    })

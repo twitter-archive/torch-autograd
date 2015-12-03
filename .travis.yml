@@ -49,6 +49,7 @@ before_script:
 - ${INSTALL_PREFIX}/bin/luarocks install moses
 - ${INSTALL_PREFIX}/bin/luarocks install trepl
 - ${INSTALL_PREFIX}/bin/luarocks install nn
+- ${INSTALL_PREFIX}/bin/luarocks install optim
 - if [[ $TORCH_LUA_VERSION != 'LUAJIT21' && $TORCH_LUA_VERSION != 'LUAJIT20' ]]; then ${INSTALL_PREFIX}/bin/luarocks install luaffi; fi
 - cd $ROOT_TRAVIS_DIR
 - export LD_LIBRARY_PATH=${INSTALL_PREFIX}/lib:$LD_LIBRARY_PATH
