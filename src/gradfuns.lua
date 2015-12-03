@@ -186,6 +186,7 @@ overload.module("torch", torch, function(module)
             end
             class.gradient("cat", functions.cat)
             class.dynamic("new")
+            class.static("dim", "size", "nDimension", "nElement")
          end)
       end
    end
