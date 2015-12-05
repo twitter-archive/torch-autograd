@@ -175,4 +175,12 @@ function util.equals(a, b)
    return a == b
 end
 
+
+function util.defaultBool(b, db)
+   if b == nil then
+      return db
+   end
+   return b
+end
+
 return util

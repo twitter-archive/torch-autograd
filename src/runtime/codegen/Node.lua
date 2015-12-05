@@ -1,5 +1,5 @@
-local Value = require 'autograd.Value'
-local Source = require 'autograd.Source'
+local Value = require 'autograd.runtime.codegen.Value'
+local Source = require 'autograd.runtime.codegen.Source'
 
 Node = { }
 Node.__index = Node

@@ -40,7 +40,7 @@ function Source:symbolPath(rootSymbols)
 				return table.concat(tt, ", ")
 			end
 		elseif type(self.val) == "table" then
-			local Value = require 'autograd.Value'
+			local Value = require 'autograd.runtime.codegen.Value'
 			local elements = { }
 			for k, v in pairs(self.val) do
 				if Value.isValue(v) then
@@ -80,7 +80,7 @@ function Source:differentiable()
 		return self.gradient
 	elseif self.type == Source.CONSTANT then
 		if type(self.val) == "table" then
-			local Value = require 'autograd.Value'
+			local Value = require 'autograd.runtime.codegen.Value'
 			for k, v in pairs(self.val) do
 				if Value.isValue(v) then
 					if v.source:differentiable() then
