@@ -9,7 +9,8 @@ local function wrap(optimfn)
          states[i] = tablex.copy(state)
       end
       return function(...)
-         local grads, loss = fn(params, ...)
+         local out = {fn(params, ...)}
+         grads, loss = out[1], out[2]
          local flatGrads = moses.flatten(grads)
          for i = 1, #flatGrads do
             local grad = flatGrads[i]
@@ -17,7 +18,7 @@ local function wrap(optimfn)
                return loss, grad
             end, flatParams[i], states[i])
          end
-         return loss
+         return table.unpack(out)
       end, states
    end
 end
