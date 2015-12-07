@@ -1202,8 +1202,66 @@ local tests = {
       end
 
       tester:asserteq(loss1, loss3, 'sgd wrapper should produce same loss')
-   end
+   end,
+
+   OptimNN = function()
+      local nn = require 'nn'
+      local cudnn = require 'cudnn'
+      local cunn = require 'cunn'
+      local cutorch = require 'cutorch'
+      local optim = require 'optim'
+
+      torch.manualSeed(0)
+
+      -- Set up the localizer network
+      ---------------------------------
+      local locnet = nn.Sequential()
+      locnet:add(nn.SpatialMaxPooling(2,2,2,2))
+      locnet:add(nn.SpatialConvolution(1,20,5,5))
+      locnet:add(nn.ReLU(true))
+      locnet:add(nn.SpatialMaxPooling(2,2,2,2))
+      locnet:add(nn.SpatialConvolution(20,20,5,5))
+      locnet:add(nn.ReLU(true))
+      locnet:add(nn.View(20*2*2))
+      locnet:add(nn.Linear(20*2*2,20))
+      locnet:add(nn.ReLU(true))
+      locnet:add(nn.Linear(20,6))
+      locnet:float() -- FAILS FOR CUDA
+
+      -- Functionalize networks
+      ---------------------------------
+      local agLocnet, locParams = autograd.functionalize(locnet)
+
+      -- Set up parameters
+      ---------------------------------
+      params = {
+         locParams = locParams,
+      }
+
+      -- Define our loss function
+      ---------------------------------
+      local function f(inputs, bhwdImages, labels)
+         local warpPrediction = agLocnet(inputs.locParams, bhwdImages)
+         return torch.sum(warpPrediction)
+      end
+
+      local g = autograd(f, {optimize = true})
+
+      -- FAILS FOR OTHER OPTIMIZERS AS WELL
+      local optimfn, states = autograd.optim.sgd(g, {learningRate=1e-2}, params)
+
+      for i=1,3 do
+         -- Get images in BHWD format, labels in one-hot format:
+         local data = torch.randn(256,1,32,32):float()
+         local target = torch.zeros(256):random(0,9):float()
+
+         -- Calculate gradients:
+         local grads, loss = optimfn(data, target)
+
+      end
+   end,
 }
+
 
 local function prefixTests(pf, t, skip)
    local nt = { }
