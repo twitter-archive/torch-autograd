@@ -1,4 +1,4 @@
-local Source = require 'autograd.Source'
+local Source = require 'autograd.runtime.codegen.Source'
 
 local Value = { }
 

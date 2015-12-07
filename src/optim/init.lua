@@ -1,17 +1,16 @@
-local moses = require 'moses'
-local tablex = require 'pl.tablex'
+local util = require 'autograd.util'
 
 local function wrap(optimfn)
    return function(fn, state, params)
       local states = { }
-      local flatParams = moses.flatten(params)
+      local flatParams = util.sortedFlatten(params)
       for i = 1, #flatParams do
-         states[i] = tablex.copy(state)
+         states[i] = util.deepCopy(state)
       end
       return function(...)
          local out = {fn(params, ...)}
-         grads, loss = out[1], out[2]
-         local flatGrads = moses.flatten(grads)
+         local grads, loss = out[1], out[2]
+         local flatGrads = util.sortedFlatten(grads)
          for i = 1, #flatGrads do
             local grad = flatGrads[i]
             optimfn(function()

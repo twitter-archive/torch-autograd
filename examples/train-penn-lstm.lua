@@ -28,8 +28,6 @@ end
 local d = require 'autograd'
 local util = require 'autograd.util'
 local model = require 'autograd.model'
-local _ = require 'moses'
-local tablex = require('pl.tablex')
 
 d.optimize(true)
 
@@ -186,12 +184,12 @@ for epoch = 1,opt.nEpochs do
 
       -- Cap gradient norms:
       local norm = 0
-      for i,grad in ipairs(_.flatten(grads)) do
+      for i,grad in ipairs(util.sortedFlatten(grads)) do
          norm = norm + torch.sum(torch.pow(grad,2))
       end
       norm = math.sqrt(norm)
       if norm > opt.maxGradNorm then
-         for i,grad in ipairs(_.flatten(grads)) do
+         for i,grad in ipairs(util.sortedFlatten(grads)) do
             grad:mul( opt.maxGradNorm / norm )
          end
       end

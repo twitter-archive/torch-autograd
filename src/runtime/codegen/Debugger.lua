@@ -1,5 +1,5 @@
-local Source = require 'autograd.Source'
-local Value = require 'autograd.Value'
+local Source = require 'autograd.runtime.codegen.Source'
+local Value = require 'autograd.runtime.codegen.Value'
 local StringBuilder = require 'autograd.StringBuilder'
 local stringx = require 'pl.stringx'
 
@@ -33,17 +33,19 @@ local function Debugger(opt)
          local infos = { }
          for i,line in ipairs(lines) do
             local info = debug.getinfo(i)
-            if info.name == 'createGraph' then
-               for j = #infos,1,-1 do
-                  if infos[j].what == 'tail' then
-                     break
+            if info ~= nil then
+               if info.name == 'createGraph' then
+                  for j = #infos,1,-1 do
+                     if infos[j].what == 'tail' then
+                        break
+                     end
+                     node.debug.callStack = node.debug.callStack or { }
+                     table.insert(node.debug.callStack, infos[j])
                   end
-                  node.debug.callStack = node.debug.callStack or { }
-                  table.insert(node.debug.callStack, infos[j])
+                  break
+               else
+                  table.insert(infos, info)
                end
-               break
-            else
-               table.insert(infos, info)
             end
          end
       end

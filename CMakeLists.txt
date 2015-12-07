@@ -10,5 +10,11 @@ ADD_TORCH_PACKAGE(autograd "" "${luasrc}")
 INSTALL(DIRECTORY "src/model" DESTINATION "${Torch_INSTALL_LUA_PATH_SUBDIR}/autograd")
 INSTALL(DIRECTORY "src/loss" DESTINATION "${Torch_INSTALL_LUA_PATH_SUBDIR}/autograd")
 INSTALL(DIRECTORY "src/auto" DESTINATION "${Torch_INSTALL_LUA_PATH_SUBDIR}/autograd")
-INSTALL(DIRECTORY "src/direct" DESTINATION "${Torch_INSTALL_LUA_PATH_SUBDIR}/autograd")
 INSTALL(DIRECTORY "src/optim" DESTINATION "${Torch_INSTALL_LUA_PATH_SUBDIR}/autograd")
+INSTALL(DIRECTORY "src/runtime" DESTINATION "${Torch_INSTALL_LUA_PATH_SUBDIR}/autograd")
+INSTALL(DIRECTORY "src/runtime/direct" DESTINATION "${Torch_INSTALL_LUA_PATH_SUBDIR}/autograd")
+INSTALL(DIRECTORY "src/runtime/codegen" DESTINATION "${Torch_INSTALL_LUA_PATH_SUBDIR}/autograd")
+INSTALL(DIRECTORY "src/runtime/codegen/backend" DESTINATION "${Torch_INSTALL_LUA_PATH_SUBDIR}/autograd")
+INSTALL(DIRECTORY "src/runtime/codegen/backend/lua" DESTINATION "${Torch_INSTALL_LUA_PATH_SUBDIR}/autograd")
+
+
