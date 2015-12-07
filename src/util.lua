@@ -175,12 +175,50 @@ function util.equals(a, b)
    return a == b
 end
 
-
 function util.defaultBool(b, db)
    if b == nil then
       return db
    end
    return b
+end
+
+function util.sortedFlatten(tbl, flat)
+   flat = flat or { }
+   if type(tbl) == "table" then
+      local keys = { }
+      for k, v in pairs(tbl) do
+         keys[#keys + 1] = k
+      end
+      table.sort(keys)
+      for i = 1, #keys do
+         local val = tbl[keys[i]]
+         if type(val) == "table" then
+            util.sortedFlatten(val, flat)
+         else
+            flat[#flat + 1] = val
+         end
+      end
+      return flat
+   else
+      flat[#flat + 1] = tbl
+   end
+   return flat
+end
+
+function util.deepCopy(tbl)
+   if type(tbl) == "table" then
+      local copy = { }
+      for k, v in pairs(tbl) do
+         if type(v) == "table" then
+            copy[k] = util.deepCopy(v)
+         else
+            copy[k] = v
+         end
+      end
+      return copy
+   else
+      return tbl
+   end
 end
 
 return util

@@ -49,8 +49,8 @@ local function create(fn, opt)
    local tensorLocals = { }
    return function(...)
       local args = {...}
-      local tensorDims = { }
       local sigFun = opt.signatureFn or function(params)
+         local tensorDims = { }
          buildSignature(params, tensorDims)
          return table.concat(tensorDims, "-")
       end
@@ -59,7 +59,7 @@ local function create(fn, opt)
          return execUncached(fn, args, opt)
       end
       if generatedFunctions[signature] == nil then
-         local gradFn, retValues = generateFn(fn, args, opt)
+         local gradFn, retValues, code = generateFn(fn, args, opt)
          generatedFunctions[signature] = gradFn
          -- We already have the answers, don't run it all over again.
          if opt.withGradients and opt.withForward and not opt.debugHook then

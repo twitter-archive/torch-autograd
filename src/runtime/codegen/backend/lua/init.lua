@@ -577,7 +577,7 @@ local function generateFn(graph, opt)
       print(code)
       error("failed to parse generated code")
    end
-   return outer()(table.unpack(outerArgs)), retValues
+   return outer()(table.unpack(outerArgs)), retValues, code
 end
 
 return {
