@@ -1241,7 +1241,6 @@ local tests = {
 
         local g = autograd(f, {optimize = true})
 
-        -- FAILS FOR OTHER OPTIMIZERS AS WELL
         local optimfn, states = autograd.optim.sgd(g, {learningRate=1e-2}, params)
 
         for i=1,3 do
@@ -1255,6 +1254,7 @@ local tests = {
         end
      end,
 }
+
 
 local function prefixTests(pf, t, skip)
    local nt = { }
