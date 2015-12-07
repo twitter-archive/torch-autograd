@@ -1254,6 +1254,16 @@ local tests = {
 
         end
      end,
+
+     NNFunc_WrapWithoutParams = function()
+      local tanh = autograd.functionalize(nn.Tanh())
+      local a = torch.eye(3)
+      tester:assertTensorEq(torch.tanh(a), autograd.nn.Tanh()(a), 1e-8)
+      tester:assertTensorEq(torch.tanh(a), tanh(a), 1e-8)
+      local loss = autograd.functionalize(nn.MSECriterion())
+
+     end,
+
 }
 
 local function prefixTests(pf, t, skip)
