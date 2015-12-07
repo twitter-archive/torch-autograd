@@ -1,4 +1,4 @@
-local Value = require 'autograd.Value'
+local Value = require 'autograd.runtime.codegen.Value'
 local DirectNode = require 'autograd.direct.DirectNode'
 local util = require 'autograd.util'
 local overload = require 'autograd.overload'

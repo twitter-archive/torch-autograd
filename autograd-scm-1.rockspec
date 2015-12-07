@@ -13,10 +13,7 @@ description = {
 
 dependencies = {
    "torch >= 7.0",
-   "trepl",
-   "penlight",
-   "totem",
-   "moses",
+   "totem"
 }
 
 build = {

@@ -47,3 +47,4 @@ penn/
 
 # Build dir
 build
+.DS_Store

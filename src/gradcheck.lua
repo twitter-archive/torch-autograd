@@ -1,6 +1,5 @@
 -- Autograd
 local autograd = require 'autograd'
-local __ = require 'moses'
 
 -- Perturbation (finite diffs):
 local perturbation = 1e-6
@@ -102,7 +101,7 @@ return function(opt)
    local function gradcheck(func, ...)
       local args = {...}
       -- get all vars:
-      local vars = __.flatten(args[1])
+      local vars = autograd.util.sortedFlatten(args[1])
       local ok = true
       for i,var in ipairs(vars) do
          ok = ok and gradcheckvar(func, args, var, randomizeInput)
