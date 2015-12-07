@@ -890,7 +890,8 @@ local tests = {
       local modelf, params = autograd.functionalize(model)
 
       -- Loss
-      local loss = autograd.nn.MSECriterion()
+      -- local loss = autograd.nn.MSECriterion()
+      local loss = autograd.functionalize(nn.MSECriterion())
 
       -- Input
       local x = torch.FloatTensor(3, 8, 8):normal()
