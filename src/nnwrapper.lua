@@ -234,6 +234,7 @@ local function functionalize(input)
       -- input is assumed to be an instantiated module
       local nnObject = input
       local hasParamFn, params = pcall(nnObject.parameters, nnObject)
+      params = params or {}
       if not hasParamFn or #params == 0 then 
          params = {}
          hasParamFn = false
