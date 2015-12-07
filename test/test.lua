@@ -1258,6 +1258,10 @@ local tests = {
      NNFunc_WrapWithoutParams = function()
       -- We should be able to wrap modules that don't have params.
       local tanh = autograd.functionalize(nn.Tanh())
+      local a = torch.eye(3)
+      -- Should run
+      tester:assertTensorEq(torch.tanh(a), autograd.nn.Tanh()(a), 1e-8)
+      tester:assertTensorEq(torch.tanh(a), tanh(a), 1e-8)
       local loss = autograd.functionalize(nn.MSECriterion())
 
      end,

@@ -231,23 +231,36 @@ local function functionalize(input)
       return map
 
    else
-      -- input is assumed to be a module:
-      -- local mod = input
+      -- input is assumed to be an instantiated module
       local nnObject = input
-      local params = nnObject:parameters()
+      local hasParamFn, params = pcall(nnObject.parameters, nnObject)
+      if not hasParamFn or #params == 0 then 
+         params = {}
+         hasParamFn = false
+      end
 
       -- Construct object:
       local lastType = ""
 
-      local function forward(params, x)
+      local function forward(...) -- {params, x} usually. If no params, then {x}
+         local args = {...}
+         local params, x
+         if not hasParamFn then
+            x = args[1]
+            params = {}
+         else
+            params = args[1]
+            x = args[2]
+         end
+
          local dataType = (params[1] or x):type()
          if lastType ~= dataType then
             lastType = dataType
             nnObject:type(dataType)
          end
 
-         local modelParams = nnObject:parameters()
-         if modelParams then
+         if hasParamFn then
+            modelParams = nnObject:parameters()
             for i,p in ipairs(modelParams) do
                if p ~= params[i] then
                   p:view(params[i], params[i]:size())
@@ -258,15 +271,28 @@ local function functionalize(input)
          return nnObject:forward(x)
       end
 
-      local function backward(g, params, x)
+      local function backward(...) -- {g, params, x} usually. If no params, then {g,x}
+
+         local args = {...}
+         local g, params, x
+         if not hasParamFn then
+            g = args[1]
+            x = args[2]
+            params = {}
+         else
+            g = args[1]
+            params = args[2]
+            x = args[3]
+         end
+
          local dataType = (params[1] or x):type()
          if lastType ~= dataType then
             lastType = dataType
             nnObject:type(dataType)
          end
 
-         local modelParams,modelGradParams = nnObject:parameters()
-         if modelParams then
+         if hasParamFn then
+            modelParams, modelGradParams = nnObject:parameters()
             for i,p in ipairs(modelParams) do
                if p ~= params[i] then
                   p:view(params[i], params[i]:size())
