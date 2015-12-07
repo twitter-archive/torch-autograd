@@ -1254,6 +1254,14 @@ local tests = {
 
         end
      end,
+
+     -- NNFunc_WrapWithoutParams = function()
+     --  -- We should be able to wrap modules that don't have params.
+     --  local tanh = autograd.functionalize(nn.Tanh())
+     --  local loss = autograd.functionalize(nn.MSECriterion())
+
+     -- end,
+
 }
 
 local function prefixTests(pf, t, skip)

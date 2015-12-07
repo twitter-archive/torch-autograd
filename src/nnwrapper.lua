@@ -232,7 +232,7 @@ local function functionalize(input)
 
    else
       -- input is assumed to be a module:
-      local mod = input
+      -- local mod = input
       local nnObject = input
       local params = nnObject:parameters()
 
