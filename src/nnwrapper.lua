@@ -40,7 +40,7 @@ local function functionalize(input)
                      local lastType = ""
 
                      local function forward(x, y)
-                        local dataType = x:type()
+                        local dataType = torch.type(x)
                         if lastType ~= dataType then
                            lastType = dataType
                            nnObject:type(dataType)
@@ -49,7 +49,7 @@ local function functionalize(input)
                      end
 
                      local function backward(g, x, y)
-                        local dataType = x:type()
+                        local dataType = torch.type(x)
                         if lastType ~= dataType then
                            lastType = dataType
                            nnObject:type(dataType)
@@ -362,7 +362,7 @@ local function functionalize(input)
          local lastType = ""
 
          local function forward(x, y)
-            local dataType = x:type()
+            local dataType = torch.type(x)
             if lastType ~= dataType then
                lastType = dataType
                nnObject:type(dataType)
@@ -371,7 +371,7 @@ local function functionalize(input)
          end
 
          local function backward(g, x, y)
-            local dataType = x:type()
+            local dataType = torch.type(x)
             if lastType ~= dataType then
                lastType = dataType
                nnObject:type(dataType)
