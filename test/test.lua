@@ -6,6 +6,8 @@ local gradcheckConstant = require 'autograd.gradcheck' {randomizeInput = false}
 local tester = totem.Tester()
 local stringx = require 'pl.stringx'
 
+autograd.protected(true)
+
 -- List of tests:
 local tests = {
    AutoModule = function()

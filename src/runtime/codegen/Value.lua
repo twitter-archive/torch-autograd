@@ -94,6 +94,8 @@ function Value.flatten(v)
 				rawTable[k] = Value.flatten(v)
 			end
 			return rawTable
+		else
+			return v
 		end
 	elseif v.type == Value.TABLE then
 		return Value.flatten(v.raw)
@@ -116,6 +118,25 @@ function Value.flattenGrads(v)
 	else
 		if v.source.gradients then
 			return v.source.gradients[1]:flatten()
+		end
+		return nil
+	end
+end
+
+function Value.collectGrads(v)
+	if not Value.isValue(v) then
+		if type(v) == "table" then
+			local rawTable = { }
+			for k,v in pairs(v) do
+				rawTable[k] = Value.collectGrads(v)
+			end
+			return rawTable
+		end
+	elseif v.type == Value.TABLE then
+		return Value.collectGrads(v.raw)
+	else
+		if v.source.gradients then
+			return v.source.gradients[1]
 		end
 		return nil
 	end
