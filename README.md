@@ -471,6 +471,24 @@ loss = loss.binaryEntropy(prediction, target)
 loss = loss.leastSquares(prediction, target)
 ```
 
+### Gradients of gradients
+
+autograd can be called from within an autograd function, and the resulting gradients can used as part
+of your outer function:
+
+```lua
+local d = require 'autograd'
+d.optimize(true)
+local innerFn = function(params)
+   -- compute something...
+end
+local ddf = d(function(params)
+   local grads = d(innerFn)(params)
+   -- do something with grads of innerFn...
+end)
+local gradGrads = ddf(params) -- second order gradient of innerFn
+```
+
 <a name="debugging"/>
 ### Debugging and fine-grain control
 
@@ -550,7 +568,7 @@ TODO
 
 Autograd is work in progress. Current list of things to be developed includes:
 
-- [ ] Gradients of gradients (Hessian)
+- [x] Gradients of gradients (Hessian)
 - [ ] Add support for sparse gradients
 - [x] Add support for caching tape for a given input configuration
 - [x] Code generation
