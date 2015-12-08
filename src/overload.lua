@@ -149,7 +149,13 @@ local function module(name, table, fn)
    end
 end
 
+local installDepth = 0
+
 local function install(fn)
+   installDepth = installDepth + 1
+   if installDepth ~= 1 then
+      return
+   end
    if #toRegister > 0 then
       for i = 1, #toRegister do
          toRegister[i]()
@@ -176,6 +182,10 @@ local function install(fn)
 end
 
 local function uninstall()
+   installDepth = installDepth - 1
+   if installDepth ~= 0 then
+      return
+   end
    nnwrapper.setApplyFn(nil)
    for i = 1, #overloads do
       local mm = overloads[i]

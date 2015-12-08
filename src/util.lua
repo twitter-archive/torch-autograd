@@ -189,7 +189,14 @@ function util.sortedFlatten(tbl, flat)
       for k, v in pairs(tbl) do
          keys[#keys + 1] = k
       end
-      table.sort(keys)
+      local ok = pcall(function()
+         return table.sort(keys)
+      end)
+      if not ok then
+         table.sort(keys, function(a, b)
+            return tostring(a) < tostring(b)
+         end)
+      end
       for i = 1, #keys do
          local val = tbl[keys[i]]
          if type(val) == "table" then

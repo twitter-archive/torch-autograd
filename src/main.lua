@@ -14,23 +14,20 @@ local function optimize(opt)
    defaultOptimize = opt
 end
 
+local defaultProtected = false
+local function protected(prot)
+   defaultProtected = prot
+end
+
 local function grad(fn, gradOpt)
    gradOpt = gradOpt or { }
-   local argnum = gradOpt.gradArg or 1
-   local optimize = util.defaultBool(gradOpt.optimize, defaultOptimize)
-   local withForward = util.defaultBool(gradOpt.withForward, true)
-   local withGradients = util.defaultBool(gradOpt.withGradients, true)
-   local partialGrad = util.defaultBool(gradOpt.partialGrad, false)
-   local debugHook = gradOpt.debugHook
-   local signatureFn = gradOpt.signatureFn
-   local opt = {
-      argnum = argnum,
-      withForward = withForward,
-      withGradients = withGradients,
-      partialGrad = partialGrad,
-      debugHook = debugHook,
-      signatureFn = signatureFn
-   }
+   local opt = util.deepCopy(gradOpt)
+   opt.argnum = opt.gradArg or 1
+   opt.optimize = util.defaultBool(opt.optimize, defaultOptimize)
+   opt.protected = util.defaultBool(opt.protected, defaultProtected)
+   opt.withForward = util.defaultBool(opt.withForward, true)
+   opt.withGradients = util.defaultBool(opt.withGradients, true)
+   opt.partialGrad = util.defaultBool(opt.partialGrad, false)
    if optimize then
       return RuntimeCodegen.create(fn, opt)
    else
@@ -42,7 +39,8 @@ end
 local autograd = {
    grad = grad,
    overload = overload,
-   optimize = optimize
+   optimize = optimize,
+   protected = protected
 }
 
 -- Shortcut:

@@ -16,13 +16,16 @@ local function buildSignature(params, tensorDims)
    end
 end
 
-local function execUncached(fn, args, opt)
-   local graph = createGraph(fn, args, opt, debugger)
-   local retValues = { Value.flattenGrads(graph.params[opt.argnum]) }
+local function execUncached(fn, args, opt, nestedGradient)
+   local graph = Graph.record(fn, args, opt)
+   local retValues = { Value.collectGrads(graph.params[opt.argnum]) }
    for i = 1, #graph.answers do
-      retValues[#retValues + 1] = flattenAnswer(graph.answers[i])
+      retValues[#retValues + 1] = graph.answers[i]
    end
-   return table.unpack(retValues)
+   if not nestedGradient then
+      retValues = Value.flatten(retValues)
+   end
+   return unpack(retValues)
 end
 
 local function printPoolStats(tensorPool)
@@ -55,11 +58,13 @@ local function create(fn, opt)
          return table.concat(tensorDims, "-")
       end
       local signature = sigFun(args)
-      if signature == nil then
-         return execUncached(fn, args, opt)
+      if signature == nil or Graph.reentryDepth() > 0 then
+         -- If we're in the middle of building the graph for a parent function, include this one in the parent, don't codegen.
+         return execUncached(fn, args, opt, Graph.reentryDepth() > 0)
       end
       if generatedFunctions[signature] == nil then
          local gradFn, retValues, code = generateFn(fn, args, opt)
+         --print(code)
          generatedFunctions[signature] = gradFn
          -- We already have the answers, don't run it all over again.
          if opt.withGradients and opt.withForward and not opt.debugHook then

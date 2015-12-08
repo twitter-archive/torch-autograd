@@ -10,12 +10,12 @@ local util = require 'autograd.util'
 
 local nodeDebugger
 local applyDepth = 0
-local nodeDisabled = true
+local reentryDepth = 0
 
 local function overloadHook(fn, gradFn, capture, ...)
    local inputs = {...}
    applyDepth = applyDepth + 1
-   if not nodeDisabled and applyDepth == 1 and capture then
+   if reentryDepth ~= 0 and applyDepth == 1 and capture then
       local n = Node.new(fn, gradFn, inputs)
       local values = {n:evaluateForward()}
       if nodeDebugger then
@@ -248,6 +248,10 @@ function Graph:walkExecutionOrder(withForward, withGradients)
    return execOrder, outputNodes
 end
 
+function Graph.reentryDepth()
+   return reentryDepth
+end
+
 function Graph.record(fn, args, opt)
    local argnum = opt.argnum or 1
    local debugger = opt.debugger
@@ -267,7 +271,7 @@ function Graph.record(fn, args, opt)
    -- Begin recording all torch operations.
    overload.install(overloadHook)
    applyDepth = 0
-   nodeDisabled = false
+   reentryDepth = reentryDepth + 1
    nodeDebugger = debugger
 
    -- Call user forward function.
@@ -275,7 +279,6 @@ function Graph.record(fn, args, opt)
 
    local protectedFn = function()
       answers = {fn(table.unpack(values))}
-
       -- Figure out forward graph traversal order.
       -- Only walk from the answer we need to differentiate (usually the first).
       local forwardExecOrder = walkOutputRoots(answers[argnum])
@@ -295,13 +298,20 @@ function Graph.record(fn, args, opt)
             node:evaluateBackward()
          end
       end
+      return true
    end
 
-   local ok, msg = pcall(protectedFn)
+   local ok, msg
+
+   if opt.protected then
+      ok, msg = pcall(protectedFn)
+   else
+      ok, msg = protectedFn()
+   end
 
    -- End recording.
    nodeDebugger = nil
-   nodeDisabled = true
+   reentryDepth = reentryDepth - 1
    overload.uninstall()
 
    if not ok then
