@@ -1203,68 +1203,84 @@ local tests = {
    end,
 
    OptimNN = function()
-        local nn = require 'nn'
-        local optim = require 'optim'
+      local nn = require 'nn'
+      local optim = require 'optim'
+ 
+      torch.manualSeed(0)
+ 
+      -- Set up the localizer network
+      ---------------------------------
+      local locnet = nn.Sequential()
+      locnet:add(nn.SpatialMaxPooling(2,2,2,2))
+      locnet:add(nn.SpatialConvolution(1,20,5,5))
+      locnet:add(nn.ReLU(true))
+      locnet:add(nn.SpatialMaxPooling(2,2,2,2))
+      locnet:add(nn.SpatialConvolution(20,20,5,5))
+      locnet:add(nn.ReLU(true))
+      locnet:add(nn.View(20*2*2))
+      locnet:add(nn.Linear(20*2*2,20))
+      locnet:add(nn.ReLU(true))
+      locnet:add(nn.Linear(20,6))
+      locnet:float() -- FAILS FOR CUDA
+ 
+      -- Functionalize networks
+      ---------------------------------
+      local agLocnet, locParams = autograd.functionalize(locnet)
+ 
+      -- Set up parameters
+      ---------------------------------
+      params = {
+         locParams = locParams,
+      }
+ 
+      -- Define our loss function
+      ---------------------------------
+      local function f(inputs, bhwdImages, labels)
+         local warpPrediction = agLocnet(inputs.locParams, bhwdImages)
+         return torch.sum(warpPrediction)
+      end
+ 
+      local g = autograd(f, {optimize = true})
+ 
+      -- FAILS FOR OTHER OPTIMIZERS AS WELL
+      local optimfn, states = autograd.optim.sgd(g, {learningRate=1e-2}, params)
+ 
+      for i=1,3 do
+         -- Get images in BHWD format, labels in one-hot format:
+         local data = torch.randn(256,1,32,32):float()
+         local target = torch.zeros(256):random(0,9):float()
+ 
+         -- Calculate gradients:
+         local grads, loss = optimfn(data, target)
+ 
+      end
+      end,
 
-        torch.manualSeed(0)
-
-        -- Set up the localizer network
-        ---------------------------------
-        local locnet = nn.Sequential()
-        locnet:add(nn.SpatialMaxPooling(2,2,2,2))
-        locnet:add(nn.SpatialConvolution(1,20,5,5))
-        locnet:add(nn.ReLU(true))
-        locnet:add(nn.SpatialMaxPooling(2,2,2,2))
-        locnet:add(nn.SpatialConvolution(20,20,5,5))
-        locnet:add(nn.ReLU(true))
-        locnet:add(nn.View(20*2*2))
-        locnet:add(nn.Linear(20*2*2,20))
-        locnet:add(nn.ReLU(true))
-        locnet:add(nn.Linear(20,6))
-        locnet:float() -- FAILS FOR CUDA
-
-        -- Functionalize networks
-        ---------------------------------
-        local agLocnet, locParams = autograd.functionalize(locnet)
-
-        -- Set up parameters
-        ---------------------------------
-        params = {
-           locParams = locParams,
-        }
-
-        -- Define our loss function
-        ---------------------------------
-        local function f(inputs, bhwdImages, labels)
-           local warpPrediction = agLocnet(inputs.locParams, bhwdImages)
-           return torch.sum(warpPrediction)
-        end
-
-        local g = autograd(f, {optimize = true})
-
-        -- FAILS FOR OTHER OPTIMIZERS AS WELL
-        local optimfn, states = autograd.optim.sgd(g, {learningRate=1e-2}, params)
-
-        for i=1,3 do
-           -- Get images in BHWD format, labels in one-hot format:
-           local data = torch.randn(256,1,32,32):float()
-           local target = torch.zeros(256):random(0,9):float()
-
-           -- Calculate gradients:
-           local grads, loss = optimfn(data, target)
-
-        end
-     end,
-
-     NNFunc_WrapWithoutParams = function()
+   NNFunc_WrapWithoutParams = function()
       local tanh = autograd.functionalize(nn.Tanh())
       local a = torch.eye(3)
       tester:assertTensorEq(torch.tanh(a), autograd.nn.Tanh()(a), 1e-8)
       tester:assertTensorEq(torch.tanh(a), tanh(a), 1e-8)
       local loss = autograd.functionalize(nn.MSECriterion())
 
-     end,
+   end,
 
+   FunctionalizeCriterionModule = function()
+      local input = {torch.rand(2,10), torch.randn(2,10)}
+      local target = {torch.IntTensor{1,8}, torch.randn(2,10)}
+      local nll = nn.ClassNLLCriterion()
+      local mse = nn.MSECriterion()
+      local pc = nn.ParallelCriterion():add(nll, 0.5):add(mse)
+      local output1 = pc:forward(input, target)
+      local pcf = autograd.functionalize(pc)
+      local mt = getmetatable(pc)
+      local output2 = pcf(input, target)
+      tester:asserteq(output1, output2, 'loss not equal')
+      local f = function(x, y)
+         return pcf(x, y)
+      end
+      tester:assert(gradcheck(f, input, target), 'incorrect gradients')
+   end,
 }
 
 local function prefixTests(pf, t, skip)

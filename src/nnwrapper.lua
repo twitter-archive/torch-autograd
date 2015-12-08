@@ -111,10 +111,10 @@ local function functionalize(input)
                      local function forward(x, W, b)
                         local dataType
                         if torch.isTensor(x) then
-                           dataType = (W or x):type()
+                           dataType = torch.type((W or x))
                         elseif type(x) == "table" then
                            if x[1] then
-                              dataType = (W or x[1]):type()
+                              dataType = torch.type((W or x[1]))
                            else
                               error("X is neither a Tensor, nor a table array")
                            end
@@ -134,10 +134,10 @@ local function functionalize(input)
                      local function backward(g, x, W, b)
                         local dataType
                         if torch.isTensor(x) then
-                           dataType = (W or x):type()
+                           dataType = torch.type((W or x))
                         elseif type(x) == "table" then
                            if x[1] then
-                              dataType = (W or x[1]):type()
+                              dataType = torch.type((W or x[1]))
                            else
                               error("X is neither a Tensor, nor a table array")
                            end
@@ -243,8 +243,18 @@ local function functionalize(input)
 
       -- Construct object:
       
+      local isCriterion = false
+      local mt = getmetatable(nnObject)
+      if mt then
+         local mmt = getmetatable(mt)
+         if mmt then
+            if mmt.__typename == 'nn.Criterion' then
+               isCriterion = true
+            end
+         end
+      end
 
-      if not torch.isTypeOf(nnObject, 'nn.Criterion') then
+      if not isCriterion then
          local lastType = ""
          local function forward(...) -- {params, x} usually. If no params, then {x}
             local args = {...}
@@ -257,7 +267,17 @@ local function functionalize(input)
                x = args[2]
             end
 
-            local dataType = (params[1] or x):type()
+            local dataType
+            if torch.isTensor(x) then
+               dataType = torch.type(x)
+            elseif type(x) == "table" then
+               if x[1] then
+                  dataType = torch.type(x[1])
+               else
+                  error("X is neither a Tensor, nor a table array")
+               end
+            end
+
             if lastType ~= dataType then
                lastType = dataType
                nnObject:type(dataType)
@@ -289,7 +309,17 @@ local function functionalize(input)
                x = args[3]
             end
 
-            local dataType = (params[1] or x):type()
+            local dataType
+            if torch.isTensor(x) then
+               dataType = torch.type(x)
+            elseif type(x) == "table" then
+               if x[1] then
+                  dataType = torch.type(x[1])
+               else
+                  error("X is neither a tensor, nor a table of tensors")
+               end
+            end
+
             if lastType ~= dataType then
                lastType = dataType
                nnObject:type(dataType)
@@ -362,7 +392,16 @@ local function functionalize(input)
          local lastType = ""
 
          local function forward(x, y)
-            local dataType = torch.type(x)
+            local dataType
+            if torch.isTensor(x) then
+               dataType = torch.type(x)
+            elseif type(x) == "table" then
+               if x[1] then
+                  dataType = torch.type(x[1])
+               else
+                  error("X is neither a tensor, nor a table of tensors")
+               end
+            end
             if lastType ~= dataType then
                lastType = dataType
                nnObject:type(dataType)
@@ -371,7 +410,16 @@ local function functionalize(input)
          end
 
          local function backward(g, x, y)
-            local dataType = torch.type(x)
+            local dataType
+            if torch.isTensor(x) then
+               dataType = torch.type(x)
+            elseif type(x) == "table" then
+               if x[1] then
+                  dataType = torch.type(x[1])
+               else
+                  error("X is neither a tensor, nor a table of tensors")
+               end
+            end
             if lastType ~= dataType then
                lastType = dataType
                nnObject:type(dataType)
