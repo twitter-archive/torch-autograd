@@ -48,8 +48,8 @@ end
 
 local function create(fn, opt)
    local generatedFunctions = { }
-   local tensorPool = { }
-   local tensorLocals = { }
+   opt.tensorPool = { }
+   opt.tensorLocals = { }
    return function(...)
       local args = {...}
       local sigFun = opt.signatureFn or function(params)
