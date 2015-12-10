@@ -347,18 +347,36 @@ local tests = {
       tester:asserteq(grads.x:size(1),100, 'incorrect dims for gradients')
    end,
 
+   GradCheck_Ger = function()
+      local A = torch.Tensor(10):normal()
+      local B = torch.Tensor(10):normal()
+      local func = function(inputs)
+         return torch.sum(torch.ger(inputs.A, inputs.B))
+      end
+
+      tester:assert(gradcheck(func, {A=A,B=B}), "incorrect gradients")
+   end,
+
    GradCheck_Dot = function()
       -- Parameters:
-      local W = torch.Tensor(32,100):normal()
-      local x = torch.Tensor(100):normal()
+      local matrices = {
+         {torch.Tensor(10,20):normal(), torch.Tensor(20):normal()}, -- 2D x 1D
+         {torch.Tensor(10,20):normal(), torch.Tensor(20,1):normal()}, -- 2D x 1D, with second dim
+         {torch.Tensor(10,20):normal(), torch.Tensor(20,20):normal()}, -- 2D x 2D
+         {torch.Tensor(20,1):normal(), torch.Tensor(1,20):normal()}, -- 1D x 1D
+      }
 
       -- Function:
       local func = function(inputs)
-         return torch.sum(inputs.W * inputs.x)
+         return torch.sum(inputs.A * inputs.B)
       end
 
       -- Check grads:
-      tester:assert(gradcheck(func, {W=W, x=x}), 'incorrect gradients')
+      for i,M in pairs(matrices) do
+         local A = M[1]
+         local B = M[2]
+         tester:assert(gradcheck(func, {A=A,B=B}), 'incorrect gradients')
+      end
    end,
 
    Inverse = function()
@@ -1259,6 +1277,7 @@ local tests = {
       end,
 
    NNFunc_WrapWithoutParams = function()
+      -- Tests that we can wrap NN modules that do not take parameters
       local tanh = autograd.functionalize(nn.Tanh())
       local a = torch.eye(3)
       tester:assertTensorEq(torch.tanh(a), autograd.nn.Tanh()(a), 1e-8)
@@ -1268,6 +1287,7 @@ local tests = {
    end,
 
    FunctionalizeCriterionModule = function()
+      -- Tests the use of table-valued inputs in criterions
       local input = {torch.rand(2,10), torch.randn(2,10)}
       local target = {torch.IntTensor{1,8}, torch.randn(2,10)}
       local nll = nn.ClassNLLCriterion()
@@ -1283,6 +1303,7 @@ local tests = {
       end
       tester:assert(gradcheck(f, input, target), 'incorrect gradients')
    end,
+
 }
 
 local function prefixTests(pf, t, skip)

@@ -127,29 +127,39 @@ operators.add = {
 }
 operators.mul = {
    function(g, ans, A, B)
-      if torch.isTensor(A) and torch.isTensor(B) then
-         if torch.nDimension(B) == 2 then
-            return g*torch.transpose(B)
-         elseif torch.nDimension(A) == 2 then
-            return torch.ger(g, B) -- outer product
+      local isTensorA = torch.isTensor(A)
+      local isTensorB = torch.isTensor(B)
+
+      if not isTensorA then
+         return torch.sum(elemwiseMul(g, B))
+      elseif isTensorB and torch.nDimension(B) == 2 then
+         return g * torch.transpose(B)
+      elseif isTensorA and torch.nDimension(A) == 2 then
+         if not isTensorB then
+            return elemwiseMul(g, B)
          else
-            return g*B -- elemwiseMul required? what about 3D?
+            return torch.ger(g,B)
          end
       else
-         return g*B
-      end
+         return B * g
+      end   
    end,
    function(g, ans, A, B)
-      if torch.isTensor(A) and torch.isTensor(B) then
-         if torch.nDimension(A) == 2 then
-            return torch.transpose(A)*g
-         elseif torch.nDimension(B) == 2 then
-            return torch.ger(A, g)
+      local isTensorA = torch.isTensor(A)
+      local isTensorB = torch.isTensor(B)
+      
+      if not isTensorB then
+         return torch.sum(elemwiseMul(g, A))
+      elseif isTensorA and torch.nDimension(A) == 2 then
+         return torch.transpose(A) * g
+      elseif isTensorB and torch.nDimension(B) == 2 then
+         if not isTensorA then
+            return elemwiseMul(g, A)
          else
-            return g*A
+            return torch.ger(A, g)
          end
       else
-         return g*A
+         return A * g
       end
    end,
 }
@@ -219,6 +229,11 @@ overload.module("torch", torch, function(module)
          local newg = elemwiseMul(g,elemwiseMul(torch.log(x),torch.pow(x,y)))
          return unbroadcast(newg, ans, y)
       end
+   })
+   module.gradient("ger", {
+      -- Only takes 1D vectors as input
+      function(g, ans, x, y) return g * y end,
+      function(g, ans, x, y) return torch.transpose(g) * x end
    })
    module.gradient("inverse", {
       function(g, ans, x) return -((torch.transpose(ans) * g) * torch.transpose(ans)) end,
@@ -399,7 +414,7 @@ overload.module("torch", torch, function(module)
       end
    })
    module.initializer("bernoulli", "uniform", "normal", "random", "zeros", "zero")
-   module.dynamic("ne",  "ger", "new", "fill",  "cosh", "sign", "repeatTensor", "typeAs", "eq")
+   module.dynamic("ne",  "new", "fill",  "cosh", "sign", "repeatTensor", "typeAs", "eq")
    module.static("size", "isTensor", "nDimension", "nElement", "isSameSizeAs")
 end)
 
