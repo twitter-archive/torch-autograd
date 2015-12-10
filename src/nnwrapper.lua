@@ -1,7 +1,4 @@
--- Register all nn grads into autograd
-local loaded = {}
 local nodeApply
-
 local function directApply(fun, gradFun, capture, ...)
    return fun.fn(...)
 end
@@ -9,465 +6,291 @@ end
 local function setApplyFn(fn)
    nodeApply = fn or directApply
 end
-
 setApplyFn()
 
--- Generic auto-wrapper of every function exposed in given
--- package + arbitary instantiated nn container/module:
-local function functionalize(input)
-   -- return pre-loaded package:
-   if loaded[input] then
-      return loaded[input]
-   end
-
-   -- input can be a pkg name or a module
-   if type(input) == 'string' then
-      -- input is a pkg name:
-      local pkg = input
-      local mod = require(pkg)
-      local map = { }
-
-      for modName, v in pairs(mod) do
-         local mt = getmetatable(v)
-         if mt then
-            local mmt = getmetatable(mt)
-            if mmt then
-               if mmt.__typename == 'nn.Criterion' then
-                  map[modName] = function(...)
-                     local args = {...}
-                     -- Construct object:
-                     local nnObject = v(table.unpack(args))
-                     local lastType = ""
-
-                     local function forward(x, y)
-                        local dataType = torch.type(x)
-                        if lastType ~= dataType then
-                           lastType = dataType
-                           nnObject:type(dataType)
-                        end
-                        return nnObject:forward(x, y)
-                     end
-
-                     local function backward(g, x, y)
-                        local dataType = torch.type(x)
-                        if lastType ~= dataType then
-                           lastType = dataType
-                           nnObject:type(dataType)
-                        end
-                        return nnObject:backward(x, y)
-                     end
-
-                     local mod = { }
-
-                     local fn = function(x, W, b)
-                        local backFnDesc = {
-                           object = mod,
-                           method = "backward",
-                           name = modName,
-                           args = args,
-                           fn = backward
-                        }
-                        local gradFn = {
-                           function(g,ans,x,y)
-                              return nodeApply(backFnDesc, nil, true, g, x, y)
-                           end,
-                           function(g,ans,x,y)
-                              return util.fillSameSizeAs(y, 0)
-                           end,
-                        }
-                        local fnDesc = {
-                           package = input,
-                           object = mod,
-                           method = "forward",
-                           name = modName,
-                           args = args,
-                           fn = forward
-                        }
-                        return nodeApply(fnDesc, gradFn, true, x, W, b)
-                     end
-
-                     mod.entry = fn
-                     mod.forward = forward
-                     mod.backward = backward
-
-                     -- Shortcut:
-                     setmetatable(mod, {
-                        __call = function(self, ...)
-                           return self.entry(...)
-                        end
-                     })
-
-                     return mod
-                  end
-
-
-               else
-                  map[modName] = function(...)
-                     -- Construct object:
-                     local args = {...}
-                     local nnObject = v(table.unpack(args))
-                     local lastType = ""
-
-                     local function forward(x, W, b)
-                        local dataType
-                        if torch.isTensor(x) then
-                           dataType = torch.type((W or x))
-                        elseif type(x) == "table" then
-                           if x[1] then
-                              dataType = torch.type((W or x[1]))
-                           else
-                              error("X is neither a Tensor, nor a table array")
-                           end
-                        end
-
-                        if lastType ~= dataType then
-                           lastType = dataType
-                           nnObject:type(dataType)
-                        end
-
-                        nnObject.weight = W
-                        nnObject.bias = b
-
-                        return nnObject:forward(x)
-                     end
-
-                     local function backward(g, x, W, b)
-                        local dataType
-                        if torch.isTensor(x) then
-                           dataType = torch.type((W or x))
-                        elseif type(x) == "table" then
-                           if x[1] then
-                              dataType = torch.type((W or x[1]))
-                           else
-                              error("X is neither a Tensor, nor a table array")
-                           end
-                        end
-
-                        if lastType ~= dataType then
-                           lastType = dataType
-                           nnObject:type(dataType)
-                        end
-
-                        nnObject.weight = W
-                        nnObject.bias = b
-
-                        if nnObject.gradWeight then
-                           nnObject.gradWeight:zero()
-                        end
-                        if nnObject.gradBias then
-                           nnObject.gradBias:zero()
-                        end
-
-                        local gradInput = nnObject:backward(x, g)
-
-                        return {
-                           gradInput,
-                           nnObject.gradWeight,
-                           nnObject.gradBias,
-                        }
-                     end
-
-                     local mod = {}
-
-                     local fn = function(x, W, b)
-                        local grads = nil
-                        local backFnDesc = {
-                           object = mod,
-                           method = "backward",
-                           name = modName,
-                           args = args,
-                           fn = backward
-                        }
-                        local gradFn = {
-                           function(g,ans,x,W,b)
-                              if grads == nil then
-                                 grads = nodeApply(backFnDesc, nil, true, g, x, W, b)
-                              end
-                              return grads[1]
-                           end,
-                           function(g,ans,x,W,b)
-                              if grads == nil then
-                                 grads = nodeApply(backFnDesc, nil, true, g, x, W, b)
-                              end
-                              return grads[2]
-                           end,
-                           function(g,ans,x,W,b)
-                              if grads == nil then
-                                 grads = nodeApply(backFnDesc, nil, true, g, x, W, b)
-                              end
-                              return grads[3]
-                           end
-                        }
-                        local fnDesc = {
-                           package = input,
-                           object = mod,
-                           method = "forward",
-                           name = modName,
-                           args = args,
-                           fn = forward
-                        }
-                        return nodeApply(fnDesc, gradFn, true, x, W, b)
-                     end
-
-                     mod.entry = fn
-                     mod.forward = forward
-                     mod.backward = backward
-
-                     -- Shortcut:
-                     setmetatable(mod, {
-                        __call = function(self, ...)
-                           return self.entry(...)
-                        end
-                     })
-
-                     return mod
-                  end
-               end
-            end
-         end
-      end
-
-      loaded[pkg] = map
-      return map
-
+local function hasParams(nnObject)
+   local hasParamFn, params = pcall(nnObject.parameters, nnObject)
+   params = params or {}
+   if not hasParamFn or #params == 0 then 
+      return false
    else
-      -- input is assumed to be an instantiated module
-      local nnObject = input
-      local mod = {}
-      local hasParamFn, params = pcall(nnObject.parameters, nnObject)
-      params = params or {}
-      if not hasParamFn or #params == 0 then 
-         params = {}
-         hasParamFn = false
-      end
-
-      -- Construct object:
-      
-      local isCriterion = false
-      local mt = getmetatable(nnObject)
-      if mt then
-         local mmt = getmetatable(mt)
-         if mmt then
-            if mmt.__typename == 'nn.Criterion' then
-               isCriterion = true
-            end
-         end
-      end
-
-      if not isCriterion then
-         local lastType = ""
-         local function forward(...) -- {params, x} usually. If no params, then {x}
-            local args = {...}
-            local params, x
-            if not hasParamFn then
-               x = args[1]
-               params = {}
-            else
-               params = args[1]
-               x = args[2]
-            end
-
-            local dataType
-            if torch.isTensor(x) then
-               dataType = torch.type(x)
-            elseif type(x) == "table" then
-               if x[1] then
-                  dataType = torch.type(x[1])
-               else
-                  error("X is neither a Tensor, nor a table array")
-               end
-            end
-
-            if lastType ~= dataType then
-               lastType = dataType
-               nnObject:type(dataType)
-            end
-
-            if hasParamFn then
-               modelParams = nnObject:parameters()
-               for i,p in ipairs(modelParams) do
-                  if p ~= params[i] then
-                     p:view(params[i], params[i]:size())
-                  end
-               end
-            end
-
-            return nnObject:forward(x)
-         end
-
-         local function backward(...) -- {g, params, x} usually. If no params, then {g,x}
-
-            local args = {...}
-            local g, params, x
-            if not hasParamFn then
-               g = args[1]
-               x = args[2]
-               params = {}
-            else
-               g = args[1]
-               params = args[2]
-               x = args[3]
-            end
-
-            local dataType
-            if torch.isTensor(x) then
-               dataType = torch.type(x)
-            elseif type(x) == "table" then
-               if x[1] then
-                  dataType = torch.type(x[1])
-               else
-                  error("X is neither a tensor, nor a table of tensors")
-               end
-            end
-
-            if lastType ~= dataType then
-               lastType = dataType
-               nnObject:type(dataType)
-            end
-
-            if hasParamFn then
-               modelParams, modelGradParams = nnObject:parameters()
-               for i,p in ipairs(modelParams) do
-                  if p ~= params[i] then
-                     p:view(params[i], params[i]:size())
-                  end
-               end
-            end
-
-            nnObject:zeroGradParameters()
-
-            local gradInput = nnObject:backward(x, g)
-
-            return {
-               modelGradParams,
-               gradInput,
-            }
-         end
-
-         local fn = function(params, x)
-            local grads = nil
-            local backFnDesc = {
-               object = mod,
-               method = "backward",
-               name = "model",
-               fn = backward,
-            }
-            local gradFn = {
-               function(g,ans,params,x)
-                  if grads == nil then
-                     grads = nodeApply(backFnDesc, nil, true, g, params, x)
-                  end
-                  return grads[1]
-               end,
-               function(g,ans,params,x)
-                  if grads == nil then
-                     grads = nodeApply(backFnDesc, nil, true, g, params, x)
-                  end
-                  return grads[2]
-               end,
-            }
-            local fnDesc = {
-               object = mod,
-               method = "forward",
-               name = "model",
-               fn = forward,
-            }
-            return nodeApply(fnDesc, gradFn, true, params, x)
-         end
-
-         mod.entry = fn
-         mod.forward = forward
-         mod.backward = backward
-
-         -- Shortcut:
-         setmetatable(mod, {
-            __call = function(self, ...)
-               return self.entry(...)
-            end
-         })
-
-         return mod, params
-
-      else -- if we ARE a criterion
-         local lastType = ""
-
-         local function forward(x, y)
-            local dataType
-            if torch.isTensor(x) then
-               dataType = torch.type(x)
-            elseif type(x) == "table" then
-               if x[1] then
-                  dataType = torch.type(x[1])
-               else
-                  error("X is neither a tensor, nor a table of tensors")
-               end
-            end
-            if lastType ~= dataType then
-               lastType = dataType
-               nnObject:type(dataType)
-            end
-            return nnObject:forward(x, y)
-         end
-
-         local function backward(g, x, y)
-            local dataType
-            if torch.isTensor(x) then
-               dataType = torch.type(x)
-            elseif type(x) == "table" then
-               if x[1] then
-                  dataType = torch.type(x[1])
-               else
-                  error("X is neither a tensor, nor a table of tensors")
-               end
-            end
-            if lastType ~= dataType then
-               lastType = dataType
-               nnObject:type(dataType)
-            end
-            return nnObject:backward(x, y)
-         end
-
-         local fn = function(x, W, b)
-            local backFnDesc = {
-               object = mod,
-               method = "backward",
-               name = "criterion",
-               fn = backward
-            }
-            local gradFn = {
-               function(g,ans,x,y)
-                  return nodeApply(backFnDesc, nil, true, g, x, y)
-               end,
-               function(g,ans,x,y)
-                  return util.fillSameSizeAs(y, 0)
-               end,
-            }
-            local fnDesc = {
-               object = mod,
-               method = "forward",
-               name = "criterion",
-               fn = forward,
-            }
-            return nodeApply(fnDesc, gradFn, true, x, W, b)
-         end   
-
-         mod.entry = fn
-         mod.forward = forward
-         mod.backward = backward
-
-         -- Shortcut:
-         setmetatable(mod, {
-            __call = function(self, ...)
-               return self.entry(...)
-            end
-         })
-
-         return mod
-      end
+      return true
    end
 end
 
+local function isCriterion(nnObject)
+   local isCriterion = false
+   local mt = getmetatable(nnObject)
+   if mt then
+      local mmt = getmetatable(mt)
+      if mmt then
+         if mmt.__typename == 'nn.Criterion' then
+            isCriterion = true
+         end
+      end
+   end
+   return isCriterion
+end
+
+local function isModule(nnObject)
+   local isModule = false
+   local mt = getmetatable(nnObject)
+   if mt then
+      local mmt = getmetatable(mt)
+      if mmt then
+         if mmt.__typename == "nn.Module" then
+            isModule = true
+         end
+      end
+   end
+   return isModule
+end
+
+local function getInputType(x)
+   local dataType = nil
+   if torch.isTensor(x) then
+      dataType = torch.type(x)
+   elseif type(x) == "table" then
+      if x[1] then
+         dataType = torch.type(x[1])
+      end
+   end
+   return dataType
+end
+
+local function updateType(nnObject, lastType, newType)
+   if not newType then
+      error("Input is neither a tensor or a table of tensors")
+   end
+   if lastType ~= newType then
+      lastType = newType
+      nnObject:type(newType)
+   end
+   return nnObject, lastType
+end
+
+local function wrapCriterion(nnObject)
+   local lastType = ""
+   local mod = {}
+
+   local function forward(x, y)
+      nnObject, lastType = updateType(nnObject, lastType, getInputType(x))
+      return nnObject:forward(x, y)
+   end
+
+   local function backward(g, x, y)
+      nnObject, lastType = updateType(nnObject, lastType, getInputType(x))
+      return nnObject:backward(x, y)
+   end
+
+   local fn = function(x, y)
+      local backFnDesc = {
+         object = mod,
+         method = "backward",
+         name = "criterion",
+         fn = backward
+      }
+      local gradFn = {
+         function(g,ans,x,y)
+            return nodeApply(backFnDesc, nil, true, g, x, y)
+         end,
+         function(g,ans,x,y)
+            -- NOTE: shoudl we throw error as uniplemented here?
+            return util.fillSameSizeAs(y, 0)
+         end,
+      }
+      local fnDesc = {
+         object = mod,
+         method = "forward",
+         name = "criterion",
+         fn = forward,
+      }
+      return nodeApply(fnDesc, gradFn, true, x, y)
+   end   
+
+   mod.entry = fn
+   mod.forward = forward
+   mod.backward = backward
+
+   -- Shortcut:
+   setmetatable(mod, {
+      __call = function(self, ...)
+         return self.entry(...)
+      end
+   })
+
+   return mod
+end
+
+local function wrapModuleWithoutParams(nnObject)
+   local lastType = ""
+   local mod = {}
+   local function forward(x)
+      nnObject, lastType = updateType(nnObject, lastType, getInputType(x))
+      return nnObject:forward(x)
+   end
+
+   local function backward(g,x)
+      -- NOTE: Is this necessary if it's done forward?
+      nnObject, lastType = updateType(nnObject, lastType, getInputType(x))
+      nnObject:zeroGradParameters()
+      local gradInput = nnObject:backward(x, g)
+      return gradInput -- {modelGradParams, gradInput}
+   end
+
+   local fn = function(x)
+      local grads = nil
+      local backFnDesc = {
+         object = mod,
+         method = "backward",
+         name = "model",
+         fn = backward,
+      }
+      local gradFn = {
+         function(g,ans,x)
+            return nodeApply(backFnDesc, nil, true, g, x)
+         end
+      }
+      local fnDesc = {
+         object = mod,
+         method = "forward",
+         name = "model",
+         fn = forward,
+      }
+      return nodeApply(fnDesc, gradFn, true, x)
+   end
+
+   mod.entry = fn
+   mod.forward = forward
+   mod.backward = backward
+
+   -- Shortcut:
+   setmetatable(mod, {
+      __call = function(self, ...)
+         return self.entry(...)
+      end
+   })
+
+   return mod
+end
+
+local function wrapModuleWithParams(nnObject)
+   local lastType = ""
+   local mod = {}
+   local params = nnObject:parameters()
+   local function forward(params,x)
+      nnObject, lastType = updateType(nnObject, lastType, getInputType(x))
+      local modelParams, modelGradParams = nnObject:parameters()
+      for i,p in ipairs(modelParams) do
+         if p ~= params[i] then
+            p:view(params[i], params[i]:size())
+         end
+      end
+      return nnObject:forward(x)
+   end
+
+   local function backward(g,params,x)
+      -- NOTE: Is this necessary if it's done forward?
+      nnObject, lastType = updateType(nnObject, lastType, getInputType(x))
+      for i,p in ipairs(modelParams) do
+         if p ~= params[i] then
+            p:view(params[i], params[i]:size())
+         end
+      end
+      nnObject:zeroGradParameters()
+      local gradInput = nnObject:backward(x, g)
+      return {modelGradParams, gradInput}
+   end
+
+   local fn = function(params, x)
+      local grads = nil
+      local backFnDesc = {
+         object = mod,
+         method = "backward",
+         name = "model",
+         fn = backward,
+      }
+      local gradFn = {
+         function(g,ans,params,x)
+            if grads == nil then
+               grads = nodeApply(backFnDesc, nil, true, g, params, x)
+            end
+            return grads[1]
+         end,
+         function(g,ans,params,x)
+            if grads == nil then
+               grads = nodeApply(backFnDesc, nil, true, g, params, x)
+            end
+            return grads[2]
+         end,
+      }
+      local fnDesc = {
+         object = mod,
+         method = "forward",
+         name = "model",
+         fn = forward,
+      }
+      return nodeApply(fnDesc, gradFn, true, params, x)
+   end
+
+   mod.entry = fn
+   mod.forward = forward
+   mod.backward = backward
+
+   -- Shortcut:
+   setmetatable(mod, {
+      __call = function(self, ...)
+         return self.entry(...)
+      end
+   })
+
+   return mod, params
+end
+
+-- Take in an nn module and functionalize it
+local functionalize, functionalizePackage
+functionalize = function(nnObject)
+   if type(nnObject) == "string" then
+      return functionalizePackage(nnObject)
+   end
+
+   if isModule(nnObject) then
+      if hasParams(nnObject) then
+         return wrapModuleWithParams(nnObject)
+      else
+         return wrapModuleWithoutParams(nnObject)
+      end
+   elseif isCriterion(nnObject) then
+      return wrapCriterion(nnObject)
+   else
+      error("Input is not a package name or nn object")
+   end
+end
+
+functionalizePackage = function(packageName)
+   assert(type(packageName) == 'string')
+   local loaded, mod = pcall(require, packageName)
+   if not loaded then
+      error("Could not load package '" .. packageName .. "'")
+   else
+      -- Iterate through every module in the package,
+      -- and functionalize it
+      local map = {}
+      for modName, nnClass in pairs(mod) do
+         if isModule(nnClass) or isCriterion(nnClass) then
+            map[modName] = function(...)
+               local out = {functionalize(nnClass(...))}
+               return table.unpack(out)
+            end
+         end
+      end
+      return map
+   end
+end
+
+
 return {
    functionalize = functionalize,
+   functionalizePackage = functionalizePackage,
    setApplyFn = setApplyFn
 }

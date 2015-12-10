@@ -130,7 +130,6 @@ local tests = {
    NNWrapperTableInput = function()
       local A = torch.eye(10)
       local B = torch.eye(10):mul(3)
-      local mmModule = nn.MM()
       local mmFn = autograd.nn.MM()
 
       local fn = function(inputs)
@@ -866,22 +865,28 @@ local tests = {
 
       -- Trainable parameters:
       local x = torch.FloatTensor(inputSize):normal()
-      local W1 = torch.FloatTensor(hiddenSize,inputSize):normal()
-      local b1 = torch.FloatTensor(hiddenSize):normal()
-      local W2 = torch.FloatTensor(outputSize,hiddenSize):normal()
-      local b2 = torch.FloatTensor(outputSize):normal()
-      local params = {W1=W1, b1=b1, W2=W2, b2=b2, x=x}
+      -- local W1 = torch.FloatTensor(hiddenSize,inputSize):normal()
+      -- local b1 = torch.FloatTensor(hiddenSize):normal()
+      -- local W2 = torch.FloatTensor(outputSize,hiddenSize):normal()
+      -- local b2 = torch.FloatTensor(outputSize):normal()
+      -- local params = {W1=W1, b1=b1, W2=W2, b2=b2, x=x}
+      -- local params = {}
 
       -- nn modules:
-      local linear1 = autograd.nn.Linear(inputSize, hiddenSize)
+      local linear1,pLinear1 = autograd.nn.Linear(inputSize, hiddenSize)
       local acts1 = autograd.nn.Tanh()
-      local linear2 = autograd.nn.Linear(hiddenSize, outputSize)
+
+      print(linear1(pLinear1, x))
+      os.exit()
+
+      local linear2,pLinear2 = autograd.nn.Linear(hiddenSize, outputSize)
       local acts2 = autograd.nn.Tanh()
+      params = {linear1 = pLinear1, linear2 = pLinear2}
 
       -- nn version:
       local function mlp(params)
-         local h1 = acts1(linear1(params.x, params.W1, params.b1))
-         local h2 = acts2(linear2(h1, params.W2, params.b2))
+         local h1 = acts1(linear1(params.linear1, params.x))
+         local h2 = acts2(linear2(params.linear2,params.x))
          local o = torch.sum(h2)
          return o
       end
