@@ -25,6 +25,7 @@ local function grad(fn, gradOpt)
    opt.argnum = opt.gradArg or 1
    opt.optimize = util.defaultBool(opt.optimize, defaultOptimize)
    opt.protected = util.defaultBool(opt.protected, defaultProtected)
+   opt.reduceFootprint = util.defaultBool(opt.reduceFootprint, false)
    opt.withForward = util.defaultBool(opt.withForward, true)
    opt.withGradients = util.defaultBool(opt.withGradients, true)
    opt.partialGrad = util.defaultBool(opt.partialGrad, false)
