@@ -54,7 +54,7 @@ end
 
 function util.setNotEqual(a, b, c, v)
    local mask = torch.ne(a, b)
-   local copy = v:clone()
+   local copy = torch.clone(v)
    copy[mask] = 0
    return copy
 end
@@ -75,7 +75,8 @@ function util.newTensorLikeInPlace(o, a)
 end
 
 function util.fillSameSizeAs(a, b)
-   return a.new(a:size()):fill(b)
+   local out = torch.new(torch.size(a))
+   out = torch.copy(b)
 end
 
 function util.fillSameSizeAsInPlace(o, a, b)
@@ -92,7 +93,8 @@ function util.zerosLikeInPlace(o, a, b)
 end
 
 function util.narrowCopy(a, dim, index, size)
-   return a:narrow(dim, index, size):clone()
+   -- return a:narrow(dim, index, size):clone()
+   return torch.clone(torch.narrow(a, dim, index, size))
 end
 
 function util.narrowCopyInPlace(a, dim, index, size)
@@ -100,7 +102,7 @@ function util.narrowCopyInPlace(a, dim, index, size)
 end
 
 function util.selectCopy(o, a, dim, index)
-   return a:select(dim, index):clone()
+   return torch.clone(torch.select(a, dim, index))
 end
 
 function util.selectCopyInPlace(o, a, dim, index)
@@ -109,9 +111,8 @@ end
 
 function util.selectSliceCopy(g, x, dim, index)
    local out = g.new(x:size()):zero()
-   local slice = out:select(dim,index)
-   slice:copy(g)
-   return out
+   local slice = torch.select(out,dim,index)
+   return torch.copy(slice,g)
 end
 
 function util.selectSliceCopyInPlace(o, g, x, dim, index)

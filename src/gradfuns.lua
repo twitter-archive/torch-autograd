@@ -13,6 +13,15 @@ function getValue(v)
    end
 end
 
+-- Utility for defining gradients that are zero
+local function zeroGradient(nArgs)
+   nArgs = nArgs or 2
+   zeroGrads = {}
+   for i=1,nArgs do
+      zeroGrads[i] = function(...) return nil end
+   end
+end
+
 -- Helps with resizing gradients
 -- Could also be called sumToMatchShape
 local function unbroadcast(g,ans,x)
@@ -413,10 +422,32 @@ overload.module("torch", torch, function(module)
          return torch.typeAs(g, x)
       end
    })
+
+   -- Zero gradients
+   module.gradient("lt", zeroGradient())
+   module.gradient("le", zeroGradient())
+   module.gradient("gt", zeroGradient())
+   module.gradient("ge", zeroGradient())
+   module.gradient("eq", zeroGradient())
+   module.gradient("ne", zeroGradient())
+   module.gradient("all", zeroGradient())
+   module.gradient("any", zeroGradient())
+   module.gradient("floor", zeroGradient())
+   module.gradient("ceil", zeroGradient())
+   module.gradient("round", zeroGradient())
+   module.gradient("sign", zeroGradient())
+
+   module.gradient("nDimension", zeroGradient())
+   module.gradient("size", zeroGradient())
+   module.gradient("nElement", zeroGradient())
+   module.gradient("isSameSizeAs", zeroGradient())
+   module.gradient("isTensor", zeroGradient())
+
    module.initializer("bernoulli", "uniform", "normal", "random", "zeros", "zero")
    module.dynamic("ne",  "new", "fill",  "cosh", "sign", "repeatTensor", "typeAs", "eq")
    module.static("size", "isTensor", "nDimension", "nElement", "isSameSizeAs")
 end)
+
 
 overload.module("Value", Value, function(module)
    for k, v in pairs(operators) do
@@ -438,7 +469,8 @@ overload.module("util", util, function(module)
       end
    })
    module.initializer("newTensorLike", "zerosLike")
-   module.dynamic("setNotEqual", "fillSameSizeAs", "narrowCopy", "selectCopy", "selectSliceCopy", "narrowSliceCopy", "makeContiguous", "indexAdd", "catTable")
+   module.dynamic("fillSameSizeAs", "narrowCopy", "selectCopy", "selectSliceCopy", "narrowSliceCopy", "makeContiguous", "indexAdd", "catTable")
+   -- "setNotEqual", 
    module.static("equals")
 end)
 

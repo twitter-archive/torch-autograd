@@ -1304,6 +1304,31 @@ local tests = {
       tester:assert(gradcheck(f, input, target), 'incorrect gradients')
    end,
 
+   GradsOfGrads = function() 
+      local tensor = torch.FloatTensor
+      local x = tensor(2000,100):normal()
+      local y = tensor(2000):uniform(1.5,10.5):floor()
+
+      local f = function(params, x, y)
+         local h1 = torch.tanh( params.W1 * x + params.b1 )
+         local h2 = params.W2 * h1 + params.b2
+         local yhat = autograd.util.logSoftMax(h2)
+         local loss = -torch.sum(torch.narrow(yhat,1,y,1))
+         return loss
+      end
+
+      local params = {
+         W1 = tensor(1000, 100):normal(.01),
+         b1 = tensor(1000):zero(),
+         W2 = tensor(10, 1000):normal(.01),
+         b2 = tensor(10):zero(),
+      }
+
+      local grads = autograd(function(params, x, y)
+         local gf = autograd(f)(params, x, y)
+         return torch.sum(gf.W1) + torch.sum(gf.b1) + torch.sum(gf.W2) + torch.sum(gf.b2)
+      end)(params, x[1], y[1])
+   end,
 }
 
 local function prefixTests(pf, t, skip)
