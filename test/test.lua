@@ -950,8 +950,8 @@ local tests = {
          return loss,pred
       end
 
-      params[1].W:normal(0,0.01)
-      params[2].W:normal(0,0.01)
+      params[1][1]:normal(0,0.01)
+      params[2][1]:normal(0,0.01)
 
       local i = torch.randn(100)
       local t = torch.Tensor({1,0})
@@ -960,10 +960,10 @@ local tests = {
       local grads = autograd(loss)(params, i, t)
 
       tester:asserteq(type(l), 'number', 'loss should be a scalar')
-      tester:asserteq(grads[1].W:dim(), 2, 'weights for layer 2 have incorrect dims')
-      tester:asserteq(grads[1].b:dim(), 1, 'biases for layer 2 have incorrect dims')
-      tester:asserteq(grads[2].W:dim(), 2, 'weights for layer 4 have incorrect dims')
-      tester:asserteq(grads[2].b:dim(), 1, 'biases for layer 4 have incorrect dims')
+      tester:asserteq(grads[1][1]:dim(), 2, 'weights for layer 2 have incorrect dims')
+      tester:asserteq(grads[1][2]:dim(), 1, 'biases for layer 2 have incorrect dims')
+      tester:asserteq(grads[2][1]:dim(), 2, 'weights for layer 4 have incorrect dims')
+      tester:asserteq(grads[2][2]:dim(), 1, 'biases for layer 4 have incorrect dims')
 
       -- Gradcheck
       tester:assert(gradcheck(loss, params, i, t), 'incorrect gradients')
@@ -995,10 +995,10 @@ local tests = {
       end
 
       local params = {params1, params2}
-      params[1][1].W:normal(0,0.01)
-      params[1][2].W:normal(0,0.01)
-      params[2][1].W:normal(0,0.01)
-      params[2][2].W:normal(0,0.01)
+      params[1][1][1]:normal(0,0.01)
+      params[1][2][1]:normal(0,0.01)
+      params[2][1][1]:normal(0,0.01)
+      params[2][2][1]:normal(0,0.01)
 
       local i = torch.randn(3,8,8)
       local t = torch.randn(2)

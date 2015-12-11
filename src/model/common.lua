@@ -5,7 +5,7 @@ return {
          for i,layer in ipairs(layers) do
             local paramsi = layer2params[i]
             if paramsi then
-               input = layer(input, params[paramsi].W, params[paramsi].b)
+               input = layer(params[paramsi], input)
             else
                input = layer(input)
             end

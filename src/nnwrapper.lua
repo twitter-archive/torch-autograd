@@ -39,7 +39,7 @@ local function isModule(nnObject)
       local mmt = getmetatable(mt)
       if mmt then
          local t = mmt.__typename
-         if t == "nn.Module" or t == "nn.Sequential" or t == "nn.Container" then
+         if t == "nn.Module" or t == "nn.Sequential" or t == "nn.Container" or t == "nn.Threshold" then
             isModule = true
          end
       end
