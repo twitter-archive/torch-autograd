@@ -136,7 +136,7 @@ local function wrapModuleWithoutParams(nnObject)
       nnObject, lastType = updateType(nnObject, lastType, getInputType(x))
       nnObject:zeroGradParameters()
       local gradInput = nnObject:backward(x, g)
-      return gradInput -- {modelGradParams, gradInput}
+      return gradInput
    end
 
    local fn = function(x)
@@ -197,13 +197,18 @@ local function wrapModuleWithParams(nnObject)
       -- NOTE: Is this necessary if it's done forward?
       nnObject, lastType = updateType(nnObject, lastType, getInputType(x))
       local modelParams, modelGradParams = nnObject:parameters()
+      print(getInputType(x))
+      print(modelParams[1]:type())
       for i,p in ipairs(modelParams) do
          if p ~= params[i] then
-            p:view(params[i]:type(lastType), params[i]:size())
+            params[i] = params[i]:type(lastType)
+            p:view(params[i], params[i]:size())
          end
       end
       nnObject:zeroGradParameters()
       local gradInput = nnObject:backward(x, g)
+      print("Grad type: " .. modelGradParams[1]:type())
+      print("Grad input: " .. gradInput:type())
       return {modelGradParams, gradInput}
    end
 

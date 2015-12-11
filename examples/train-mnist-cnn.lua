@@ -18,13 +18,13 @@ local reshape = grad.nn.Reshape(1,32,32)
 
 local conv1, acts1, pool1, conv2, acts2, pool2, flatten, linear
 local params = {}
-conv1,params.conv1 = grad.nn.SpatialConvolutionMM(1, 16, 5, 5)
+conv1, params.conv1 = grad.nn.SpatialConvolutionMM(1, 16, 5, 5)
 acts1 = grad.nn.Tanh()
 pool1 = grad.nn.SpatialMaxPooling(2, 2, 2, 2)
 
-conv2,params.conv2 = grad.nn.SpatialConvolutionMM(16, 16, 5, 5)
+conv2, params.conv2 = grad.nn.SpatialConvolutionMM(16, 16, 5, 5)
 acts2 = grad.nn.Tanh()
-pool2,params.pool2 = grad.nn.SpatialMaxPooling(2, 2, 2, 2)
+pool2, params.pool2 = grad.nn.SpatialMaxPooling(2, 2, 2, 2)
 
 flatten = grad.nn.Reshape(16*5*5)
 linear,params.linear = grad.nn.Linear(16*5*5, 10)
@@ -61,13 +61,16 @@ for epoch = 1,100 do
       local y = torch.view(trainData.y[i], 1, 10)
 
       -- Grads:
+      print("Preparam type: " .. params.conv1[1]:type())
       local grads, loss, prediction = df(params,x,y)
 
       -- Update weights and biases
-      for i=1,2 do
-         params.conv1[i] = params.conv1[i] - grads.conv1[i] * 0.01
-         params.conv2[i] = params.conv2[i] - grads.conv2[i] * 0.01
-         params.linear[i] = params.linear[i] - grads.linear[i] * 0.01
+      print("Param type: " .. params.conv1[1]:type())
+      print("Grad type: " .. grads.conv1[1]:type())
+      for iparam=1,2 do
+         params.conv1[iparam] = params.conv1[iparam] - grads.conv1[iparam] * 0.01
+         params.conv2[iparam] = params.conv2[iparam] - grads.conv2[iparam] * 0.01
+         params.linear[iparam] = params.linear[iparam] - grads.linear[iparam] * 0.01
       end
 
       -- Log performance:
