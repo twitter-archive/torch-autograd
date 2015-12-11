@@ -175,21 +175,18 @@ local tests = {
       end
 
       do
-         local lin = d.nn.Linear(100,10)
+         local lin
+         local params = {}
+         lin,params.lin = d.nn.Linear(100,10)
          local lsm = d.nn.LogSoftMax()
          local lossf = d.nn.ClassNLLCriterion()
 
          local f = function(params, x, y)
-            local h = lin(x, params.W, params.b)
+            local h = lin(params.lin, x)
             local yhat = lsm(h)
             local loss = lossf(yhat, y)
             return loss
          end
-
-         local params = {
-            W = tensor(10, 100):normal(.01),
-            b = tensor(10):zero(),
-         }
 
          -- force allocs
          local df = d(f)
@@ -309,24 +306,20 @@ local tests = {
       end
 
       do
-         local lin1 = d.nn.Linear(100,1000)
-         local tanh = d.nn.Tanh()
-         local lin2 = d.nn.Linear(1000,10)
-         local lsm = d.nn.LogSoftMax()
+         local lin1,tanh,lin2,lsm
+         local params = {}
+         lin1,params.lin1 = d.nn.Linear(100,1000)
+         tanh = d.nn.Tanh()
+         lin2,params.lin2 = d.nn.Linear(1000,10)
+         lsm = d.nn.LogSoftMax()
 
          local f = function(params, x, y)
-            local h1 = tanh( lin1(x, params.W1, params.b1) )
-            local h2 = lin2(h1, params.W2, params.b2)
+            local h1 = tanh( lin1(params.lin1, x) )
+            local h2 = lin2(params.lin2, h1)
             local yhat = lsm(h2)
             local loss = -torch.sum(torch.narrow(yhat, 1, y, 1))
             return loss
          end
-         local params = {
-            W1 = tensor(1000, 100):normal(.01),
-            b1 = tensor(1000):zero(),
-            W2 = tensor(10, 1000):normal(.01),
-            b2 = tensor(10):zero(),
-         }
 
          -- force allocs
          local df = d(f)
@@ -380,25 +373,21 @@ local tests = {
       end
 
       do
-         local lin1 = d.nn.Linear(100,1000)
-         local tanh = d.nn.Tanh()
-         local lin2 = d.nn.Linear(1000,10)
-         local lsm = d.nn.LogSoftMax()
-         local lossf = d.nn.ClassNLLCriterion()
+         local lin1, tanh, lin2, lsm, lossf
+         local params = {}
+         lin1,params.lin1 = d.nn.Linear(100,1000)
+         tanh = d.nn.Tanh()
+         lin2,params.lin2 = d.nn.Linear(1000,10)
+         lsm = d.nn.LogSoftMax()
+         lossf = d.nn.ClassNLLCriterion()
 
          local f = function(params, x, y)
-            local h1 = tanh( lin1(x, params.W1, params.b1) )
-            local h2 = lin2(h1, params.W2, params.b2)
+            local h1 = tanh( lin1(params.lin1, x) )
+            local h2 = lin2(params.lin2, h1)
             local yhat = lsm(h2)
             local loss = lossf(yhat, y)
             return loss
          end
-         local params = {
-            W1 = tensor(1000, 100):normal(.01),
-            b1 = tensor(1000):zero(),
-            W2 = tensor(10, 1000):normal(.01),
-            b2 = tensor(10):zero(),
-         }
 
          -- force allocs
          local df = d(f)
@@ -591,25 +580,21 @@ local tests = {
       end
 
       do
-         local lin1 = d.nn.Linear(1000,1000)
-         local tanh = d.nn.Tanh()
-         local lin2 = d.nn.Linear(1000,10)
-         local lsm = d.nn.LogSoftMax()
-         local lossf = d.nn.ClassNLLCriterion()
+         local lin1,tanh,lin2,lsm,lossf
+         local params = {}
+         lin1,params.lin1 = d.nn.Linear(1000,1000)
+         tanh = d.nn.Tanh()
+         lin2,params.lin2 = d.nn.Linear(1000,10)
+         lsm = d.nn.LogSoftMax()
+         lossf = d.nn.ClassNLLCriterion()
 
          local f = function(params, x, y)
-            local h1 = tanh( lin1(x, params.W1, params.b1) )
-            local h2 = lin2(h1, params.W2, params.b2)
+            local h1 = tanh( lin1(params.lin1, x) )
+            local h2 = lin2(params.lin2, h1)
             local yhat = lsm(h2)
             local loss = lossf(yhat, y)
             return loss
          end
-         local params = {
-            W1 = tensor(1000, 1000):normal(.01),
-            b1 = tensor(1000):normal(.01),
-            W2 = tensor(10, 1000):normal(.01),
-            b2 = tensor(10):normal(.01),
-         }
 
          -- force allocs
          local df = d(f)
@@ -664,33 +649,35 @@ local tests = {
       end
 
       do
-         local c1 = d.nn.SpatialConvolutionMM(3,16,5,5)
-         local t1 = d.nn.Tanh()
-         local m1 = d.nn.SpatialMaxPooling(2,2,2,2)
-         local c2 = d.nn.SpatialConvolutionMM(16,32,5,5)
-         local t2 = d.nn.Tanh()
-         local m2 = d.nn.SpatialMaxPooling(2,2,2,2)
-         local r = d.nn.Reshape(13*13*32)
-         local l3 = d.nn.Linear(13*13*32,10)
-         local lsm = d.nn.LogSoftMax()
-         local lossf = d.nn.ClassNLLCriterion()
+         local c1,t1,m1,c2,t2,m2,r,l3,lsm,lossf
+         local params = {}
+         c1,params.c1 = d.nn.SpatialConvolutionMM(3,16,5,5)
+         t1 = d.nn.Tanh()
+         m1 = d.nn.SpatialMaxPooling(2,2,2,2)
+         c2,params.c2 = d.nn.SpatialConvolutionMM(16,32,5,5)
+         t2 = d.nn.Tanh()
+         m2 = d.nn.SpatialMaxPooling(2,2,2,2)
+         r = d.nn.Reshape(13*13*32)
+         l3,params.l3 = d.nn.Linear(13*13*32,10)
+         lsm = d.nn.LogSoftMax()
+         lossf = d.nn.ClassNLLCriterion()
 
          local f = function(params, x, y)
-            local h1 = m1( t1( c1(x, params.W1, params.b1) ) )
-            local h2 = m2( t2( c2(h1, params.W2, params.b2) ) )
-            local h3 = l3(r(h2), params.W3, params.b3)
+            local h1 = m1( t1( c1(params.c1, x) ) )
+            local h2 = m2( t2( c2(params.c2, h1) ) )
+            local h3 = l3(params.l3, r(h2))
             local yhat = lsm(h3)
             local loss = lossf(yhat, y)
             return loss
          end
-         local params = {
-            W1 = tensor(16, 3*5*5):normal(.01),
-            b1 = tensor(16):zero(),
-            W2 = tensor(32, 16*5*5):normal(.01),
-            b2 = tensor(32):zero(),
-            W3 = tensor(10, 32*13*13):normal(.01),
-            b3 = tensor(10):zero(),
-         }
+         -- local params = {
+         --    W1 = tensor(16, 3*5*5):normal(.01),
+         --    b1 = tensor(16):zero(),
+         --    W2 = tensor(32, 16*5*5):normal(.01),
+         --    b2 = tensor(32):zero(),
+         --    W3 = tensor(10, 32*13*13):normal(.01),
+         --    b3 = tensor(10):zero(),
+         -- }
 
          -- force allocs
          local df = d(f)
@@ -812,23 +799,21 @@ local tests = {
       end
 
       do
-         local lstm1,params = d.model.RecurrentLSTMNetwork({
+         local lstm1
+         local params = {}
+         lstm1,params.lstm1 = d.model.RecurrentLSTMNetwork({
             inputFeatures = 100,
             hiddenFeatures = 200,
             outputType = 'last',
          })
-         local lin2 = d.nn.Linear(200,10)
-         local lsm = d.nn.LogSoftMax()
-         local lossf = d.nn.ClassNLLCriterion()
-
-         table.insert(params, {
-            W = tensor(10,200),
-            b = tensor(10),
-         })
+         local lin2,lsm,lossf
+         lin2,params.lin2 = d.nn.Linear(200,10)
+         lsm = d.nn.LogSoftMax()
+         lossf = d.nn.ClassNLLCriterion()
 
          local f = function(params, x, y)
-            local h1 = lstm1(params[1], x)
-            local h2 = lin2(h1, params[2].W, params[2].b)
+            local h1 = lstm1(params.lstm1, x)
+            local h2 = lin2(params.lin2, h1)
             local yhat = lsm(h2)
             local loss = lossf(yhat, y)
             return loss
@@ -898,23 +883,21 @@ local tests = {
       end
 
       do
-         local lstm1,params = d.model.RecurrentLSTMNetwork({
+         local lstm1
+         local params = {}
+         lstm1,params.lstm1 = d.model.RecurrentLSTMNetwork({
             inputFeatures = 100,
             hiddenFeatures = 200,
             outputType = 'last',
          })
-         local lin2 = d.nn.Linear(200,10)
-         local lsm = d.nn.LogSoftMax()
-         local lossf = d.nn.ClassNLLCriterion()
-
-         table.insert(params, {
-            W = tensor(10,200),
-            b = tensor(10),
-         })
+         local lin2, lsm, lossf
+         lin2,params.lin2 = d.nn.Linear(200,10)
+         lsm = d.nn.LogSoftMax()
+         lossf = d.nn.ClassNLLCriterion()
 
          local f = function(params, x, y)
-            local h1 = lstm1(params[1], x)
-            local h2 = lin2(h1, params[2].W, params[2].b)
+            local h1 = lstm1(params.lstm1, x)
+            local h2 = lin2(params.lin2, h1)
             local yhat = lsm(h2)
             local loss = lossf(yhat, y)
             return loss
