@@ -849,6 +849,7 @@ local tests = {
    end,
 
    NNFunc_Float = function()
+
       -- More complex model:
       local inputSize = 100
       local hiddenSize = 50
@@ -858,9 +859,9 @@ local tests = {
       local x = torch.FloatTensor(inputSize):normal()
 
       -- nn modules:
-      local linear1,pLinear1 = autograd.nn.Linear(inputSize, hiddenSize)
+      local linear1, pLinear1 = autograd.nn.Linear(inputSize, hiddenSize)
       local acts1 = autograd.nn.Tanh()
-      local linear2,pLinear2 = autograd.nn.Linear(hiddenSize, outputSize)
+      local linear2, pLinear2 = autograd.nn.Linear(hiddenSize, outputSize)
       local acts2 = autograd.nn.Tanh()
       params = {linear1 = pLinear1, linear2 = pLinear2, x = x}
 

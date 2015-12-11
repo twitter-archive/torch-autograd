@@ -185,8 +185,8 @@ local function wrapModuleWithParams(nnObject)
       local modelParams, modelGradParams = nnObject:parameters()
       for i,p in ipairs(modelParams) do
          if p ~= params[i] then
-            -- NOTE: casting params here
-            params[i] = params[i]:type(lastType)
+            -- NOTE: need a better error message
+            -- if there's a type mismatch
             p:view(params[i], params[i]:size())
          end
       end
@@ -197,18 +197,13 @@ local function wrapModuleWithParams(nnObject)
       -- NOTE: Is this necessary if it's done forward?
       nnObject, lastType = updateType(nnObject, lastType, getInputType(x))
       local modelParams, modelGradParams = nnObject:parameters()
-      print(getInputType(x))
-      print(modelParams[1]:type())
       for i,p in ipairs(modelParams) do
          if p ~= params[i] then
-            params[i] = params[i]:type(lastType)
             p:view(params[i], params[i]:size())
          end
       end
       nnObject:zeroGradParameters()
       local gradInput = nnObject:backward(x, g)
-      print("Grad type: " .. modelGradParams[1]:type())
-      print("Grad input: " .. gradInput:type())
       return {modelGradParams, gradInput}
    end
 

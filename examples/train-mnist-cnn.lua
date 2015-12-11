@@ -29,6 +29,9 @@ pool2, params.pool2 = grad.nn.SpatialMaxPooling(2, 2, 2, 2)
 flatten = grad.nn.Reshape(16*5*5)
 linear,params.linear = grad.nn.Linear(16*5*5, 10)
 
+-- Cast the parameters
+params = grad.util.cast(params, 'float')
+
 -- Define our network
 function predict(params, input, target)
    local h1 = pool1(acts1(conv1(params.conv1, reshape(input))))
@@ -61,12 +64,9 @@ for epoch = 1,100 do
       local y = torch.view(trainData.y[i], 1, 10)
 
       -- Grads:
-      print("Preparam type: " .. params.conv1[1]:type())
       local grads, loss, prediction = df(params,x,y)
 
       -- Update weights and biases
-      print("Param type: " .. params.conv1[1]:type())
-      print("Grad type: " .. grads.conv1[1]:type())
       for iparam=1,2 do
          params.conv1[iparam] = params.conv1[iparam] - grads.conv1[iparam] * 0.01
          params.conv2[iparam] = params.conv2[iparam] - grads.conv2[iparam] * 0.01
