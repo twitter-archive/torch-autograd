@@ -863,7 +863,10 @@ local tests = {
       local acts1 = autograd.nn.Tanh()
       local linear2, pLinear2 = autograd.nn.Linear(hiddenSize, outputSize)
       local acts2 = autograd.nn.Tanh()
-      params = {linear1 = pLinear1, linear2 = pLinear2, x = x}
+      params = autograd.util.cast({
+         linear1 = pLinear1, 
+         linear2 = pLinear2, 
+         x = x}, "float")
 
       -- nn version:
       local function mlp(params)
