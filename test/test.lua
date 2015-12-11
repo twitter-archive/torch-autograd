@@ -736,23 +736,21 @@ local tests = {
       -- Tested params:
       local inputSize = 100
       local outputSize = 50
-      local W = torch.Tensor(outputSize,inputSize):normal()
-      local b = torch.Tensor(outputSize):normal()
       local x = torch.Tensor(inputSize):normal()
-      local params = {W=W, b=b, x=x}
 
       -- nn modules:
-      local linear1 = autograd.nn.Linear(inputSize, outputSize)
+      local linear1, linearParams = autograd.nn.Linear(inputSize, outputSize)
+      params = {linearParams=linearParams, x=x}
 
       -- nn version:
       local function f_nn(params)
-         local funcout = linear1(params.x, params.W, params.b)
+         local funcout = linear1(params.linearParams, params.x)
          return torch.sum(funcout)
       end
 
       -- autograd version:
       local function f_autograd(params)
-         return torch.sum(params.W * params.x + params.b)
+         return torch.sum(params.linearParams[1] * params.x + params.linearParams[2])
       end
 
       -- Get the NN predictions
@@ -766,13 +764,13 @@ local tests = {
       local grad_autograd = g_autograd(params)
 
       -- Check
-      tester:asserteq((grad_nn.W-grad_autograd.W):abs():max(), 0, "Incorrect gradients")
+      tester:asserteq((grad_nn.linearParams[1]-grad_autograd.linearParams[1]):abs():max(), 0, "Incorrect gradients")
       tester:asserteq((grad_nn.x-grad_autograd.x):abs():max(), 0, "Incorrect gradients")
 
       -- Run a 2nd time - gradients should get recomputed:
-      W:normal()
-      b:normal()
-      x:normal()
+      params.linearParams[1]:normal()
+      params.linearParams[2]:normal()
+      params.x:normal()
 
       -- Get the NN predictions
       local pred_nn = f_nn(params)
@@ -785,7 +783,7 @@ local tests = {
       local grad_autograd = g_autograd(params)
 
       -- Check
-      tester:asserteq((grad_nn.W-grad_autograd.W):abs():max(), 0, "Incorrect gradients")
+      tester:asserteq((grad_nn.linearParams[1]-grad_autograd.linearParams[1]):abs():max(), 0, "Incorrect gradients")
       tester:asserteq((grad_nn.x-grad_autograd.x):abs():max(), 0, "Incorrect gradients")
    end,
 
@@ -795,24 +793,21 @@ local tests = {
       local hiddenSize = 50
       local outputSize = 10
 
-      -- Trainable parameters:
-      local x = torch.Tensor(inputSize):normal()
-      local W1 = torch.Tensor(hiddenSize,inputSize):normal()
-      local b1 = torch.Tensor(hiddenSize):normal()
-      local W2 = torch.Tensor(outputSize,hiddenSize):normal()
-      local b2 = torch.Tensor(outputSize):normal()
-      local params = {W1=W1, b1=b1, W2=W2, b2=b2, x=x}
+      -- nn modules and their parameters:
+      local params = {}
+      local linear1, linear2, acts1, acts2
+      linear1, params.linear1 = autograd.nn.Linear(inputSize, hiddenSize)
+      acts1 = autograd.nn.Tanh()
+      linear2,params.linear2 = autograd.nn.Linear(hiddenSize, outputSize)
+      acts2 = autograd.nn.Tanh()
 
-      -- nn modules:
-      local linear1 = autograd.nn.Linear(inputSize, hiddenSize)
-      local acts1 = autograd.nn.Tanh()
-      local linear2 = autograd.nn.Linear(hiddenSize, outputSize)
-      local acts2 = autograd.nn.Tanh()
+      -- input data
+      params.x = torch.Tensor(inputSize):normal()
 
       -- nn version:
       local function mlp(params)
-         local h1 = acts1(linear1(params.x, params.W1, params.b1))
-         local h2 = acts2(linear2(h1, params.W2, params.b2))
+         local h1 = acts1(linear1(params.linear1, params.x))
+         local h2 = acts2(linear2(params.linear2, h1))
          local o = torch.sum(h2)
          return o
       end
@@ -826,25 +821,21 @@ local tests = {
    end,
 
    NNFunc_CNN = function()
-      -- Trainable parameters:
-      local x = torch.Tensor(3, 8, 8):normal()
-      local W1 = torch.Tensor(16, 3*3*3):normal()
-      local b1 = torch.Tensor(16):normal()
-      local W2 = torch.Tensor(10, 16*8*8):normal()
-      local b2 = torch.Tensor(10):normal()
-      local params = {W1=W1, b1=b1, W2=W2, b2=b2, x=x}
+      -- Start params with input data:
+      local params = {x=torch.Tensor(3, 8, 8):normal()}
 
       -- nn modules:
-      local conv1 = autograd.nn.SpatialConvolutionMM(3, 16, 3, 3, 1, 1, 1, 1)
-      local acts1 = autograd.nn.Tanh()
-      local flatten = autograd.nn.Reshape(16*8*8)
-      local linear2 = autograd.nn.Linear(16*8*8, 10)
-      local acts2 = autograd.nn.Tanh()
+      local conv1, acts1, flatten, linear2, acts2
+      conv1,params.conv1 = autograd.nn.SpatialConvolutionMM(3, 16, 3, 3, 1, 1, 1, 1)
+      acts1 = autograd.nn.Tanh()
+      flatten = autograd.nn.Reshape(16*8*8)
+      linear2, params.linear2 = autograd.nn.Linear(16*8*8, 10)
+      acts2 = autograd.nn.Tanh()
 
       -- nn version:
       local function cnn(params)
-         local h1 = acts1(conv1(params.x, params.W1, params.b1))
-         local h2 = acts2(linear2(flatten(h1), params.W2, params.b2))
+         local h1 = acts1(conv1(params.conv1, params.x))
+         local h2 = acts2(linear2(params.linear2, flatten(h1)))
          local o = torch.sum(h2)
          return o
       end
@@ -863,30 +854,20 @@ local tests = {
       local hiddenSize = 50
       local outputSize = 10
 
-      -- Trainable parameters:
+      -- Input data
       local x = torch.FloatTensor(inputSize):normal()
-      -- local W1 = torch.FloatTensor(hiddenSize,inputSize):normal()
-      -- local b1 = torch.FloatTensor(hiddenSize):normal()
-      -- local W2 = torch.FloatTensor(outputSize,hiddenSize):normal()
-      -- local b2 = torch.FloatTensor(outputSize):normal()
-      -- local params = {W1=W1, b1=b1, W2=W2, b2=b2, x=x}
-      -- local params = {}
 
       -- nn modules:
       local linear1,pLinear1 = autograd.nn.Linear(inputSize, hiddenSize)
       local acts1 = autograd.nn.Tanh()
-
-      print(linear1(pLinear1, x))
-      os.exit()
-
       local linear2,pLinear2 = autograd.nn.Linear(hiddenSize, outputSize)
       local acts2 = autograd.nn.Tanh()
-      params = {linear1 = pLinear1, linear2 = pLinear2}
+      params = {linear1 = pLinear1, linear2 = pLinear2, x = x}
 
       -- nn version:
       local function mlp(params)
          local h1 = acts1(linear1(params.linear1, params.x))
-         local h2 = acts2(linear2(params.linear2,params.x))
+         local h2 = acts2(linear2(params.linear2,h1))
          local o = torch.sum(h2)
          return o
       end
@@ -896,10 +877,10 @@ local tests = {
       local pred = mlp(params)
 
       -- Check grads:
-      tester:asserteq(torch.typename(grads.W1), 'torch.FloatTensor', 'incorrect type')
-      tester:asserteq(torch.typename(grads.W2), 'torch.FloatTensor', 'incorrect type')
-      tester:asserteq(torch.typename(grads.b1), 'torch.FloatTensor', 'incorrect type')
-      tester:asserteq(torch.typename(grads.b2), 'torch.FloatTensor', 'incorrect type')
+      tester:asserteq(torch.typename(grads.linear1[1]), 'torch.FloatTensor', 'incorrect type')
+      tester:asserteq(torch.typename(grads.linear1[2]), 'torch.FloatTensor', 'incorrect type')
+      tester:asserteq(torch.typename(grads.linear2[1]), 'torch.FloatTensor', 'incorrect type')
+      tester:asserteq(torch.typename(grads.linear2[2]), 'torch.FloatTensor', 'incorrect type')
    end,
 
    NNFunc_DynamicWrap = function()
@@ -1322,8 +1303,8 @@ local function prefixTests(pf, t, skip)
 end
 
 -- Run tests:
-autograd.optimize(true)
-tester:add(prefixTests("Optimized_", tests, { })):run()
+-- autograd.optimize(true)
+-- tester:add(prefixTests("Optimized_", tests, { })):run()
 autograd.optimize(false)
 tester = totem.Tester()
 tester:add(prefixTests("Direct_", tests, { AutoModule = true, DebuggerDivZero = true })):run()

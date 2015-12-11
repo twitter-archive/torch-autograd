@@ -38,7 +38,8 @@ local function isModule(nnObject)
    if mt then
       local mmt = getmetatable(mt)
       if mmt then
-         if mmt.__typename == "nn.Module" then
+         local t = mmt.__typename
+         if t == "nn.Module" or t == "nn.Sequential" or t == "nn.Container" then
             isModule = true
          end
       end
@@ -60,7 +61,7 @@ end
 
 local function updateType(nnObject, lastType, newType)
    if not newType then
-      error("Input is neither a tensor or a table of tensors")
+      error("Input is neither a tensor or a table of tensors. Type is " .. type(newType))
    end
    if lastType ~= newType then
       lastType = newType
@@ -180,9 +181,12 @@ local function wrapModuleWithParams(nnObject)
    local params = nnObject:parameters()
    local function forward(params,x)
       nnObject, lastType = updateType(nnObject, lastType, getInputType(x))
+
       local modelParams, modelGradParams = nnObject:parameters()
       for i,p in ipairs(modelParams) do
          if p ~= params[i] then
+            -- NOTE: casting params here
+            params[i] = params[i]:type(lastType)
             p:view(params[i], params[i]:size())
          end
       end
@@ -192,9 +196,10 @@ local function wrapModuleWithParams(nnObject)
    local function backward(g,params,x)
       -- NOTE: Is this necessary if it's done forward?
       nnObject, lastType = updateType(nnObject, lastType, getInputType(x))
+      local modelParams, modelGradParams = nnObject:parameters()
       for i,p in ipairs(modelParams) do
          if p ~= params[i] then
-            p:view(params[i], params[i]:size())
+            p:view(params[i]:type(lastType), params[i]:size())
          end
       end
       nnObject:zeroGradParameters()
