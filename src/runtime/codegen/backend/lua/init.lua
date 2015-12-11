@@ -204,7 +204,7 @@ local function flattenAnswer(val)
    end
 end
 
-local function createSymbolTable(graph, execOrder, params, tensorPool, tensorLocals)
+local function createSymbolTable(graph, execOrder, aliases, params, tensorPool, tensorLocals)
    -- Assign symbols to params, inputs, outputs.
    local symbols = { }
    local undefined = { }
@@ -240,7 +240,8 @@ local function createSymbolTable(graph, execOrder, params, tensorPool, tensorLoc
    -- Exact matches first.
    for i = 1, #execOrder do
       local node = execOrder[i]
-      if #node.outputs == 1 then
+      if aliases[node] ~= nil then
+      elseif #node.outputs == 1 then
          local output = node.outputs[1]
          if node.outputs[1].type == Value.TENSOR then
             if canReuseOutput(node) then
@@ -360,6 +361,15 @@ local function createSymbolTable(graph, execOrder, params, tensorPool, tensorLoc
          symbols[output.source] = "rlocals[" .. tensorIdx .. "]"
       end
    end
+
+   -- Map aliased outputs.
+   for node, aliasNode in pairs(aliases) do
+      if not symbols[aliasNode.outputs[1].source] then
+         error("invalid node alias")
+      end
+      symbols[node.outputs[1].source] = symbols[aliasNode.outputs[1].source]
+   end
+
    return symbols, undefined, constants, tensorPoolViews
 end
 
@@ -399,6 +409,54 @@ local function changeToReuseFunctions(execOrder)
    end
 end
 
+local function aliasFreeTensors(execOrder, aliases)
+   local availableTensorMap = { }
+   local availableCount = 0
+   local refCounts = { }
+   local freeTensors = { }
+   for i = 1, #execOrder do
+      local node = execOrder[i]
+      if canReuseOutput(node) then
+         refCounts[node.outputs[1]] = #node.outputTargets[1]
+         if aliases[node] == nil then
+            if availableCount > 0 then
+               local sig = tensorSig(node.outputs[1]:get())
+               local matchingList = availableTensorMap[sig]
+               if matchingList ~= nil and #matchingList > 0 then
+                  local aliasInput = table.remove(matchingList, #matchingList)
+                  local target = aliasInput.source:getRoot().node
+                  if aliases[target] ~= nil then
+                     aliases[node] = aliases[target]
+                  else
+                     aliases[node] = target
+                  end
+                  availableCount = availableCount - 1
+               end
+            end
+         end
+      end
+      for k = 1, #node.inputs do
+         local input = node.inputs[k]
+         if input.type == Value.TENSOR then
+            local refCount = refCounts[input]
+            if refCount ~= nil then
+               refCounts[input] = refCount - 1
+               if refCount == 1 then
+                  local sig = tensorSig(input:get())
+                  local list = availableTensorMap[sig]
+                  if list == nil then
+                     list = { }
+                     availableTensorMap[sig] = list
+                  end
+                  list[#list + 1] = input
+                  availableCount = availableCount + 1
+               end
+            end
+         end
+      end
+   end
+end
+
 local function generateCode(graph, opt)
    local optimize = opt.optimize or true
    local withForward = util.defaultBool(opt.withForward, true)
@@ -410,7 +468,11 @@ local function generateCode(graph, opt)
    local execOrder, outputNodes = graph:walkExecutionOrder(withForward, withGradients)
    changeToReuseFunctions(execOrder)
    local params = collectParams(graph.params)
-   local symbols, undefined, constants, tensorPoolViews = createSymbolTable(graph, execOrder, params, tensorPool, tensorLocals)
+   local aliases = { }
+   if opt.reduceFootprint then
+      aliasFreeTensors(execOrder, aliases)
+   end
+   local symbols, undefined, constants, tensorPoolViews = createSymbolTable(graph, execOrder, aliases, params, tensorPool, tensorLocals)
    local objects = collectObjects(execOrder)
 
    local out = StringBuilder()
