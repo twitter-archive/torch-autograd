@@ -180,6 +180,7 @@ local tests = {
          lin,params.lin = d.nn.Linear(100,10)
          local lsm = d.nn.LogSoftMax()
          local lossf = d.nn.ClassNLLCriterion()
+         params = d.util.cast(params, ttype)
 
          local f = function(params, x, y)
             local h = lin(params.lin, x)
@@ -312,6 +313,7 @@ local tests = {
          tanh = d.nn.Tanh()
          lin2,params.lin2 = d.nn.Linear(1000,10)
          lsm = d.nn.LogSoftMax()
+         params = d.util.cast(params, ttype)
 
          local f = function(params, x, y)
             local h1 = tanh( lin1(params.lin1, x) )
@@ -380,6 +382,7 @@ local tests = {
          lin2,params.lin2 = d.nn.Linear(1000,10)
          lsm = d.nn.LogSoftMax()
          lossf = d.nn.ClassNLLCriterion()
+         params = d.util.cast(params, ttype)
 
          local f = function(params, x, y)
             local h1 = tanh( lin1(params.lin1, x) )
@@ -587,6 +590,7 @@ local tests = {
          lin2,params.lin2 = d.nn.Linear(1000,10)
          lsm = d.nn.LogSoftMax()
          lossf = d.nn.ClassNLLCriterion()
+         params = d.util.cast(params, ttype)
 
          local f = function(params, x, y)
             local h1 = tanh( lin1(params.lin1, x) )
@@ -661,6 +665,7 @@ local tests = {
          l3,params.l3 = d.nn.Linear(13*13*32,10)
          lsm = d.nn.LogSoftMax()
          lossf = d.nn.ClassNLLCriterion()
+         params = d.util.cast(params, ttype)
 
          local f = function(params, x, y)
             local h1 = m1( t1( c1(params.c1, x) ) )
@@ -894,6 +899,7 @@ local tests = {
          lin2,params.lin2 = d.nn.Linear(200,10)
          lsm = d.nn.LogSoftMax()
          lossf = d.nn.ClassNLLCriterion()
+         params = d.util.cast(params, ttype)
 
          local f = function(params, x, y)
             local h1 = lstm1(params.lstm1, x)
