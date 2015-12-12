@@ -29,7 +29,7 @@ local function grad(fn, gradOpt)
    opt.withForward = util.defaultBool(opt.withForward, true)
    opt.withGradients = util.defaultBool(opt.withGradients, true)
    opt.partialGrad = util.defaultBool(opt.partialGrad, false)
-   if optimize then
+   if opt.optimize then
       return RuntimeCodegen.create(fn, opt)
    else
       return RuntimeDirect.create(fn, opt)
