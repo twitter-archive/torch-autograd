@@ -405,7 +405,7 @@ overload.module("torch", torch, function(module)
    })
    module.gradient("transpose", {
       function(g, ans, x, d1, d2)
-         return torch.t(g, d1, d2)
+         return torch.transpose(g, d1, d2)
       end,
       function(g, ans, x, d1, d2)
          return nil
