@@ -42,7 +42,11 @@ torch.isSameSizeAs = function(A, B)
    return A:isSameSizeAs(B)
 end
 
-torch.transpose = function(A)
+torch.transpose = function(A, d1, d2)
+   return A:transpose(d1,d2)
+end
+
+torch.t = function(A)
    return A:t()
 end
 

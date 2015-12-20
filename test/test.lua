@@ -274,7 +274,7 @@ local tests = {
 
    Transpose = function()
       local fn = function(inputs)
-         return torch.sum(torch.transpose(inputs.x))
+         return torch.sum(torch.t(inputs.x))
       end
 
       -- Check grads:
