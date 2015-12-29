@@ -38,7 +38,13 @@ local function isModule(nnObject)
    if mt then
       local mmt = getmetatable(mt)
       if mmt then
-         local t = mmt.__typename
+         local t
+         local mmmt = getmetatable(mmt)
+         if mmmt then
+            t = mmmt.__typename
+         else
+            t = mmt.__typename
+         end
          if t == "nn.Module" or t == "nn.Sequential" or t == "nn.Container" or t == "nn.Threshold" then
             isModule = true
          end
@@ -281,6 +287,7 @@ functionalizePackage = function(packageName)
       -- Iterate through every module in the package,
       -- and functionalize it
       local map = {}
+
       for modName, nnClass in pairs(mod) do
          if isModule(nnClass) or isCriterion(nnClass) then
             map[modName] = function(...)

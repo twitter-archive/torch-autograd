@@ -1,6 +1,11 @@
 local sequence = require 'autograd.model.common'.sequence
-local nn = require('autograd.main').nn
-hasCudnn, cudnn = pcall(require, 'cudnn')
+local hasCudnn, cudnn = pcall(require, 'cudnn')
+local functionalize = require('autograd.nnwrapper').functionalize
+local cast = require('autograd.util').cast
+if hasCudnn then
+   cudnn = functionalize('cudnn')
+end
+local nn = functionalize('nn')
 
 local function NeuralLayer(opt, params, layers, layer2params)
    -- options:
@@ -20,7 +25,7 @@ local function NeuralLayer(opt, params, layers, layer2params)
    -- Dropout
    --------------------------------------
    if dropoutProb > 0 then
-      table.insert(layers, nn.SpatialDropout(dropoutProb) )
+      table.insert(layers, nn.Dropout(dropoutProb) )
    end
 
    -- Fully-connected layer
@@ -33,7 +38,7 @@ local function NeuralLayer(opt, params, layers, layer2params)
    -- Batch normalization
    --------------------------------------
    if batchNormalization then
-      local l,p = nn.SpatialBatchNormalization(outputFeatures)
+      local l,p = nn.BatchNormalization(outputFeatures)
       table.insert(layers, l)
       table.insert(params, p)
       layer2params[#layers] = #params
@@ -42,7 +47,13 @@ local function NeuralLayer(opt, params, layers, layer2params)
    -- Activations
    --------------------------------------
    if opt.activations then
-      table.insert(layers, nn[activations]())
+      local activation
+      if hasCudnn and cuda then
+         activation = cudnn[activations]()
+      else
+         activation = nn[activations]()
+      end
+      table.insert(layers, activation)
    end
 
    -- layers
@@ -84,6 +95,12 @@ return function(opt, params, layers, layer2params)
          cuda = cuda,
       }, params, layers, layer2params)
       inputFeatures = hiddens
+   end
+
+   -- Type cast, if CUDA
+   --------------------------------------
+   if cuda then
+      params = cast(params, "cuda")
    end
 
    -- layers
