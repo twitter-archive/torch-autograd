@@ -1,6 +1,6 @@
 local isTensor = torch.isTensor
 local overload = require 'autograd.overload'
-local DirectNode = require 'autograd.direct.DirectNode'
+local DirectNode = require 'autograd.runtime.direct.DirectNode'
 
 local DirectTape = { }
 

@@ -1,5 +1,5 @@
 local Value = require 'autograd.runtime.codegen.Value'
-local DirectNode = require 'autograd.direct.DirectNode'
+local DirectNode = require 'autograd.runtime.direct.DirectNode'
 local util = require 'autograd.util'
 local overload = require 'autograd.overload'
 
@@ -151,12 +151,12 @@ operators.mul = {
          end
       else
          return B * g
-      end   
+      end
    end,
    function(g, ans, A, B)
       local isTensorA = torch.isTensor(A)
       local isTensorB = torch.isTensor(B)
-      
+
       if not isTensorB and isTensorA then
          return torch.sum(elemwiseMul(g, A))
       elseif isTensorA and torch.nDimension(A) == 2 then
