@@ -1313,7 +1313,7 @@ local tests = {
       local params = { W = torch.randn(5,5) }
       -- this line should not raise an error
       local grads, loss = df(params)
-	  tester:assert(gradcheck(f, {W=params.W}), 'incorrect gradients')
+      tester:assert(gradcheck(f, {W=params.W}), 'incorrect gradients')
    end,
 }
 
