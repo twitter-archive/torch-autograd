@@ -1304,6 +1304,17 @@ local tests = {
       tester:assert(gradcheck(f, input, target), 'incorrect gradients')
    end,
 
+   ScalarMul = function()
+      -- Tests that functions that use scalar multiply do not cause an error
+      function f(params)
+        return torch.sum(params.W) * 0.4
+      end
+      local df = autograd(f)
+      local params = { W = torch.randn(5,5) }
+      -- this line should not raise an error
+      local grads, loss = df(params)
+      tester:assert(gradcheck(f, {W=params.W}), 'incorrect gradients')
+   end,
 }
 
 local function prefixTests(pf, t, skip)
