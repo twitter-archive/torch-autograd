@@ -139,7 +139,7 @@ operators.mul = {
       local isTensorA = torch.isTensor(A)
       local isTensorB = torch.isTensor(B)
 
-      if not isTensorA then
+      if not isTensorA and isTensorB then
          return torch.sum(elemwiseMul(g, B))
       elseif isTensorB and torch.nDimension(B) == 2 then
          return g * torch.transpose(B)
@@ -157,7 +157,7 @@ operators.mul = {
       local isTensorA = torch.isTensor(A)
       local isTensorB = torch.isTensor(B)
       
-      if not isTensorB then
+      if not isTensorB and isTensorA then
          return torch.sum(elemwiseMul(g, A))
       elseif isTensorA and torch.nDimension(A) == 2 then
          return torch.transpose(A) * g
