@@ -142,7 +142,7 @@ operators.mul = {
       if not isTensorA and isTensorB then
          return torch.sum(elemwiseMul(g, B))
       elseif isTensorB and torch.nDimension(B) == 2 then
-         return g * torch.transpose(B)
+         return g * torch.t(B)
       elseif isTensorA and torch.nDimension(A) == 2 then
          if not isTensorB then
             return elemwiseMul(g, B)
@@ -160,7 +160,7 @@ operators.mul = {
       if not isTensorB and isTensorA then
          return torch.sum(elemwiseMul(g, A))
       elseif isTensorA and torch.nDimension(A) == 2 then
-         return torch.transpose(A) * g
+         return torch.t(A) * g
       elseif isTensorB and torch.nDimension(B) == 2 then
          if not isTensorA then
             return elemwiseMul(g, A)
@@ -242,10 +242,10 @@ overload.module("torch", torch, function(module)
    module.gradient("ger", {
       -- Only takes 1D vectors as input
       function(g, ans, x, y) return g * y end,
-      function(g, ans, x, y) return torch.transpose(g) * x end
+      function(g, ans, x, y) return torch.t(g) * x end
    })
    module.gradient("inverse", {
-      function(g, ans, x) return -((torch.transpose(ans) * g) * torch.transpose(ans)) end,
+      function(g, ans, x) return -((torch.t(ans) * g) * torch.t(ans)) end,
    })
    module.gradient("exp", {
       function(g, ans, x) return elemwiseMul(ans, g) end,
@@ -413,9 +413,20 @@ overload.module("torch", torch, function(module)
       end
    })
    module.gradient("transpose", {
-      function(g, ans, x)
-         return torch.transpose(g)
+      function(g, ans, x, d1, d2)
+         return torch.transpose(g, d1, d2)
+      end,
+      function(g, ans, x, d1, d2)
+         return nil
+      end,
+      function(g, ans, x, d1, d2)
+         return nil
       end
+   })
+   module.gradient("t", {
+      function(g, ans, x)
+         return torch.t(g)
+      end,
    })
    module.gradient("long", {
       function(g, ans, x)

@@ -1,6 +1,11 @@
 local sequence = require 'autograd.model.common'.sequence
-
-local nn = require('autograd.main').nn
+local hasCudnn, cudnn = pcall(require, 'cudnn')
+local functionalize = require('autograd.nnwrapper').functionalize
+local cast = require('autograd.util').cast
+if hasCudnn then
+   cudnn = functionalize('cudnn')
+end
+local nn = functionalize('nn')
 
 local function SpatialLayer(opt, params, layers, layer2params)
    -- options:
@@ -14,42 +19,61 @@ local function SpatialLayer(opt, params, layers, layer2params)
    local activations = opt.activations
    local pooling = opt.pooling or 1
    local inputStride = opt.inputStride or 1
+   local cuda = opt.cuda or false
+
+   -- Set up modules
+   local SpatialConvolution = nn.SpatialConvolutionMM
+   local SpatialMaxPooling = nn.SpatialMaxPooling
+   if cuda and hasCudnn then
+      SpatialConvolution = cudnn.SpatialConvolution
+      SpatialMaxPooling = cudnn.SpatialMaxPooling
+   end
 
    -- container
    layers = layers or {}
    params = params or {}
    layer2params = layer2params or {}
 
-   -- stack modules:
+   -- Dropout
+   --------------------------------------
    if dropoutProb > 0 then
       table.insert(layers, nn.SpatialDropout(dropoutProb) )
    end
-   table.insert(layers, nn.SpatialConvolutionMM(inputFeatures, outputFeatures, kernelSize, kernelSize, inputStride, inputStride, padding, padding) )
-   do
-      table.insert(params, {
-         W = torch.zeros(outputFeatures, inputFeatures*kernelSize*kernelSize),
-         b = torch.zeros(outputFeatures),
-      })
+
+   -- Convolution
+   --------------------------------------
+   local l,p = SpatialConvolution(inputFeatures, outputFeatures, kernelSize, kernelSize, inputStride, inputStride, padding, padding)
+   table.insert(layers, l)
+   table.insert(params, p)
+   layer2params[#layers] = #params
+
+   -- Batch normalization
+   --------------------------------------
+   if batchNormalization then
+      local l,p = nn.SpatialBatchNormalization(outputFeatures)
+      table.insert(layers, l)
+      table.insert(params, p)
       layer2params[#layers] = #params
    end
-   if batchNormalization then
-      table.insert(layers, nn.SpatialBatchNormalization(outputFeatures) )
-      do
-         table.insert(params, {
-            W = torch.zeros(outputFeatures),
-            b = torch.zeros(outputFeatures),
-         })
-         layer2params[#layers] = #params
-      end
-   end
+
+   -- Activations
+   --------------------------------------
    if opt.activations then
-      table.insert(layers, nn[activations]())
-   end
-   if pooling > 1 then
-      table.insert(layers, nn.SpatialMaxPooling(pooling, pooling) )
+      local activation
+      if hasCudnn and cuda then
+         activation = cudnn[activations]()
+      else
+         activation = nn[activations]()
+      end
+      table.insert(layers, activation)
    end
 
-   -- layers
+   -- Pooling
+   --------------------------------------
+   if pooling > 1 then
+      table.insert(layers, SpatialMaxPooling(pooling, pooling))
+   end
+
    return sequence(layers, layer2params), params, layers
 end
 
@@ -66,6 +90,7 @@ return function(opt, params, layers, layer2params)
    local activations = opt.activations or 'ReLU'
    local poolings = opt.poolings or {1,1,1}
    local inputStride = opt.inputStride or 1
+   local cuda = opt.cuda or false
 
    -- container
    layers = layers or {}
@@ -89,6 +114,13 @@ return function(opt, params, layers, layer2params)
       inputFeatures = hiddens
       inputStride = 1
    end
+
+   -- Type cast, if CUDA
+   --------------------------------------
+   if cuda then
+      params = cast(params, "cuda")
+   end
+
 
    -- layers
    return sequence(layers, layer2params), params, layers

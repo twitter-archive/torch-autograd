@@ -1,6 +1,11 @@
 local sequence = require 'autograd.model.common'.sequence
-
-local nn = require('autograd.main').nn
+local hasCudnn, cudnn = pcall(require, 'cudnn')
+local functionalize = require('autograd.nnwrapper').functionalize
+local cast = require('autograd.util').cast
+if hasCudnn then
+   cudnn = functionalize('cudnn')
+end
+local nn = functionalize('nn')
 
 local function NeuralLayer(opt, params, layers, layer2params)
    -- options:
@@ -10,38 +15,45 @@ local function NeuralLayer(opt, params, layers, layer2params)
    local batchNormalization = opt.batchNormalization or false
    local dropoutProb = opt.dropoutProb or 0
    local activations = opt.activations
+   local cuda = opt.cuda or false
 
    -- container
    layers = layers or {}
    params = params or {}
    layer2params = layer2params or {}
 
-   -- dropout:
+   -- Dropout
+   --------------------------------------
    if dropoutProb > 0 then
-      table.insert(layers, nn.Dropout(dropoutProb))
+      table.insert(layers, nn.Dropout(dropoutProb) )
    end
 
-   -- linear layer:
-   table.insert(layers, nn.Linear(inputFeatures, outputFeatures))
-   table.insert(params, {
-      W = torch.zeros(outputFeatures, inputFeatures),
-      b = torch.zeros(outputFeatures),
-   })
+   -- Fully-connected layer
+   --------------------------------------
+   local l,p = nn.Linear(inputFeatures, outputFeatures)
+   table.insert(layers, l)
+   table.insert(params, p)
    layer2params[#layers] = #params
 
-   -- batch normalization:
+   -- Batch normalization
+   --------------------------------------
    if batchNormalization then
-      table.insert(layers, nn.BatchNormalization(outputFeatures))
-      table.insert(params, {
-         W = torch.zeros(outputFeatures),
-         b = torch.zeros(outputFeatures),
-      })
+      local l,p = nn.BatchNormalization(outputFeatures)
+      table.insert(layers, l)
+      table.insert(params, p)
       layer2params[#layers] = #params
    end
 
-   -- activations:
+   -- Activations
+   --------------------------------------
    if opt.activations then
-      table.insert(layers, nn[activations]())
+      local activation
+      if hasCudnn and cuda then
+         activation = cudnn[activations]()
+      else
+         activation = nn[activations]()
+      end
+      table.insert(layers, activation)
    end
 
    -- layers
@@ -58,6 +70,7 @@ return function(opt, params, layers, layer2params)
    local dropoutProbs = opt.dropoutProbs or {}
    local activations = opt.activations or 'ReLU'
    local classifier = opt.classifier or false
+   local cuda = opt.cuda or false
 
    -- container
    layers = layers or {}
@@ -79,8 +92,15 @@ return function(opt, params, layers, layer2params)
          dropoutProb = dropoutProbs[i] or dropoutProb,
          activations = activations,
          batchNormalization = batchNormalization,
+         cuda = cuda,
       }, params, layers, layer2params)
       inputFeatures = hiddens
+   end
+
+   -- Type cast, if CUDA
+   --------------------------------------
+   if cuda then
+      params = cast(params, "cuda")
    end
 
    -- layers

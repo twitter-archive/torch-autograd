@@ -1,6 +1,29 @@
 -- Utilities
 local util = {}
 
+local cast
+function cast(tableOfParams, typeName)
+   -- Some nice aliases
+   if typeName == "float" then typeName = "torch.FloatTensor" end
+   if typeName == "double" then typeName = "torch.DoubleTensor" end
+   if typeName == "cuda" then typeName = "torch.CudaTensor" end
+
+   -- Recursively cast
+   local out = {}
+   for key,value in pairs(tableOfParams) do
+      if torch.isTensor(value) then
+         out[key] = value:type(typeName)
+      elseif type(value) == "table" then
+         out[key] = cast(value,typeName)
+      else
+         out[key] = value
+      end
+   end
+   return out
+end
+
+util.cast = cast
+
 function util.oneHot(labels, n)
    --[[
    Assume labels is a 1D tensor of contiguous class IDs, starting at 1.

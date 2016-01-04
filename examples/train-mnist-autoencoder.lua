@@ -26,9 +26,9 @@ function predict(params, input)
    local h2 = util.sigmoid(h1 * params.W[2] + torch.expand(params.B[2], torch.size(input, 1), torch.size(params.B[2], 2)))
    local h3 = util.sigmoid(h2 * params.W[3] + torch.expand(params.B[3], torch.size(input, 1), torch.size(params.B[3], 2)))
    -- Decoder
-   local h4 = util.sigmoid(h3 * torch.transpose(params.W[3]) + torch.expand(params.B[4], torch.size(input, 1), torch.size(params.B[4], 2)))
-   local h5 = util.sigmoid(h4 * torch.transpose(params.W[2]) + torch.expand(params.B[5], torch.size(input, 1), torch.size(params.B[5], 2)))
-   local out = util.sigmoid(h5 * torch.transpose(params.W[1]) + torch.expand(params.B[6], torch.size(input, 1), torch.size(params.B[6], 2)))
+   local h4 = util.sigmoid(h3 * torch.t(params.W[3]) + torch.expand(params.B[4], torch.size(input, 1), torch.size(params.B[4], 2)))
+   local h5 = util.sigmoid(h4 * torch.t(params.W[2]) + torch.expand(params.B[5], torch.size(input, 1), torch.size(params.B[5], 2)))
+   local out = util.sigmoid(h5 * torch.t(params.W[1]) + torch.expand(params.B[6], torch.size(input, 1), torch.size(params.B[6], 2)))
 
    return out
 end
