@@ -1,5 +1,6 @@
 local sequence = require 'autograd.model.common'.sequence
 local hasCudnn, cudnn = pcall(require, 'cudnn')
+hasCudnn = hasCudnn and cudnn
 local functionalize = require('autograd.nnwrapper').functionalize
 local cast = require('autograd.util').cast
 if hasCudnn then
