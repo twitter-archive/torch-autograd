@@ -46,10 +46,29 @@ local function generateFn(fn, args, opt)
    return LuaBackend.generateFn(graph, opt)
 end
 
+local function copyStableTensors(retValues, stableGrads)
+   for k, sv in pairs(stableGrads) do
+      local rv = retValues[k]
+      if type(rv) ~= type(sv) then
+         error("mismatched types in stable tensor copy")
+      end
+      if torch.isTensor(rv) and rv ~= sv then
+         if not torch.isSameSizeAs(rv, sv) then
+            error("mismatched tensor size in stable tensor copy")
+         end
+         sv:copy(rv)
+         retValues[k] = sv
+      elseif type(v) == "table" then
+         copyTensors(rv, sv)
+      end
+   end
+end
+
 local function create(fn, opt)
    local generatedFunctions = { }
    opt.tensorPool = { }
    opt.tensorLocals = { }
+   local stableGradTensors = nil
    return function(...)
       local args = {...}
       local sigFun = opt.signatureFn or function(params)
@@ -67,7 +86,15 @@ local function create(fn, opt)
          --print(code)
          generatedFunctions[signature] = gradFn
          -- We already have the answers, don't run it all over again.
-         if opt.withGradients and opt.withForward and not opt.debugHook and not opt.stableGradients then
+         if opt.withGradients and opt.withForward and not opt.debugHook then
+            if opt.stableGradients then
+               if stableGradTensors == nil then
+                  stableGradTensors = retValues[1]
+               else
+                  -- Since the user is expecting the results in the same tensors, copy the new results to the first set of results.
+                  copyStableTensors(retValues[1], stableGradTensors)
+               end
+            end
             return table.unpack(retValues)
          end
       end

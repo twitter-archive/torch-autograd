@@ -224,7 +224,7 @@ local function mapReusableTensorNodeSymbol(node, symbols, tensorPool, availableT
       else
          -- No available tensors, so just go ahead and allocate a slot for this one now.
          tensorIdx = #tensorPool + 1
-         tensorPool[tensorIdx] = tensor.new(tensor:size())
+         tensorPool[tensorIdx] = tensor
       end
    end
    if tensorIdx ~= nil then

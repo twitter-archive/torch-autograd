@@ -1325,7 +1325,10 @@ local tests = {
 
       local df = autograd(func, { stableGradients = true })
       local g = df({W=W, x=x}, torch.Tensor(1))
-      for i = 2, 10 do
+      for i = 1, 10 do
+         local ng = df({W=W, x=x}, torch.Tensor(i))
+         tester:assert(g.W == ng.W, 'gradient tensors should match')
+         tester:assert(g.x == ng.x, 'gradient tensors should match')
          local ng = df({W=W, x=x}, torch.Tensor(i))
          tester:assert(g.W == ng.W, 'gradient tensors should match')
          tester:assert(g.x == ng.x, 'gradient tensors should match')
