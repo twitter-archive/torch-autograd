@@ -32,6 +32,9 @@ local function grad(fn, gradOpt)
    if opt.optimize then
       return RuntimeCodegen.create(fn, opt)
    else
+      if opt.stableGradients then
+         error("stable gradient tensors only available in optimized mode")
+      end
       return RuntimeDirect.create(fn, opt)
    end
 end
