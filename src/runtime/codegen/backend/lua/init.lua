@@ -204,7 +204,36 @@ local function flattenAnswer(val)
    end
 end
 
-local function createSymbolTable(graph, execOrder, aliases, params, tensorPool, tensorLocals)
+local function mapReusableTensorNodeSymbol(node, symbols, tensorPool, availableTensorMap, remainingOutputs, availableCount, index)
+   local output = node.outputs[1]
+   local tensor = output:get()
+   local sig = tensorSig(tensor)
+   local matchingList = availableTensorMap[sig]
+   local tensorIdx = nil
+   if matchingList ~= nil and #matchingList > 0 then
+      -- Map to tensor pool.
+      tensorIdx = table.remove(matchingList, #matchingList)
+      availableCount = availableCount - 1
+   else
+      if availableCount > 0 then
+         -- There are tensors remaining, so keep track for possible later inexact allocation.
+         if index == nil then
+            error("invalid remaining output index")
+         end
+         remainingOutputs[#remainingOutputs + 1] = index
+      else
+         -- No available tensors, so just go ahead and allocate a slot for this one now.
+         tensorIdx = #tensorPool + 1
+         tensorPool[tensorIdx] = tensor.new(tensor:size())
+      end
+   end
+   if tensorIdx ~= nil then
+      symbols[output.source] = "rlocals[" .. tensorIdx .. "]"
+   end
+   return availableCount
+end
+
+local function createSymbolTable(graph, execOrder, aliases, params, tensorPool, tensorLocals, opt)
    -- Assign symbols to params, inputs, outputs.
    local symbols = { }
    local undefined = { }
@@ -237,35 +266,37 @@ local function createSymbolTable(graph, execOrder, aliases, params, tensorPool, 
 
    local localCount = 0
 
+   local skip = { }
+
+   -- Guarantee a stable mapping for gradient output tensors.
+   if opt.stableGradients then
+      local grads = graph.grads
+      local gradsByParamPath = { }
+      for i = 1, #grads do
+         local node = grads[i].grad.source:getRoot().node
+         if canReuseOutput(node) then
+            local paramPath = grads[i].param.source:symbolPath(symbols)
+            gradsByParamPath[paramPath] = node
+         end
+      end
+
+      local flatParamGrads = util.sortedFlatten(gradsByParamPath, { }, true)
+      for i = 1, #flatParamGrads do
+         local gradNode = flatParamGrads[i]
+         availableCount = mapReusableTensorNodeSymbol(gradNode, symbols, tensorPool, availableTensorMap, remainingOutputs, availableCount)
+         skip[gradNode] = true
+      end
+   end
+
    -- Exact matches first.
    for i = 1, #execOrder do
       local node = execOrder[i]
-      if aliases[node] ~= nil then
+      if aliases[node] ~= nil or skip[node] ~= nil then
       elseif #node.outputs == 1 then
          local output = node.outputs[1]
          if node.outputs[1].type == Value.TENSOR then
             if canReuseOutput(node) then
-               local tensor = output:get()
-               local sig = tensorSig(tensor)
-               local matchingList = availableTensorMap[sig]
-               local tensorIdx = nil
-               if matchingList ~= nil and #matchingList > 0 then
-                  -- Map to tensor pool.
-                  tensorIdx = table.remove(matchingList, #matchingList)
-                  availableCount = availableCount - 1
-               else
-                  if availableCount > 0 then
-                     -- There are tensors remaining, so keep track for possible later inexact allocation.
-                     remainingOutputs[#remainingOutputs + 1] = i
-                  else
-                     -- No available tensors, so just go ahead and allocate a slot for this one now.
-                     tensorIdx = #tensorPool + 1
-                     tensorPool[tensorIdx] = tensor.new(tensor:size())
-                  end
-               end
-               if tensorIdx ~= nil then
-                  symbols[output.source] = "rlocals[" .. tensorIdx .. "]"
-               end
+               availableCount = mapReusableTensorNodeSymbol(node, symbols, tensorPool, availableTensorMap, remainingOutputs, availableCount, i)
             else
                -- Non-reusable local.
                localCount = localCount + 1
@@ -409,7 +440,7 @@ local function changeToReuseFunctions(execOrder)
    end
 end
 
-local function aliasFreeTensors(execOrder, aliases)
+local function aliasFreeTensors(execOrder, aliases, outputNodes)
    local availableTensorMap = { }
    local availableCount = 0
    local refCounts = { }
@@ -418,7 +449,7 @@ local function aliasFreeTensors(execOrder, aliases)
       local node = execOrder[i]
       if canReuseOutput(node) then
          refCounts[node.outputs[1]] = #node.outputTargets[1]
-         if aliases[node] == nil then
+         if aliases[node] == nil and outputNodes[node] == nil then
             if availableCount > 0 then
                local sig = tensorSig(node.outputs[1]:get())
                local matchingList = availableTensorMap[sig]
@@ -470,9 +501,13 @@ local function generateCode(graph, opt)
    local params = collectParams(graph.params)
    local aliases = { }
    if opt.reduceFootprint then
-      aliasFreeTensors(execOrder, aliases)
+      if opt.stableGradients then
+         aliasFreeTensors(execOrder, aliases, outputNodes)
+      else
+         aliasFreeTensors(execOrder, aliases, { })
+      end
    end
-   local symbols, undefined, constants, tensorPoolViews = createSymbolTable(graph, execOrder, aliases, params, tensorPool, tensorLocals)
+   local symbols, undefined, constants, tensorPoolViews = createSymbolTable(graph, execOrder, aliases, params, tensorPool, tensorLocals, opt)
    local objects = collectObjects(execOrder)
 
    local out = StringBuilder()

@@ -864,8 +864,8 @@ local tests = {
       local linear2, pLinear2 = autograd.nn.Linear(hiddenSize, outputSize)
       local acts2 = autograd.nn.Tanh()
       params = autograd.util.cast({
-         linear1 = pLinear1, 
-         linear2 = pLinear2, 
+         linear1 = pLinear1,
+         linear2 = pLinear2,
          x = x}, "float")
 
       -- nn version:
@@ -1215,9 +1215,9 @@ local tests = {
    OptimNN = function()
       local nn = require 'nn'
       local optim = require 'optim'
- 
+
       torch.manualSeed(0)
- 
+
       -- Set up the localizer network
       ---------------------------------
       local locnet = nn.Sequential()
@@ -1232,37 +1232,37 @@ local tests = {
       locnet:add(nn.ReLU(true))
       locnet:add(nn.Linear(20,6))
       locnet:float() -- FAILS FOR CUDA
- 
+
       -- Functionalize networks
       ---------------------------------
       local agLocnet, locParams = autograd.functionalize(locnet)
- 
+
       -- Set up parameters
       ---------------------------------
       params = {
          locParams = locParams,
       }
- 
+
       -- Define our loss function
       ---------------------------------
       local function f(inputs, bhwdImages, labels)
          local warpPrediction = agLocnet(inputs.locParams, bhwdImages)
          return torch.sum(warpPrediction)
       end
- 
+
       local g = autograd(f, {optimize = true})
- 
+
       -- FAILS FOR OTHER OPTIMIZERS AS WELL
       local optimfn, states = autograd.optim.sgd(g, {learningRate=1e-2}, params)
- 
+
       for i=1,3 do
          -- Get images in BHWD format, labels in one-hot format:
          local data = torch.randn(256,1,32,32):float()
          local target = torch.zeros(256):random(0,9):float()
- 
+
          -- Calculate gradients:
          local grads, loss = optimfn(data, target)
- 
+
       end
       end,
 
@@ -1305,6 +1305,32 @@ local tests = {
       local grads, loss = df(params)
       tester:assert(gradcheck(f, {W=params.W}), 'incorrect gradients')
    end,
+
+   StableGradients = function()
+      -- Parameters:
+      local W = torch.Tensor(32,100):fill(.5)
+      local x = torch.Tensor(100):fill(.5)
+
+      -- Function:
+      local func = function(inputs, zf)
+         local dims = torch.size(zf, 1)
+         local w1 = inputs.W
+         local x1 = inputs.x
+         for i = 1, dims do
+            w1 = w1 * 1.1
+            x1 = x1 * 1.1
+         end
+         return torch.sum(w1 * x1 * 3.0 + 1.0)
+      end
+
+      local df = autograd(func, { stableGradients = true })
+      local g = df({W=W, x=x}, torch.Tensor(1))
+      for i = 2, 10 do
+         local ng = df({W=W, x=x}, torch.Tensor(i))
+         tester:assert(g.W == ng.W, 'gradient tensors should match')
+         tester:assert(g.x == ng.x, 'gradient tensors should match')
+      end
+   end,
 }
 
 local function prefixTests(pf, t, skip)
@@ -1322,5 +1348,5 @@ autograd.optimize(true)
 tester:add(prefixTests("Optimized_", tests, { })):run()
 autograd.optimize(false)
 tester = totem.Tester()
-tester:add(prefixTests("Direct_", tests, { AutoModule = true, DebuggerDivZero = true })):run()
+tester:add(prefixTests("Direct_", tests, { AutoModule = true, DebuggerDivZero = true, StableGradients = true })):run()
 

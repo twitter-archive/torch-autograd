@@ -205,7 +205,7 @@ function util.defaultBool(b, db)
    return b
 end
 
-function util.sortedFlatten(tbl, flat)
+function util.sortedFlatten(tbl, flat, noRecurse)
    flat = flat or { }
    if type(tbl) == "table" then
       local keys = { }
@@ -222,7 +222,7 @@ function util.sortedFlatten(tbl, flat)
       end
       for i = 1, #keys do
          local val = tbl[keys[i]]
-         if type(val) == "table" then
+         if type(val) == "table" and not noRecurse then
             util.sortedFlatten(val, flat)
          else
             flat[#flat + 1] = val

@@ -67,7 +67,7 @@ local function create(fn, opt)
          --print(code)
          generatedFunctions[signature] = gradFn
          -- We already have the answers, don't run it all over again.
-         if opt.withGradients and opt.withForward and not opt.debugHook then
+         if opt.withGradients and opt.withForward and not opt.debugHook and not opt.stableGradients then
             return table.unpack(retValues)
          end
       end
