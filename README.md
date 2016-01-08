@@ -170,12 +170,12 @@ grad = require 'autograd'
 
 -- define trainable parameters:
 params = {
-   W = {
+   linear1 = {
       t.randn(50,100), -- note that parameters are transposed (nn convention for nn.Linear)
-      t.randn(10,50),
-   },
-   b = {
       t.randn(50),
+   },
+   linear2 = {
+      t.randn(10,50),
       t.randn(10),
    }
 }
@@ -191,8 +191,8 @@ acts2 = grad.nn.Tanh()
 
 -- define model
 neuralNet = function(params, x, y)
-   local h1 = acts1(linear1(x, params.W[1], params.b[1]))
-   local h2 = acts2(linear2(h1, params.W[2], params.b[2]))
+   local h1 = acts1(linear1(params.linear1, x))
+   local h2 = acts2(linear2(params.linear2, h1))
    local yHat = h2 - t.log(t.sum(t.exp(h2)))
    local loss = - t.sum(t.cmul(yHat, y))
    return loss
@@ -250,6 +250,19 @@ end
 -- Note: the parameters are always handled as an array, passed as the first
 -- argument to the model function (modelf). This API is similar to the other
 -- model primitives we provide (see below in "Model Primitives").
+
+-- Note 2: if there are no parameters in the model, then you need to pass the input only, e.g.:
+local model = nn.Sigmoid()
+-- Functionalize :
+local sigmoid = autograd.functionalize(model)
+
+-- The sigmoid can now be used as part of a regular autograd function:
+local loss = autograd.nn.MSECriterion()
+neuralNet = function(params, x, y)
+   local h = modelf(x) -- please note the absence of params arg
+   return loss(h, y)
+end
+
 ```
 
 ### Creating auto-differentiated nn modules
