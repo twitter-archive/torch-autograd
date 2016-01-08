@@ -38,58 +38,6 @@ function DirectNode.getValue(v)
    end
 end
 
--- A wrapper for a function
--- Anytime we try to apply a function to some arguments,
--- we'd like to make sure that if we're passing nodes in,
--- that we unpack the value in those nodes, apply the function
--- to the underlying value, and then wrap the value in a node
-function DirectNode.nodeApply(fun, gradFun, capture, ...)
-   local arg = {...}
-   local parent = nil
-   local values = { }
-   local ln = #arg
-   for k = 1, ln do
-      local v = arg[k]
-      if getmetatable(v) == DirectNode then
-         parent = v
-         values[#values + 1] = v.value
-      elseif type(v) == "table" then
-         local tableValue = {}
-         for j,element in pairs(v) do
-            if getmetatable(element) == DirectNode then
-               parent = element
-               tableValue[j] = element.value
-            else
-               tableValue[j] = element
-            end
-         end
-         values[#values + 1] = tableValue
-      else
-         values[#values + 1] = v
-      end
-   end
-   if capture and parent ~= nil then
-      local value = fun.fn(table.unpack(values))
-      local node = nil
-      local tape = parent.tape
-      local o = tape[tape.nextIndex]
-      if o ~= nil then
-         o.tape = tape
-         o.value = value
-         o.fun = fun
-         o.gradFun = gradFun
-         o.args = arg
-         o.outgrad = nil
-         o.argValues = values
-         tape.nextIndex = tape.nextIndex + 1
-         return o
-      end
-      return DirectNode:init(value, fun, gradFun, arg, values, tape)
-   else
-      return fun.fn(table.unpack(values))
-   end
-end
-
 -- If we passed in just a tensor, return the outgrad.
 -- If we passed in a table, return all the outgrads.
 function DirectNode.getOutgrad(arg)
@@ -125,6 +73,9 @@ end
 function DirectNode:__index(i)
    local value = rawget(self, "value")
    if torch.isTensor(value) and value[i] ~= nil then
+      if type(i) ~= "string" then
+         error("tensor [] operator currently not supported by autograd")
+      end
       return value[i]
    end
    return rawget(DirectNode, i)

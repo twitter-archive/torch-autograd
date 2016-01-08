@@ -1,5 +1,5 @@
 local nodeApply
-local function directApply(fun, gradFun, capture, ...)
+local function directApply(fun, gradFun, ...)
    return fun.fn(...)
 end
 
@@ -11,7 +11,7 @@ setApplyFn()
 local function hasParams(nnObject)
    local hasParamFn, params = pcall(nnObject.parameters, nnObject)
    params = params or {}
-   if not hasParamFn or #params == 0 then 
+   if not hasParamFn or #params == 0 then
       return false
    else
       return true
@@ -95,11 +95,12 @@ local function wrapCriterion(nnObject)
          object = mod,
          method = "backward",
          name = "criterion",
-         fn = backward
+         fn = backward,
+         capture = true,
       }
       local gradFn = {
          function(g,ans,x,y)
-            return nodeApply(backFnDesc, nil, true, g, x, y)
+            return nodeApply(backFnDesc, nil, g, x, y)
          end,
          function(g,ans,x,y)
             -- NOTE: shoudl we throw error as uniplemented here?
@@ -111,9 +112,10 @@ local function wrapCriterion(nnObject)
          method = "forward",
          name = "criterion",
          fn = forward,
+         capture = true,
       }
-      return nodeApply(fnDesc, gradFn, true, x, y)
-   end   
+      return nodeApply(fnDesc, gradFn, x, y)
+   end
 
    mod.entry = fn
    mod.forward = forward
@@ -152,10 +154,11 @@ local function wrapModuleWithoutParams(nnObject)
          method = "backward",
          name = "model",
          fn = backward,
+         capture = true,
       }
       local gradFn = {
          function(g,ans,x)
-            return nodeApply(backFnDesc, nil, true, g, x)
+            return nodeApply(backFnDesc, nil, g, x)
          end
       }
       local fnDesc = {
@@ -163,8 +166,9 @@ local function wrapModuleWithoutParams(nnObject)
          method = "forward",
          name = "model",
          fn = forward,
+         capture = true,
       }
-      return nodeApply(fnDesc, gradFn, true, x)
+      return nodeApply(fnDesc, gradFn, x)
    end
 
    mod.entry = fn
@@ -220,17 +224,18 @@ local function wrapModuleWithParams(nnObject)
          method = "backward",
          name = "model",
          fn = backward,
+         capture = true,
       }
       local gradFn = {
          function(g,ans,params,x)
             if grads == nil then
-               grads = nodeApply(backFnDesc, nil, true, g, params, x)
+               grads = nodeApply(backFnDesc, nil, g, params, x)
             end
             return grads[1]
          end,
          function(g,ans,params,x)
             if grads == nil then
-               grads = nodeApply(backFnDesc, nil, true, g, params, x)
+               grads = nodeApply(backFnDesc, nil, g, params, x)
             end
             return grads[2]
          end,
@@ -240,8 +245,9 @@ local function wrapModuleWithParams(nnObject)
          method = "forward",
          name = "model",
          fn = forward,
+         capture = true,
       }
-      return nodeApply(fnDesc, gradFn, true, params, x)
+      return nodeApply(fnDesc, gradFn, params, x)
    end
 
    mod.entry = fn

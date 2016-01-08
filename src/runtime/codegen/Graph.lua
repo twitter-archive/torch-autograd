@@ -12,10 +12,13 @@ local nodeDebugger
 local applyDepth = 0
 local reentryDepth = 0
 
-local function overloadHook(fn, gradFn, capture, ...)
+local function overloadHook(fn, gradFn, ...)
    local inputs = {...}
    applyDepth = applyDepth + 1
-   if reentryDepth ~= 0 and applyDepth == 1 and capture then
+   if reentryDepth ~= 0 and applyDepth == 1 and fn.capture then
+      if fn.unsupported then
+         error("function " .. fn.name .. " not currently supported by autograd")
+      end
       local n = Node.new(fn, gradFn, inputs)
       local values = {n:evaluateForward()}
       if nodeDebugger then

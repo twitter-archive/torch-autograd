@@ -12,36 +12,41 @@ local function module(name, table, fn)
          functions = { },
          classes = { }
       }
-      local overload = function(table, fnName, gradFn, capture, differentiable)
+      local supported = { }
+      local overload = function(table, fnName, gradFn, capture, differentiable, unsupported)
          local old = table[fnName]
          if old ~= nil then
             local fnDesc = {
                name = name .. "." .. fnName,
                differentiable = differentiable,
-               fn = old
+               fn = old,
+               capture = capture,
+               unsupported = unsupported,
             }
             local newFn = function(...)
-               return nodeApply(fnDesc, gradFn, capture, ...)
+               return nodeApply(fnDesc, gradFn, ...)
             end
-           return {
+            return {
                name = fnName,
                newFn = newFn,
                oldFn = old
             }
          end
       end
-      local overloadClass = function(table, className, fnName, gradFn, capture)
+      local overloadClass = function(table, className, fnName, gradFn, capture, differentiable, unsupported)
          local old = table[fnName]
          if old ~= nil then
             local fnDesc = {
                name = name .. "." .. className .. "." .. fnName,
-               differentiable = true,
-               fn = old
+               differentiable = differentiable,
+               fn = old,
+               capture = capture,
+               unsupported = unsupported,
             }
             local newFn = function(...)
-               return nodeApply(fnDesc, gradFn, capture, ...)
+               return nodeApply(fnDesc, gradFn, ...)
             end
-           return {
+            return {
                name = fnName,
                newFn = newFn,
                oldFn = old
@@ -56,16 +61,17 @@ local function module(name, table, fn)
                name = "op." .. fnName,
                operator = opName,
                differentiable = true,
+               capture = true,
                fn = old
             }
             local newFn
             if opName == "unm" then
                newFn = function(a)
-                  return nodeApply(fnDesc, gradFn, true, a)
+                  return nodeApply(fnDesc, gradFn, a)
                end
             else
                newFn = function(a, b)
-                  return nodeApply(fnDesc, gradFn, true, a, b)
+                  return nodeApply(fnDesc, gradFn, a, b)
                end
             end
             return {
@@ -77,14 +83,16 @@ local function module(name, table, fn)
       end
       local moduleFns = {
          gradient = function(fnName, gradFn)
-            local fn = overload(table, fnName, gradFn, true, true)
+            local fn = overload(table, fnName, gradFn, true, true, false)
+            supported[fnName] = true
             mm.functions[#mm.functions + 1] = fn
          end,
          dynamic = function(...)
             local arg = {...}
             for i = 1, #arg do
                local fnName = arg[i]
-               local fn = overload(table, fnName, nil, true, true)
+               local fn = overload(table, fnName, nil, true, true, false)
+               supported[fnName] = true
                mm.functions[#mm.functions + 1] = fn
             end
          end,
@@ -92,7 +100,8 @@ local function module(name, table, fn)
             local arg = {...}
             for i = 1, #arg do
                local fnName = arg[i]
-               local fn = overload(table, fnName, nil, true, false)
+               local fn = overload(table, fnName, nil, true, false, false)
+               supported[fnName] = true
                mm.functions[#mm.functions + 1] = fn
             end
          end,
@@ -100,13 +109,32 @@ local function module(name, table, fn)
             local arg = {...}
             for i = 1, #arg do
                local fnName = arg[i]
-               local fn = overload(table, fnName, nil, false, false)
+               local fn = overload(table, fnName, nil, false, false, false)
+               supported[fnName] = true
+               mm.functions[#mm.functions + 1] = fn
+            end
+         end,
+         unsupported = function(...)
+            local arg = {...}
+            for i = 1, #arg do
+               local fnName = arg[i]
+               local fn = overload(table, fnName, nil, true, false, true)
+               supported[fnName] = true
                mm.functions[#mm.functions + 1] = fn
             end
          end,
          operator = function(opName, gradFn)
             local fn = overloadOp(table, opName, gradFn)
+            supported[opName] = true
             mm.functions[#mm.functions + 1] = fn
+         end,
+         defaultUnsupported = function()
+            for k, v in pairs(table) do
+               if supported[k] == nil and type(v) == "function" and string.sub(k, 1, 2) ~= "__" then
+                  local fn = overload(table, k, nil, true, false, true)
+                  mm.functions[#mm.functions + 1] = fn
+               end
+            end
          end,
          class = function(className, fn)
             local classTable = table[className]
@@ -114,20 +142,33 @@ local function module(name, table, fn)
                name = className,
                functions = { }
             }
+            local supported = { }
             local classFns = {
                operator = function(opName, gradFn)
                   local fn = overloadOp(classTable, opName, gradFn)
+                  supported[opName] = true
                   cc.functions[#cc.functions + 1] = fn
                end,
                gradient = function(fnName, gradFn)
-                  local fn = overloadClass(classTable, className, fnName, gradFn, true)
+                  local fn = overloadClass(classTable, className, fnName, gradFn, true, true, false)
+                  supported[fnName] = true
                   cc.functions[#cc.functions + 1] = fn
                end,
                dynamic = function(...)
                   local arg = {...}
                   for i = 1, #arg do
                      local fnName = arg[i]
-                     local fn = overloadClass(classTable, className, fnName, nil, true)
+                     local fn = overloadClass(classTable, className, fnName, nil, true, true, false)
+                     supported[fnName] = true
+                     cc.functions[#cc.functions + 1] = fn
+                  end
+               end,
+               initializer = function(...)
+                  local arg = {...}
+                  for i = 1, #arg do
+                     local fnName = arg[i]
+                     local fn = overloadClass(classTable, className, fnName, nil, true, false, false)
+                     supported[fnName] = true
                      cc.functions[#cc.functions + 1] = fn
                   end
                end,
@@ -135,10 +176,29 @@ local function module(name, table, fn)
                   local arg = {...}
                   for i = 1, #arg do
                      local fnName = arg[i]
-                     local fn = overload(classTable, fnName, nil, false)
+                     local fn = overloadClass(classTable, className, fnName, nil, false, false, false)
+                     supported[fnName] = true
                      cc.functions[#cc.functions + 1] = fn
                   end
                end,
+               unsupported = function(...)
+                  local arg = {...}
+                  for i = 1, #arg do
+                     local fnName = arg[i]
+                     local fn = overloadClass(classTable, className, fnName, nil, true, false, true)
+                     supported[fnName] = true
+                     cc.functions[#cc.functions + 1] = fn
+                  end
+               end,
+               defaultUnsupported = function()
+                  local mt = getmetatable(classTable)
+                  for k, v in pairs(mt) do
+                     if supported[k] == nil and type(v) == "function" and string.sub(k, 1, 2) ~= "__" then
+                        local fn = overloadClass(classTable, className, k, nil, true, false, true)
+                        cc.functions[#cc.functions + 1] = fn
+                     end
+                  end
+               end
             }
             fn(classFns)
             mm.classes[#mm.classes + 1] = cc

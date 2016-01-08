@@ -204,7 +204,8 @@ overload.module("torch", torch, function(module)
                class.operator(k, v)
             end
             class.gradient("cat", functions.cat)
-            class.dynamic("new")
+            class.initializer("new")
+            class.unsupported("unfold")
             class.static("dim", "size", "nDimension", "nElement")
          end)
       end
@@ -448,16 +449,12 @@ overload.module("torch", torch, function(module)
    module.gradient("round", zeroGradient())
    module.gradient("sign", zeroGradient())
 
-   module.gradient("nDimension", zeroGradient())
-   module.gradient("size", zeroGradient())
-   module.gradient("nElement", zeroGradient())
-   module.gradient("isSameSizeAs", zeroGradient())
-   module.gradient("isTensor", zeroGradient())
+   module.initializer("new", "bernoulli", "uniform", "normal", "random", "zeros", "zero")
 
-   module.initializer("bernoulli", "uniform", "normal", "random", "zeros", "zero")
-
-   module.dynamic("new", "fill",  "cosh", "sign", "repeatTensor", "typeAs", "eq")
+   module.dynamic("fill", "cosh", "sign", "repeatTensor", "typeAs", "eq")
    module.static("size", "isTensor", "nDimension", "nElement", "isSameSizeAs")
+
+   module.defaultUnsupported()
 end)
 
 

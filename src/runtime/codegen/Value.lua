@@ -8,16 +8,13 @@ Value.NUMBER = "number"
 Value.LONG_STORAGE = "long_storage"
 
 function Value.create(type, val, source)
-	local v = { }
+	local v = {
+		type = type,
+		raw = val,
+		source = source
+	}
 	setmetatable(v, Value)
-	v:init(type, val, source)
 	return v
-end
-
-function Value:init(type, val, source)
-	self.type = type
-	self.raw = val
-	self.source = source
 end
 
 function Value.from(v, source, skipWrapTables)
@@ -76,10 +73,26 @@ function Value:__index(i)
 	elseif rtype == Value.TENSOR then
 		local raw = rawget(self, "raw")
 		if raw[i] ~= nil then
+			if type(i) ~= "string" then
+				error("tensor __index [] operator not supported by autograd")
+			end
 			return raw[i]
 		end
 	end
 	return rawget(Value, i)
+end
+
+function Value:__newindex(k, v)
+	local rtype = rawget(self, "type")
+	if rtype == Value.TABLE then
+		local raw = rawget(self, "raw")
+		return rawset(raw, k, v)
+	elseif rtype == Value.TENSOR then
+		if type(k) ~= "string" then
+			error("tensor __newindex [] operator not supported by autograd")
+		end
+	end
+	return rawset(self, k, v)
 end
 
 function Value:__len()

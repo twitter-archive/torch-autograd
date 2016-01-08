@@ -5,7 +5,7 @@
 local grad = require 'autograd'
 local lossFuns = require 'autograd.loss'
 local util = require 'autograd.util'
-local Value = require 'autograd.Value'
+local Value = require 'autograd.runtime.codegen.Value'
 local gradcheck = require 'autograd.gradcheck'
 local optim = require 'optim'
 

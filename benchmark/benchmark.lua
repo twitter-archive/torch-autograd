@@ -824,11 +824,7 @@ local tests = {
             return loss
          end
 
-         for i in ipairs(params) do
-            for k in pairs(params[i]) do
-               params[i][k] = params[i][k]:type(ttype):normal()
-            end
-         end
+         params = d.util.cast(params, ttype)
 
          -- force allocs
          local df = d(f)

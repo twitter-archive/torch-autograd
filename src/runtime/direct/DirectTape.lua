@@ -4,6 +4,62 @@ local DirectNode = require 'autograd.runtime.direct.DirectNode'
 
 local DirectTape = { }
 
+-- A wrapper for a function
+-- Anytime we try to apply a function to some arguments,
+-- we'd like to make sure that if we're passing nodes in,
+-- that we unpack the value in those nodes, apply the function
+-- to the underlying value, and then wrap the value in a node
+function nodeApply(fun, gradFun, ...)
+   local arg = {...}
+   local parent = nil
+   local values = { }
+   local ln = #arg
+   for k = 1, ln do
+      local v = arg[k]
+      if getmetatable(v) == DirectNode then
+         parent = v
+         values[#values + 1] = v.value
+      elseif type(v) == "table" then
+         local tableValue = {}
+         for j,element in pairs(v) do
+            if getmetatable(element) == DirectNode then
+               parent = element
+               tableValue[j] = element.value
+            else
+               tableValue[j] = element
+            end
+         end
+         values[#values + 1] = tableValue
+      else
+         values[#values + 1] = v
+      end
+   end
+   if fun.capture and parent ~= nil then
+      if fun.unsupported then
+         error("function " .. fun.name .. " not currently supported by autograd")
+      end
+      local value = fun.fn(table.unpack(values))
+      local node = nil
+      local tape = parent.tape
+      local o = tape[tape.nextIndex]
+      if o ~= nil then
+         o.tape = tape
+         o.value = value
+         o.fun = fun
+         o.gradFun = gradFun
+         o.args = arg
+         o.outgrad = nil
+         o.argValues = values
+         tape.nextIndex = tape.nextIndex + 1
+         return o
+      end
+      return DirectNode:init(value, fun, gradFun, arg, values, tape)
+   else
+      local values = {fun.fn(table.unpack(values))}
+      return table.unpack(values)
+   end
+end
+
 function DirectTape.funOnly(fun, tape, argnum, ...)
    local arg = {...}
    local tape = tape or {}
@@ -14,7 +70,7 @@ function DirectTape.funOnly(fun, tape, argnum, ...)
    -- if it's a table, we'll try to walk it
    arg[argnum] = DirectNode.newStartNode(arg[argnum], tape)
 
-   overload.install(DirectNode.nodeApply)
+   overload.install(nodeApply)
 
    local allAns = {fun(table.unpack(arg))}
 
