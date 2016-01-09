@@ -123,6 +123,13 @@ local function module(name, table, fn)
                mm.functions[#mm.functions + 1] = fn
             end
          end,
+         ignore = function(...)
+            local arg = {...}
+            for i = 1, #arg do
+               local fnName = arg[i]
+               supported[fnName] = true
+            end
+         end,
          operator = function(opName, gradFn)
             local fn = overloadOp(table, opName, gradFn)
             supported[opName] = true

@@ -454,6 +454,8 @@ overload.module("torch", torch, function(module)
    module.dynamic("fill", "cosh", "sign", "repeatTensor", "typeAs", "eq")
    module.static("size", "isTensor", "nDimension", "nElement", "isSameSizeAs")
 
+   module.ignore("typename")
+
    module.defaultUnsupported()
 end)
 
