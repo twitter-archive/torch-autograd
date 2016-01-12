@@ -205,8 +205,8 @@ overload.module("torch", torch, function(module)
             end
             class.gradient("cat", functions.cat)
             class.initializer("new")
-            class.unsupported("unfold")
             class.static("dim", "size", "nDimension", "nElement")
+            class.defaultUnsupported()
          end)
       end
    end
