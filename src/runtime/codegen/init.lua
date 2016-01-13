@@ -58,8 +58,8 @@ local function copyStableTensors(retValues, stableGrads)
          end
          sv:copy(rv)
          retValues[k] = sv
-      elseif type(v) == "table" then
-         copyTensors(rv, sv)
+      elseif type(sv) == "table" then
+         copyStableTensors(rv, sv)
       end
    end
 end
@@ -98,7 +98,13 @@ local function create(fn, opt)
             return table.unpack(retValues)
          end
       end
-      return generatedFunctions[signature](table.unpack(args))
+      if opt.stableGradients then
+         local retValues = {generatedFunctions[signature](table.unpack(args))}
+         copyStableTensors(retValues[1], stableGradTensors)
+         return table.unpack(retValues)
+      else
+         return generatedFunctions[signature](table.unpack(args))
+      end
    end
 end
 
