@@ -1338,7 +1338,7 @@ local tests = {
    LessThan = function()
       f = function(params, x)
          local s = torch.sum(params.a)
-         local t = autograd.util.lt(s, 100)
+         local t = autograd.util.lt(s, 3)
          if t then
             return s*3
          else
