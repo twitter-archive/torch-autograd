@@ -904,13 +904,11 @@ local tests = {
       local loss = autograd.functionalize(nn.MSECriterion())
 
       -- Input
-      local x = torch.FloatTensor(3, 8, 8):normal()
-      local y = torch.FloatTensor(10):normal()
+      local x = torch.Tensor(3, 8, 8):normal()
+      local y = torch.Tensor(10):normal()
 
-      -- Force to float:
-      for i,p in ipairs(params) do
-         params[i] = p:float()
-      end
+      -- Force to double:
+      params = autograd.util.cast(params, "double")
 
       -- nn version:
       local function cnn(params, y)
@@ -924,10 +922,10 @@ local tests = {
       local grads = autograd(cnn)(params, y)
 
       -- Clone model to compare to built-in nn grad eval:
-      local model2 = model:clone():float()
+      local model2 = model:clone()
       model2:zeroGradParameters()
       local yhat = model2:forward(x)
-      local gx = model2:backward( x, nn.MSECriterion():float():backward(yhat,y) )
+      local gx = model2:backward( x, nn.MSECriterion():backward(yhat,y) )
       local _,grads2 = model:parameters()
 
       -- Check errs:
@@ -1089,9 +1087,7 @@ local tests = {
       end
 
       -- Move to Float
-      params[1].W = params[1].W:float()
-      params[1].b = params[1].b:float()
-      i = i:float()
+      params = autograd.util.cast(params, "double")
 
       -- Test on sequence data:
       local o = loss(params, i)
@@ -1231,7 +1227,6 @@ local tests = {
       locnet:add(nn.Linear(20*2*2,20))
       locnet:add(nn.ReLU(true))
       locnet:add(nn.Linear(20,6))
-      locnet:float() -- FAILS FOR CUDA
 
       -- Functionalize networks
       ---------------------------------
@@ -1257,8 +1252,8 @@ local tests = {
 
       for i=1,3 do
          -- Get images in BHWD format, labels in one-hot format:
-         local data = torch.randn(256,1,32,32):float()
-         local target = torch.zeros(256):random(0,9):float()
+         local data = torch.randn(256,1,32,32)
+         local target = torch.zeros(256):random(0,9)
 
          -- Calculate gradients:
          local grads, loss = optimfn(data, target)
