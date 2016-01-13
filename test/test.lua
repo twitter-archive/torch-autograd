@@ -1334,6 +1334,23 @@ local tests = {
          tester:assert(g.x == ng.x, 'gradient tensors should match')
       end
    end,
+
+   LessThan = function()
+      f = function(params, x)
+         local s = torch.sum(params.a)
+         local t = autograd.util.lt(s, 100)
+         if t then
+            return s*3
+         else
+            return s
+         end
+      end
+
+      tester:assert(gradcheck(f,{a = torch.eye(5)}), "Incorrect gradient")
+      tester:assert(gradcheck(f,{a = torch.eye(1)}), "Incorrect gradient")
+   end,
+
+
 }
 
 local function prefixTests(pf, t, skip)
@@ -1349,7 +1366,7 @@ end
 -- Run tests:
 autograd.optimize(true)
 tester:add(prefixTests("Optimized_", tests, { })):run()
-autograd.optimize(false)
-tester = totem.Tester()
+-- autograd.optimize(false)
+-- tester = totem.Tester()
 tester:add(prefixTests("Direct_", tests, { AutoModule = true, DebuggerDivZero = true, StableGradients = true })):run()
 

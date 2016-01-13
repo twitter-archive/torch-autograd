@@ -21,8 +21,33 @@ function cast(tableOfParams, typeName)
    end
    return out
 end
-
 util.cast = cast
+
+-- Comparison functions
+-- We need to define our own for comparing scalars
+-- to Nodes, because Lua checks for type equality before using comparison metamethods e.g. __lt,
+-- which fails in autograd because we may be comparing numbers and Nodes. Node type is table, not number,
+-- and we cannot override this default behavior, so our metamethods will never be called.
+-- This unfortunate state of things is a good argument for a DSL, to improve the user experience.
+function util.lt(a, b)
+   return a < b
+end
+
+function util.le(a, b)
+   return a <= b
+end
+
+function util.gt(a, b)
+   return a > b
+end
+
+function util.ge(a, b)
+   return a >= b
+end
+
+function util.eq(a, b)
+   return a == b
+end
 
 function util.oneHot(labels, n)
    --[[
@@ -192,10 +217,6 @@ function util.makeContiguous(g)
       g = g:contiguous()
    end
    return g
-end
-
-function util.equals(a, b)
-   return a == b
 end
 
 function util.defaultBool(b, db)

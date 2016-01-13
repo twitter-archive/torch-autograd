@@ -20,6 +20,7 @@ local function zeroGradient(nArgs)
    for i=1,nArgs do
       zeroGrads[i] = function(...) return nil end
    end
+   return zeroGrads
 end
 
 -- Helps with resizing gradients
@@ -479,9 +480,16 @@ overload.module("util", util, function(module)
          return torch.cmul(g, p)
       end
    })
+   -- module.gradient("lt", zeroGradient())
+   -- module.gradient("le", zeroGradient())
+   -- module.gradient("gt", zeroGradient())
+   -- module.gradient("ge", zeroGradient())
+   -- module.gradient("eq", zeroGradient())
+   module.gradient("newTensorLike", zeroGradient())
+   module.gradient("zerosLike", zeroGradient())
+   module.static("lt")
    module.initializer("newTensorLike", "zerosLike")
    module.dynamic("setNotEqual", "fillSameSizeAs", "narrowCopy", "selectCopy", "selectSliceCopy", "narrowSliceCopy", "makeContiguous", "indexAdd", "catTable")
-   module.static("equals")
 end)
 
 

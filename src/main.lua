@@ -14,6 +14,10 @@ local function optimize(opt)
    defaultOptimize = opt
 end
 
+local function optimizing()
+   return defaultOptimize
+end
+
 local defaultProtected = false
 local function protected(prot)
    defaultProtected = prot
@@ -44,6 +48,7 @@ local autograd = {
    grad = grad,
    overload = overload,
    optimize = optimize,
+   optimizing = optimizing,
    protected = protected
 }
 

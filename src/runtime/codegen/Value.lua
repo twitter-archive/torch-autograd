@@ -6,6 +6,7 @@ Value.TABLE = "table"
 Value.TENSOR = "tensor"
 Value.NUMBER = "number"
 Value.LONG_STORAGE = "long_storage"
+Value.BOOLEAN = "boolean"
 
 function Value.create(type, val, source)
 	local v = {
@@ -40,6 +41,8 @@ function Value.from(v, source, skipWrapTables)
 		return Value.create(Value.TENSOR, v, source)
 	elseif type(v) == "number" then
 		return Value.create(Value.NUMBER, v, source)
+	elseif type(v) == "boolean" then
+		return Value.create(Value.BOOLEAN, v, source)
 	elseif v.totable then
 		return Value.create(Value.LONG_STORAGE, v, source)
 	else
