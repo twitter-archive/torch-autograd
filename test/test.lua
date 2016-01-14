@@ -1295,7 +1295,7 @@ local tests = {
         return torch.sum(params.W) * 0.4
       end
       local df = autograd(f)
-      local params = { W = torch.randn(5,5) }
+      local params = { W = torch.randn(5,5)}
       -- this line should not raise an error
       local grads, loss = df(params)
       tester:assert(gradcheck(f, {W=params.W}), 'incorrect gradients')
@@ -1331,10 +1331,9 @@ local tests = {
    end,
 
    LessThan = function()
-      f = function(params, x)
+      local f = function(params, x)
          local s = torch.sum(params.a)
-         local t = autograd.util.lt(s, 3)
-         if t then
+         if autograd.util.lt(s, 3) then
             return s*3
          else
             return s
@@ -1344,7 +1343,16 @@ local tests = {
       tester:assert(gradcheck(f,{a = torch.eye(5)}), "Incorrect gradient")
       tester:assert(gradcheck(f,{a = torch.eye(1)}), "Incorrect gradient")
    end,
-
+   CatNumber = function() 
+      local function f(params)
+         local a = autograd.util.cat({params.a,params.b,params.c})
+         return -torch.sum(a)
+      end
+      df = autograd(f)
+      local params = {a=1,b=2,c=3}
+      grads, loss = df(params)
+      -- It just needs to run, gradcheck doesn't support numbers right now
+   end,
 
 }
 

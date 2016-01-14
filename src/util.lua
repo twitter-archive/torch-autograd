@@ -1,5 +1,6 @@
 -- Utilities
 local util = {}
+local Value = require 'autograd.runtime.codegen.Value'
 
 local cast
 function cast(tableOfParams, typeName)
@@ -199,9 +200,9 @@ function util.indexAddInPlace(o, g, x, dim, index)
    return out
 end
 
-function util.catTable(g, x, y)
-   dim = y or torch.nDimension(x[1])
-   local ln=#x
+function util.catTableGradient(g, x, dim)
+   dim = dim or torch.nDimension(x[1])
+   local ln=Value.len(x)
    local out = {}
    local currentIndex = 1
    for i=1,ln do
@@ -210,6 +211,31 @@ function util.catTable(g, x, y)
       currentIndex = currentIndex + thisSize
    end
    return out
+end
+
+function util.catNumberGradient(g, x, dim)
+   local ln=Value.len(x)
+   local out = {}
+   local currentIndex = 1
+   for i=1,ln do
+      out[i] = torch.select(g,1,i)
+   end
+   return out
+end
+
+function util.cat(x, y, dim)
+   if torch.isTensor(x) then
+      dim = dim or torch.nDimension(x)
+      return torch.cat(x,y,dim)
+   else -- x should be a table filled with stuff of all the same type
+      if torch.isTensor(x[1]) then
+         dim = y or torch.nDimension(x[1]) -- second arg becomes dimension
+         return torch.cat(x,dim)
+      else
+         -- We're concatenating numbers, and we'll yield the default Tensor type
+         return torch.Tensor(x)
+      end
+   end
 end
 
 function util.makeContiguous(g)

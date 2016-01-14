@@ -52,6 +52,8 @@ function DirectNode.getOutgrad(arg)
          out[k] = DirectNode.getOutgrad(v)
       end
       return out
+   elseif type(val) == "number" then
+      return arg.outgrad
    end
 end
 
@@ -67,6 +69,8 @@ function DirectNode.newStartNode(val, tape)
          valCopy[k] = DirectNode.newStartNode(v, tape)
       end
       return valCopy
+   elseif type(val) == "number" then
+      return DirectNode:init(val, nil, nil, {}, {}, tape)
    end
 end
 
