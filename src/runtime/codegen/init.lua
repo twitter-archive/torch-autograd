@@ -47,14 +47,19 @@ local function generateFn(fn, args, opt)
 end
 
 local function copyStableTensors(retValues, stableGrads)
-   for k, sv in pairs(stableGrads) do
-      local rv = retValues[k]
+   for k, rv in pairs(retValues) do
+      local sv = stableGrads[k]
+      if sv == nil then
+         sv = rv:clone()
+         stableGrads[k] = sv
+      end
       if type(rv) ~= type(sv) then
          error("mismatched types in stable tensor copy")
       end
       if torch.isTensor(rv) and rv ~= sv then
          if not torch.isSameSizeAs(rv, sv) then
-            error("mismatched tensor size in stable tensor copy")
+            print("resizing stable grad " .. table.concat(sv:size():totable(), "x") .. " -> " .. table.concat(rv:size():totable(), "x"))
+            sv:resize(rv:size())
          end
          sv:copy(rv)
          retValues[k] = sv

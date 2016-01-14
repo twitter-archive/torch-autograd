@@ -215,11 +215,8 @@ local function mapReusableTensorNodeSymbol(node, symbols, tensorPool, availableT
       tensorIdx = table.remove(matchingList, #matchingList)
       availableCount = availableCount - 1
    else
-      if availableCount > 0 then
+      if availableCount > 0 and index ~= nil then
          -- There are tensors remaining, so keep track for possible later inexact allocation.
-         if index == nil then
-            error("invalid remaining output index")
-         end
          remainingOutputs[#remainingOutputs + 1] = index
       else
          -- No available tensors, so just go ahead and allocate a slot for this one now.
