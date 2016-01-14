@@ -9,6 +9,11 @@ function cast(tableOfParams, typeName)
    if typeName == "double" then typeName = "torch.DoubleTensor" end
    if typeName == "cuda" then typeName = "torch.CudaTensor" end
 
+   -- If we passed in a tensor, just cast it
+   if torch.isTensor(tableOfParams) then
+      return tableOfParams:type(typeName)
+   end
+
    -- Recursively cast
    local out = {}
    for key,value in pairs(tableOfParams) do
@@ -230,7 +235,7 @@ function util.cat(x, y, dim)
    else -- x should be a table filled with stuff of all the same type
       if torch.isTensor(x[1]) then
          dim = y or torch.nDimension(x[1]) -- second arg becomes dimension
-         return torch.cat(x,dim)
+         return x[1].cat(x,dim)
       else
          -- We're concatenating numbers, and we'll yield the default Tensor type
          return torch.Tensor(x)
