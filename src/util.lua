@@ -1,5 +1,6 @@
 -- Utilities
 local util = {}
+local Value = require 'autograd.runtime.codegen.Value'
 
 local cast
 function cast(tableOfParams, typeName)
@@ -201,7 +202,7 @@ end
 
 function util.catTableGradient(g, x, dim)
    dim = dim or torch.nDimension(x[1])
-   local ln=#x
+   local ln=Value.len(x)
    local out = {}
    local currentIndex = 1
    for i=1,ln do
@@ -213,7 +214,7 @@ function util.catTableGradient(g, x, dim)
 end
 
 function util.catNumberGradient(g, x, dim)
-   local ln=#x
+   local ln=Value.len(x)
    local out = {}
    local currentIndex = 1
    for i=1,ln do
