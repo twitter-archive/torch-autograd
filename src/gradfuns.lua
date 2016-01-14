@@ -111,19 +111,27 @@ end
 
 local functions = { }
 
-functions.cat = {
-   function(g, ans, x,y,dim)
+functions.catGradient = {
+   function(g, ans, x, y,dim)
       if torch.isTensor(x) then
          dim = dim or torch.nDimension(x)
          return torch.narrow(g, dim, 1, torch.size(x, dim))
       else
-         -- Second argument is dimension if table is passed in
-         return util.catTable(g, x, y)
+         if torch.isTensor(x[1]) then
+            -- Second argument is dimension if table is passed in
+            return util.catTableGradient(g, x, y)
+         else
+            return util.catNumberGradient(g, x, y)
+         end
       end
    end,
    function(g,ans,x,y,dim)
-      dim = dim or torch.nDimension(x)
-      return torch.narrow(g, dim, torch.size(x, dim) + 1, torch.size(y, dim))
+      if torch.isTensor(y) then
+         dim = dim or torch.nDimension(x)
+         return torch.narrow(g, dim, torch.size(x, dim) + 1, torch.size(y, dim))
+      else
+         return nil
+      end
    end
 }
 
@@ -204,7 +212,7 @@ overload.module("torch", torch, function(module)
             for k, v in pairs(operators) do
                class.operator(k, v)
             end
-            class.gradient("cat", functions.cat)
+            class.gradient("cat", functions.catGradient)
             class.initializer("new")
             class.static("dim", "size", "nDimension", "nElement")
             class.defaultUnsupported()
@@ -287,7 +295,7 @@ overload.module("torch", torch, function(module)
          return g
       end
    })
-   module.gradient("cat", functions.cat)
+   module.gradient("cat", functions.catGradient)
    module.gradient("expand", {
       function(g, ans, x,...)
          local xSizes = torch.size(x):totable()
@@ -480,7 +488,7 @@ overload.module("util", util, function(module)
          return torch.cmul(g, p)
       end
    })
-
+   module.gradient("cat", functions.catGradient)
    module.gradient("newTensorLike", zeroGradient())
    module.gradient("zerosLike", zeroGradient())
    module.static("lt")
