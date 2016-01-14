@@ -1351,7 +1351,6 @@ local tests = {
       df = autograd(f)
       local params = {a=1,b=2,c=3}
       grads, loss = df(params)
-      print(grads)
       -- It just needs to run, gradcheck doesn't support numbers right now
    end,
 
