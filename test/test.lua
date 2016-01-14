@@ -1345,7 +1345,11 @@ local tests = {
    end,
    CatNumber = function() 
       local function f(params)
-         local a = autograd.util.cat({params.a,params.b,params.c})
+         local tbl = {}
+         tbl[#tbl+1] = params.a
+         tbl[#tbl+1] = params.b
+         tbl[#tbl+1] = params.c
+         local a = autograd.util.cat(tbl)
          return -torch.sum(a)
       end
       df = autograd(f)
