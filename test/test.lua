@@ -1370,7 +1370,7 @@ end
 -- Run tests:
 autograd.optimize(true)
 tester:add(prefixTests("Optimized_", tests, { })):run()
--- autograd.optimize(false)
--- tester = totem.Tester()
+autograd.optimize(false)
+tester = totem.Tester()
 tester:add(prefixTests("Direct_", tests, { AutoModule = true, DebuggerDivZero = true, StableGradients = true })):run()
 
