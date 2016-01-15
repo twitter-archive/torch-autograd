@@ -1409,6 +1409,51 @@ local tests = {
          return torch.sum(y)
       end
       tester:assert(gradcheck(f3to4, {x=torch.randn(3,3,3)}), "Incorrect gradient")
+
+   GradGrad = function()
+      
+      local function nearlyEqual(a,b)
+         diff = (a-b):abs():sum()
+         return diff < 0.000001
+      end
+
+      local numFeatures = 5
+      local params = torch.randn(numFeatures)
+
+      --synthetic data
+      local x = torch.randn(numFeatures)
+      local y = torch.randn(1)[1]
+
+      local innerFn = function(params, x, y)
+         local yHat = params*x
+         local squaredLoss = torch.pow(y - yHat,2)
+         return squaredLoss
+      end
+
+      --autodiff
+      local dneuralNet = autograd(innerFn)
+      local numericalGrad = dneuralNet(params,x,y)
+
+      --analytical expression
+      local residual = y - params*x
+      analyticalGrad = x:clone():mul(-2*residual)
+      
+      tester:assert(nearlyEqual(analyticalGrad,numericalGrad), 'analytical and numerical solution do not match')
+
+      --the outer function computes the sum of the gradient of the neural network. Therefore, differentiating yields the sum of each column of the Hessian
+      local outerFn = function(params,x,y)
+         local grad = dneuralNet(params,x,y)
+         return torch.sum(grad)
+      end
+
+      --autodiff solution for sum of each column of Hessian
+      local ddf = autograd(outerFn)
+      local numericalGradGrad = ddf(params,x,y)
+
+      --analytical expression
+      hessian = torch.ger(x,x):mul(2)
+      analyticalGradGrad = torch.sum(hessian,1)
+      tester:assert(nearlyEqual(analyticalGradGrad,numericalGradGrad), 'analytical and numerical solution do not match')
    end,
 
 
