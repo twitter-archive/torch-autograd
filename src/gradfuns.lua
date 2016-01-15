@@ -558,7 +558,6 @@ overload.module("util", util, function(module)
    module.static("ge")
    module.static("eq")
    module.initializer("newTensorLike", "zerosLike")
-   module.dynamic("setNotEqual")
 end)
 
 
