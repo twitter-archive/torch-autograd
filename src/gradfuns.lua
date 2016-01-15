@@ -525,6 +525,31 @@ overload.module("util", util, function(module)
          return torch.cmul(g, p)
       end
    })
+   module.gradient("selectSliceCopy", {
+      function(g, ans, x, template, dim, index)
+         return torch.select(g, dim, index)
+      end,
+      function(g, ans, x, template, dim, index) return nil end,
+      function(g, ans, x, template, dim, index) return nil end,
+      function(g, ans, x, template, dim, index) return nil end,
+   })
+   module.gradient("narrowSliceCopy", {
+      function(g, ans, x, template, dim, index, size)
+         return torch.narrow(g, dim, index, size)
+      end,
+      function(g, ans, x, template, dim, index, size) return nil end,
+      function(g, ans, x, template, dim, index, size) return nil end,
+      function(g, ans, x, template, dim, index, size) return nil end,
+      function(g, ans, x, template, dim, index, size) return nil end,
+   })
+   module.gradient("indexAdd", {
+      function(g, ans, x, template, dim, index)
+         return torch.index(g, dim, index)
+      end,
+      function(g, ans, x, template, dim, index) return nil end,
+      function(g, ans, x, template, dim, index) return nil end,
+      function(g, ans, x, template, dim, index) return nil end,
+   })
    module.gradient("makeContiguous", zeroGradient())
    module.gradient("cat", functions.catGradient)
    module.static("lt")
@@ -533,7 +558,7 @@ overload.module("util", util, function(module)
    module.static("ge")
    module.static("eq")
    module.initializer("newTensorLike", "zerosLike")
-   module.dynamic("setNotEqual", "selectSliceCopy", "narrowSliceCopy", "indexAdd")
+   module.dynamic("setNotEqual")
 end)
 
 

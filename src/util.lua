@@ -106,11 +106,12 @@ function util.dropout(state, dropout)
    return torch.cmul(state, keep)
 end
 
+-- NOTE
+-- Made inefficient for grads of grads
 function util.setNotEqual(a, b, c, v)
    local mask = torch.ne(a, b)
    local copy = torch.clone(v)
-   copy[mask] = 0
-   return copy
+   return torch.cmul(copy,torch.typeAs(mask,copy))
 end
 
 function util.setNotEqualInPlace(o, a, b, c, v)
