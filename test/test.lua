@@ -1364,27 +1364,6 @@ local tests = {
       end
       tester:assert(gradcheck(f,{a = torch.randn(5,5)}), "Incorrect gradient")
    end,
-   TypeAs = function()
-      local W1 = torch.FloatTensor(1, 1, 10, 10):normal()
-      local W2 = W1 + 1  -- all different
-      W1[{1, 1, 1, 1}] = W2[{1, 1, 1, 1}]
-
-      print(torch.typeAs)
-
-      local testeq = function(inputs)
-         print("==========================")
-         print(torch.typeAs)
-         print("==========================")
-         local mask = torch.typeAs(torch.eq(inputs.W1, inputs.W2), inputs.W1)
-         local product = torch.cmul(inputs.W1, mask)
-         return torch.sum(product)
-      end
-
-      df = autograd(testeq)
-      testeq({W1=W1, W2=W2})
-      grads, val = df({W1=W1, W2=W2})
-      print(grads.W1)  -- should have 1 in the upper left corner
-   end
 
 }
 

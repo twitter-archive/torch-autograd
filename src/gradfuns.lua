@@ -457,6 +457,9 @@ overload.module("torch", torch, function(module)
    module.gradient("typeAs", {
       function(g, ans, x, y)
          return torch.typeAs(g, x)
+      end,
+      function(g, ans, x, y)
+         return nil
       end
    })
    module.gradient("fill", {

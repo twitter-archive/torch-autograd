@@ -120,7 +120,7 @@ function DirectTape.gradOnly(tape, arg, argnum, allAns, gradOutput)
                   end
                end
             elseif node.fun.differentiable then
-               error("missing gradient for function " .. node.fun.name)
+               error("missing gradient for argument " .. tostring(iarg) .. " in function " .. node.fun.name)
             end
          -- Special-casing table-valued arguments that contain nodes
          -- right now, this is just torch.cat

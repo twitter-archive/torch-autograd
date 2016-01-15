@@ -132,7 +132,7 @@ function Node:evaluateBackward()
 						end
 					end
 				elseif self.forwardFn.differentiable then
-					error("missing gradient for function " .. self.forwardFn.name)
+					error("missing gradient for argument " .. tostring(i) .. " in function " .. self.forwardFn.name)
 				end
 			end
 		end
