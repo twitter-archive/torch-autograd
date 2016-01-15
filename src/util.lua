@@ -147,22 +147,6 @@ function util.zerosLikeInPlace(o, a, b)
    return o:zero()
 end
 
-function util.narrowCopy(a, dim, index, size)
-   return a:narrow(dim, index, size):clone()
-end
-
-function util.narrowCopyInPlace(a, dim, index, size)
-   return o:copy(a:narrow(dim, index, size))
-end
-
-function util.selectCopy(o, a, dim, index)
-   return a:select(dim, index):clone()
-end
-
-function util.selectCopyInPlace(o, a, dim, index)
-   return o:copy(a:select(dim, index))
-end
-
 function util.selectSliceCopy(g, x, dim, index)
    local out = g.new(x:size()):zero()
    local slice = out:select(dim,index)

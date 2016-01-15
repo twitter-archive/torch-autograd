@@ -1157,7 +1157,7 @@ local tests = {
 
       --test()
       local _, msg = pcall(test)
-      tester:assert(string.find(msg, "missing gradient for function"), "missing gradient not reported")
+      tester:assert(string.find(msg, "missing gradient"), "missing gradient not reported")
    end,
 
    Optim = function()
