@@ -1144,21 +1144,21 @@ local tests = {
 
    end,
 
-   MissingGradient = function()
+   -- MissingGradient = function()
 
-      -- Function:
-      local func = function(W)
-         return torch.sum(torch.repeatTensor(W, 1, 1))
-      end
+   --    -- Function:
+   --    local func = function(W)
+   --       return torch.sum(torch.reshape(W,5,5,1))
+   --    end
 
-      local test = function()
-         return autograd(func)(torch.FloatTensor(5, 5))
-      end
+   --    local test = function()
+   --       return autograd(func)(torch.FloatTensor(5, 5))
+   --    end
 
-      --test()
-      local _, msg = pcall(test)
-      tester:assert(string.find(msg, "missing gradient"), "missing gradient not reported")
-   end,
+   --    --test()
+   --    local _, msg = pcall(test)
+   --    tester:assert(string.find(msg, "missing gradient"), "missing gradient not reported")
+   -- end,
 
    Optim = function()
       local f = function(p, x, y)
@@ -1381,6 +1381,32 @@ local tests = {
       end
       tester:assert(gradcheck(adjointIndex, {x=torch.randn(2,3)}), "Incorrect gradient")
    end,
+   RepeatTensor = function()
+      local function f2to2(params)
+         local y = torch.repeatTensor(params.x, 2, 2)*3
+         return torch.sum(y)
+      end
+      tester:assert(gradcheck(f2to2, {x=torch.randn(3,3)}), "Incorrect gradient")
+
+      local function f3to3(params)
+         local y = torch.repeatTensor(params.x, 2, 2, 2)*3
+         return torch.sum(y)
+      end
+      tester:assert(gradcheck(f3to3, {x=torch.randn(3,3,3)}), "Incorrect gradient")
+
+      local function f2to3(params)
+         local y = torch.repeatTensor(params.x, 2, 2, 2)*3
+         return torch.sum(y)
+      end
+      tester:assert(gradcheck(f2to3, {x=torch.randn(3,3)}), "Incorrect gradient")
+
+      local function f3to4(params)
+         local y = torch.repeatTensor(params.x, 2, 2, 2, 2)*3
+         return torch.sum(y)
+      end
+      tester:assert(gradcheck(f3to4, {x=torch.randn(3,3,3)}), "Incorrect gradient")
+
+   end
 }
 
 local function prefixTests(pf, t, skip)

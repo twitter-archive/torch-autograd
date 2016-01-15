@@ -102,8 +102,7 @@ local function repeatToMatchShape(x,axis)
       axis = getValue(axis)
       local size = torch.size(x):fill(1)
       size[axis] = torch.size(x, axis)
-      return function(g)
-         return torch.repeatTensor(g, size) end, size[axis]
+      return function(g) return torch.repeatTensor(g, size) end, size[axis]
    end
 end
 
@@ -470,15 +469,40 @@ overload.module("torch", torch, function(module)
          return torch.sum(g)
       end,
    })
-   -- module.gradient("repeatTensor", {
-   --    function(g, ans, ...)
 
+   module.gradient("repeatTensor", {
+      function(g, ans, x, ...)
+         Dg = torch.nDimension(g)
+         Dx = torch.nDimension(x)
+         for i=Dx,1,-1 do
+            local D = torch.nDimension(g)
+            local c = torch.cat(torch.split(g,torch.size(x,i), Dg-Dx+i), D+1)
+            g = torch.squeeze(torch.sum(c,D+1))
+         end
+         for i=1,Dg-Dx do
+            g = torch.squeeze(torch.sum(g,1))
+         end
+         return g
+      end,
+      function(g, ans, ...) return nil end,
+      function(g, ans, ...) return nil end,
+      function(g, ans, ...) return nil end,
+      function(g, ans, ...) return nil end,
+      function(g, ans, ...) return nil end, -- five dimensions should be enough
+   })
+   module.gradient("squeeze", {
+      function(g, ans, x)
+         return torch.viewAs(g, x)
+      end
+   })
+   -- module.gradient("split", {
+   --    function(g, ans, x, size, dim) 
+   --       -- TODO: untested, not sure if we support table output
+   --       return torch.cat(g, dim)
    --    end,
-   --    function(g, ans, ...) return nil end,
-   --    function(g, ans, ...) return nil end,
-   --    function(g, ans, ...) return nil end,
-   --    function(g, ans, ...) return nil end,
-   --    function(g, ans, ...) return nil end, -- five dimensions should be enough
+   --    function(g, ans, x, size, dim) return nil end,
+   --    function(g, ans, x, size, dim) return nil end,
+
    -- })
 
    -- Zero gradients
@@ -496,11 +520,10 @@ overload.module("torch", torch, function(module)
    module.gradient("sign", zeroGradient())
 
    module.initializer("new", "bernoulli", "uniform", "normal", "random", "zeros", "zero", "eye", "ones")
-
-   module.dynamic("repeatTensor")
    module.static("size", "isTensor", "nDimension", "nElement", "isSameSizeAs")
 
    module.ignore("typename")
+   module.dynamic("split")
 
    module.defaultUnsupported()
 end)
