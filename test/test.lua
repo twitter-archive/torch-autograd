@@ -1343,6 +1343,7 @@ local tests = {
       tester:assert(gradcheck(f,{a = torch.eye(5)}), "Incorrect gradient")
       tester:assert(gradcheck(f,{a = torch.eye(1)}), "Incorrect gradient")
    end,
+
    CatNumber = function() 
       local function f(params)
          local tbl = {}
@@ -1357,6 +1358,7 @@ local tests = {
       local grads, loss = df(params)
       -- It just needs to run, gradcheck doesn't support numbers right now
    end,
+
    FunctionalFill = function()
       local function f(params)
          local o = torch.fill(params.a, torch.sum(params.a))
@@ -1364,6 +1366,7 @@ local tests = {
       end
       tester:assert(gradcheck(f,{a = torch.randn(5,5)}), "Incorrect gradient")
    end,
+
    Padding = function()
       local function adjointSelect(params)
          local padded = autograd.util.selectSliceCopy(params.x, torch.zeros(3,3), 1, 1)
@@ -1381,6 +1384,7 @@ local tests = {
       end
       tester:assert(gradcheck(adjointIndex, {x=torch.randn(2,3)}), "Incorrect gradient")
    end,
+
    RepeatTensor = function()
       local function f2to2(params)
          local y = torch.repeatTensor(params.x, 2, 2)*3
@@ -1405,8 +1409,9 @@ local tests = {
          return torch.sum(y)
       end
       tester:assert(gradcheck(f3to4, {x=torch.randn(3,3,3)}), "Incorrect gradient")
+   end,
 
-   end
+
 }
 
 local function prefixTests(pf, t, skip)
