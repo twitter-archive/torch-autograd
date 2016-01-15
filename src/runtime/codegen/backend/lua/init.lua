@@ -27,8 +27,6 @@ local reusableFunctionsMap = {
    ["util.fillSameSizeAsInPlace"] = true,
    ["util.zerosLikeInPlace"] = true,
    ["util.setNotEqualInPlace"] = true,
-   ["util.narrowCopyInPlace"] = true,
-   ["util.selectCopyInPlace"] = true,
    ["util.indexAddInPlace"] = true,
    ["util.newTensorLikeInPlace"] = true,
 }
@@ -39,8 +37,6 @@ local reusableFunctionTransforms = {
    ["util.fillSameSizeAs"] = "util.fillSameSizeAsInPlace",
    ["util.zerosLike"] = "util.zerosLikeInPlace",
    ["util.setNotEqual"] = "util.setNotEqualInPlace",
-   ["util.narrowCopy"] = "util.narrowCopyInPlace",
-   ["util.selectCopy"] = "util.selectCopyInPlace",
    ["util.indexAdd"] = "util.indexAddInPlace",
    ["util.sigmoid"] = "util.sigmoidInPlace",
    ["util.newTensorLike"] = "util.newTensorLikeInPlace",

@@ -108,7 +108,7 @@ end
 
 function util.setNotEqual(a, b, c, v)
    local mask = torch.ne(a, b)
-   local copy = v:clone()
+   local copy = torch.clone(v)
    copy[mask] = 0
    return copy
 end
@@ -121,15 +121,17 @@ function util.setNotEqualInPlace(o, a, b, c, v)
 end
 
 function util.newTensorLike(a)
-   return a.new(a:size())
+   return a.new(torch.size(a))
 end
 
 function util.newTensorLikeInPlace(o, a)
    return o
 end
 
+-- TODO: this is now implemented as torch.fill,
+-- which is overloaded in support.lua to be functional
 function util.fillSameSizeAs(a, b)
-   return a.new(a:size()):fill(b)
+   return torch.fill(a,b)
 end
 
 function util.fillSameSizeAsInPlace(o, a, b)
@@ -138,7 +140,7 @@ end
 
 function util.zerosLike(a, b)
    b = b or a
-   return a.new(b:size()):zero()
+   return a.new(torch.size(b)):fill(0)
 end
 
 function util.zerosLikeInPlace(o, a, b)

@@ -97,7 +97,7 @@ local function repeatToMatchShape(x,axis)
    end
    local size
    if not axis then
-      return function(g) return util.fillSameSizeAs(x, _sum(g)) end, torch.nElement(x)
+      return function(g) return torch.fill(x, _sum(g)) end, torch.nElement(x)
    else
       axis = getValue(axis)
       local size = torch.size(x):fill(1)
@@ -266,6 +266,17 @@ overload.module("torch", torch, function(module)
          return elemwiseMul(g, mzz)
       end
    })
+   module.gradient("sinh", {
+      function(g, ans, x)
+         return torch.cosh(x)
+      end
+   })
+   module.gradient("cosh", {
+      function(g, ans, x)
+         return torch.sinh(x)
+      end
+   })
+
    module.gradient("abs", {
       function(g, ans, x)
          if torch.isTensor(x) then
@@ -309,7 +320,7 @@ overload.module("torch", torch, function(module)
       end
    })
    module.gradient("expandAs", {
-      function(g, ans, x,template)
+      function(g, ans, x, template)
          local sizes = torch.size(x):totable()
          local out = g
          for dim,size in pairs(sizes) do
@@ -443,6 +454,29 @@ overload.module("torch", torch, function(module)
          return torch.typeAs(g, x)
       end
    })
+   module.gradient("typeAs", {
+      function(g, ans, x, y)
+         return torch.typeAs(g, x)
+      end
+   })
+   module.gradient("fill", {
+      function(g, ans, template, x)
+         return nil
+      end,
+      function(g, ans, template, x)
+         return torch.sum(g)
+      end,
+   })
+   -- module.gradient("repeatTensor", {
+   --    function(g, ans, ...)
+
+   --    end,
+   --    function(g, ans, ...) return nil end,
+   --    function(g, ans, ...) return nil end,
+   --    function(g, ans, ...) return nil end,
+   --    function(g, ans, ...) return nil end,
+   --    function(g, ans, ...) return nil end, -- five dimensions should be enough
+   -- })
 
    -- Zero gradients
    module.gradient("lt", zeroGradient())
@@ -458,9 +492,9 @@ overload.module("torch", torch, function(module)
    module.gradient("round", zeroGradient())
    module.gradient("sign", zeroGradient())
 
-   module.initializer("new", "bernoulli", "uniform", "normal", "random", "zeros", "zero")
+   module.initializer("new", "bernoulli", "uniform", "normal", "random", "zeros", "zero", "eye", "ones")
 
-   module.dynamic("fill", "cosh", "sign", "repeatTensor", "typeAs", "eq")
+   module.dynamic("repeatTensor")
    module.static("size", "isTensor", "nDimension", "nElement", "isSameSizeAs")
 
    module.ignore("typename")
@@ -488,16 +522,15 @@ overload.module("util", util, function(module)
          return torch.cmul(g, p)
       end
    })
+   module.gradient("makeContiguous", zeroGradient())
    module.gradient("cat", functions.catGradient)
-   module.gradient("newTensorLike", zeroGradient())
-   module.gradient("zerosLike", zeroGradient())
    module.static("lt")
    module.static("le")
    module.static("gt")
    module.static("ge")
    module.static("eq")
    module.initializer("newTensorLike", "zerosLike")
-   module.dynamic("setNotEqual", "fillSameSizeAs", "narrowCopy", "selectCopy", "selectSliceCopy", "narrowSliceCopy", "makeContiguous", "indexAdd", "catTable")
+   module.dynamic("setNotEqual", "selectSliceCopy", "narrowSliceCopy", "indexAdd")
 end)
 
 

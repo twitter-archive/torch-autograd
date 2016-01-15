@@ -103,8 +103,8 @@ local function wrapCriterion(nnObject)
             return nodeApply(backFnDesc, nil, g, x, y)
          end,
          function(g,ans,x,y)
-            -- NOTE: shoudl we throw error as uniplemented here?
-            return util.fillSameSizeAs(y, 0)
+            -- NOTE: should we throw error as uniplemented here?
+            return torch.fill(y, 0)
          end,
       }
       local fnDesc = {
