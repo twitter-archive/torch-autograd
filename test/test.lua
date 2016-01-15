@@ -1413,45 +1413,44 @@ local tests = {
 
    GradGrad = function()
       
-      if autograd.optimizing() then -- 2nd and higher grads only supported in optimized mode
-         local numFeatures = 5
-         local params = torch.randn(numFeatures)
+      local numFeatures = 5
+      local params = torch.randn(numFeatures)
 
-         --synthetic data
-         local x = torch.randn(numFeatures)
-         local y = torch.randn(1)[1]
+      --synthetic data
+      local x = torch.randn(numFeatures)
+      local y = torch.randn(1)[1]
 
-         local innerFn = function(params, x, y)
-            local yHat = params*x
-            local squaredLoss = torch.pow(y - yHat,2)
-            return squaredLoss
-         end
-
-         --autodiff
-         local dneuralNet = autograd(innerFn)
-         local numericalGrad = dneuralNet(params,x,y)
-
-         --analytical expression
-         local residual = y - params*x
-         analyticalGrad = x:clone():mul(-2*residual)
-         
-         tester:assertTensorEq(analyticalGrad,numericalGrad,1e-8,'analytical and numerical solution do not match')
-
-         --the outer function computes the sum of the gradient of the neural network. Therefore, differentiating yields the sum of each column of the Hessian
-         local outerFn = function(params,x,y)
-            local grad = dneuralNet(params,x,y)
-            return torch.sum(grad)
-         end
-
-         --autodiff solution for sum of each column of Hessian
-         local ddf = autograd(outerFn)
-         local numericalGradGrad = ddf(params,x,y)
-
-         --analytical expression
-         hessian = torch.ger(x,x):mul(2)
-         analyticalGradGrad = torch.sum(hessian,1)
-         tester:assertTensorEq(analyticalGrad,numericalGrad,1e-8,'analytical and numerical solution do not match')
+      local innerFn = function(params, x, y)
+         local yHat = params*x
+         local squaredLoss = torch.pow(y - yHat,2)
+         return squaredLoss
       end
+
+      --autodiff
+      local dneuralNet = autograd(innerFn)
+      local numericalGrad = dneuralNet(params,x,y)
+
+      --analytical expression
+      local residual = y - params*x
+      analyticalGrad = x:clone():mul(-2*residual)
+      
+      tester:assertTensorEq(analyticalGrad,numericalGrad,1e-8,'analytical and numerical solution do not match')
+
+      --the outer function computes the sum of the gradient of the neural network. Therefore, differentiating yields the sum of each column of the Hessian
+      local outerFn = function(params,x,y)
+         local grad = dneuralNet(params,x,y)
+         return torch.sum(grad)
+      end
+
+      --autodiff solution for sum of each column of Hessian
+      local ddf = autograd(outerFn)
+      local numericalGradGrad = ddf(params,x,y)
+
+      --analytical expression
+      hessian = torch.ger(x,x):mul(2)
+      analyticalGradGrad = torch.sum(hessian,1)
+      tester:assertTensorEq(analyticalGrad,numericalGrad,1e-8,'analytical and numerical solution do not match')
+      
    end,
 
 
@@ -1472,5 +1471,5 @@ autograd.optimize(true)
 tester:add(prefixTests("Optimized_", tests, { })):run()
 autograd.optimize(false)
 tester = totem.Tester()
-tester:add(prefixTests("Direct_", tests, { AutoModule = true, DebuggerDivZero = true, StableGradients = true })):run()
+tester:add(prefixTests("Direct_", tests, { GradGrad = true, AutoModule = true, DebuggerDivZero = true, StableGradients = true })):run()
 
