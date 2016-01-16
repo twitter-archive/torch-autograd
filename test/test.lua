@@ -495,7 +495,7 @@ local tests = {
          tester:asserteq(grads.W:dim(), 2, 'incorrect dims for gradients')
          tester:asserteq(grads.W:size(1), 5, 'incorrect dims for gradients')
          tester:asserteq(grads.W:size(2), 5, 'incorrect dims for gradients')
-         -- tester:assert(gradcheck(func1, {W=W}), 'incorrect gradients')
+         tester:assert(gradcheck(func1, {W=W}), 'incorrect gradients')
 
          -- Compute func and grads:
          local W = torch.ones(5,5):fill(2)

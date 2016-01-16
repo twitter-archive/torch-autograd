@@ -97,7 +97,7 @@ local function repeatToMatchShape(x,axis)
    end
    local size
    if not axis then
-      return function(g) return torch.fill(x, _sum(g)) end, torch.nElement(x)
+      return function(g) return util.fillSameSizeAs(x, _sum(g)) end, torch.nElement(x)
    else
       axis = getValue(axis)
       local size = torch.size(x):fill(1)

@@ -104,7 +104,7 @@ local function wrapCriterion(nnObject)
          end,
          function(g,ans,x,y)
             -- NOTE: should we throw error as uniplemented here?
-            return torch.fill(y, 0)
+            return util.fillSameSizeAs(y, 0)
          end,
       }
       local fnDesc = {
