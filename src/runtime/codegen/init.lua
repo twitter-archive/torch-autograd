@@ -25,7 +25,7 @@ local function execUncached(fn, args, opt, nestedGradient)
    if not nestedGradient then
       retValues = Value.flatten(retValues)
    end
-   return unpack(retValues)
+   return table.unpack(retValues)
 end
 
 local function printPoolStats(tensorPool)
