@@ -290,4 +290,16 @@ function util.deepCopy(tbl)
    end
 end
 
+function util.fillInPlace(o,A,b)
+   return o:fill(b)
+end
+
+function util.cloneInPlace(o,A)
+   return o:copy(A)
+end
+
+function util.newInPlace(o,s)
+   return o
+end
+
 return util

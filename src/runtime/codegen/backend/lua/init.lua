@@ -20,6 +20,7 @@ local reusableFunctionsMap = {
    ["torch.cosh"] = true,
    ["torch.cat"] = true,
    ["torch.log"] = true,
+   ["torch.repeatTensor"] = true,
    ["util.sigmoidInPlace"] = true,
    ["util.narrowSliceCopyInPlace"] = true,
    ["util.selectSliceCopyInPlace"] = true,
@@ -29,6 +30,9 @@ local reusableFunctionsMap = {
    ["util.setNotEqualInPlace"] = true,
    ["util.indexAddInPlace"] = true,
    ["util.newTensorLikeInPlace"] = true,
+   ["util.fillInPlace"] = true,
+   ["util.cloneInPlace"] = true,
+   ["util.newInPlace"] = true,
 }
 
 local reusableFunctionTransforms = {
@@ -40,6 +44,11 @@ local reusableFunctionTransforms = {
    ["util.indexAdd"] = "util.indexAddInPlace",
    ["util.sigmoid"] = "util.sigmoidInPlace",
    ["util.newTensorLike"] = "util.newTensorLikeInPlace",
+   ["torch.fill"] = "util.fillInPlace",
+   ["torch.clone"] = "util.cloneInPlace",
+   ["torch.DoubleTensor.new"] = "util.newInPlace",
+   ["torch.FloatTensor.new"] = "util.newInPlace",
+   ["torch.CudaTensor.new"] = "util.newInPlace",
 }
 
 local function canReuseOutput(node)
