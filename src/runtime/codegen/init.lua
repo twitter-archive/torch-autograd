@@ -25,7 +25,7 @@ local function execUncached(fn, args, opt, nestedGradient)
    if not nestedGradient then
       retValues = Value.flatten(retValues)
    end
-   return unpack(retValues)
+   return table.unpack(retValues)
 end
 
 local function printPoolStats(tensorPool)
@@ -76,15 +76,18 @@ local function create(fn, opt)
    local stableGradTensors = nil
    return function(...)
       local args = {...}
+      if Graph.reentryDepth() > 0 then
+         -- If we're in the middle of building the graph for a parent function, include this one in the parent, don't codegen.
+         return execUncached(fn, args, opt, true)
+      end
       local sigFun = opt.signatureFn or function(params)
          local tensorDims = { }
          buildSignature(params, tensorDims)
          return table.concat(tensorDims, "-")
       end
       local signature = sigFun(args)
-      if signature == nil or Graph.reentryDepth() > 0 then
-         -- If we're in the middle of building the graph for a parent function, include this one in the parent, don't codegen.
-         return execUncached(fn, args, opt, Graph.reentryDepth() > 0)
+      if signature == nil then
+         return execUncached(fn, args, opt, false)
       end
       if generatedFunctions[signature] == nil then
          local gradFn, retValues, code = generateFn(fn, args, opt)

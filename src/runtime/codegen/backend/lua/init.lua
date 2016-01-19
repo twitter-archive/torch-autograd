@@ -20,6 +20,7 @@ local reusableFunctionsMap = {
    ["torch.cosh"] = true,
    ["torch.cat"] = true,
    ["torch.log"] = true,
+   ["torch.repeatTensor"] = true,
    ["util.sigmoidInPlace"] = true,
    ["util.narrowSliceCopyInPlace"] = true,
    ["util.selectSliceCopyInPlace"] = true,
@@ -27,10 +28,12 @@ local reusableFunctionsMap = {
    ["util.fillSameSizeAsInPlace"] = true,
    ["util.zerosLikeInPlace"] = true,
    ["util.setNotEqualInPlace"] = true,
-   ["util.narrowCopyInPlace"] = true,
-   ["util.selectCopyInPlace"] = true,
    ["util.indexAddInPlace"] = true,
    ["util.newTensorLikeInPlace"] = true,
+   ["util.fillInPlace"] = true,
+   ["util.cloneInPlace"] = true,
+   ["util.newInPlace"] = true,
+   ["util.typeAsInPlace"] = true,
 }
 
 local reusableFunctionTransforms = {
@@ -39,11 +42,15 @@ local reusableFunctionTransforms = {
    ["util.fillSameSizeAs"] = "util.fillSameSizeAsInPlace",
    ["util.zerosLike"] = "util.zerosLikeInPlace",
    ["util.setNotEqual"] = "util.setNotEqualInPlace",
-   ["util.narrowCopy"] = "util.narrowCopyInPlace",
-   ["util.selectCopy"] = "util.selectCopyInPlace",
    ["util.indexAdd"] = "util.indexAddInPlace",
    ["util.sigmoid"] = "util.sigmoidInPlace",
    ["util.newTensorLike"] = "util.newTensorLikeInPlace",
+   ["torch.fill"] = "util.fillInPlace",
+   ["torch.clone"] = "util.cloneInPlace",
+   ["torch.DoubleTensor.new"] = "util.newInPlace",
+   ["torch.FloatTensor.new"] = "util.newInPlace",
+   ["torch.CudaTensor.new"] = "util.newInPlace",
+   ["torch.typeAs"] = "util.typeAsInPlace",
 }
 
 local function canReuseOutput(node)

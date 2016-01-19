@@ -103,7 +103,7 @@ local function wrapCriterion(nnObject)
             return nodeApply(backFnDesc, nil, g, x, y)
          end,
          function(g,ans,x,y)
-            -- NOTE: shoudl we throw error as uniplemented here?
+            -- NOTE: should we throw error as uniplemented here?
             return util.fillSameSizeAs(y, 0)
          end,
       }

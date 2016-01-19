@@ -102,8 +102,7 @@ local function repeatToMatchShape(x,axis)
       axis = getValue(axis)
       local size = torch.size(x):fill(1)
       size[axis] = torch.size(x, axis)
-      return function(g)
-         return torch.repeatTensor(g, size) end, size[axis]
+      return function(g) return torch.repeatTensor(g, size) end, size[axis]
    end
 end
 
@@ -266,6 +265,17 @@ overload.module("torch", torch, function(module)
          return elemwiseMul(g, mzz)
       end
    })
+   module.gradient("sinh", {
+      function(g, ans, x)
+         return torch.cosh(x)
+      end
+   })
+   module.gradient("cosh", {
+      function(g, ans, x)
+         return torch.sinh(x)
+      end
+   })
+
    module.gradient("abs", {
       function(g, ans, x)
          if torch.isTensor(x) then
@@ -309,7 +319,7 @@ overload.module("torch", torch, function(module)
       end
    })
    module.gradient("expandAs", {
-      function(g, ans, x,template)
+      function(g, ans, x, template)
          local sizes = torch.size(x):totable()
          local out = g
          for dim,size in pairs(sizes) do
@@ -443,6 +453,57 @@ overload.module("torch", torch, function(module)
          return torch.typeAs(g, x)
       end
    })
+   module.gradient("typeAs", {
+      function(g, ans, x, y)
+         return torch.typeAs(g, x)
+      end,
+      function(g, ans, x, y)
+         return nil
+      end
+   })
+   module.gradient("fill", {
+      function(g, ans, template, x)
+         return nil
+      end,
+      function(g, ans, template, x)
+         return torch.sum(g)
+      end,
+   })
+
+   module.gradient("repeatTensor", {
+      function(g, ans, x, ...)
+         local Dg = torch.nDimension(g)
+         local Dx = torch.nDimension(x)
+         for i=Dx,1,-1 do
+            local D = torch.nDimension(g)
+            local c = torch.cat(torch.split(g,torch.size(x,i), Dg-Dx+i), D+1)
+            g = torch.squeeze(torch.sum(c,D+1))
+         end
+         for i=1,Dg-Dx do
+            g = torch.squeeze(torch.sum(g,1))
+         end
+         return g
+      end,
+      function(g, ans, ...) return nil end,
+      function(g, ans, ...) return nil end,
+      function(g, ans, ...) return nil end,
+      function(g, ans, ...) return nil end,
+      function(g, ans, ...) return nil end, -- five dimensions should be enough
+   })
+   module.gradient("squeeze", {
+      function(g, ans, x)
+         return torch.viewAs(g, x)
+      end
+   })
+   -- module.gradient("split", {
+   --    function(g, ans, x, size, dim) 
+   --       -- TODO: untested, not sure if we support table output
+   --       return torch.cat(g, dim)
+   --    end,
+   --    function(g, ans, x, size, dim) return nil end,
+   --    function(g, ans, x, size, dim) return nil end,
+
+   -- })
 
    -- Zero gradients
    module.gradient("lt", zeroGradient())
@@ -458,12 +519,11 @@ overload.module("torch", torch, function(module)
    module.gradient("round", zeroGradient())
    module.gradient("sign", zeroGradient())
 
-   module.initializer("new", "bernoulli", "uniform", "normal", "random", "zeros", "zero")
-
-   module.dynamic("fill", "cosh", "sign", "repeatTensor", "typeAs", "eq")
+   module.initializer("new", "bernoulli", "uniform", "normal", "random", "zeros", "zero", "eye", "ones")
    module.static("size", "isTensor", "nDimension", "nElement", "isSameSizeAs")
 
    module.ignore("typename")
+   module.dynamic("split")
 
    module.defaultUnsupported()
 end)
@@ -488,16 +548,39 @@ overload.module("util", util, function(module)
          return torch.cmul(g, p)
       end
    })
+   module.gradient("selectSliceCopy", {
+      function(g, ans, x, template, dim, index)
+         return torch.select(g, dim, index)
+      end,
+      function(g, ans, x, template, dim, index) return nil end,
+      function(g, ans, x, template, dim, index) return nil end,
+      function(g, ans, x, template, dim, index) return nil end,
+   })
+   module.gradient("narrowSliceCopy", {
+      function(g, ans, x, template, dim, index, size)
+         return torch.narrow(g, dim, index, size)
+      end,
+      function(g, ans, x, template, dim, index, size) return nil end,
+      function(g, ans, x, template, dim, index, size) return nil end,
+      function(g, ans, x, template, dim, index, size) return nil end,
+      function(g, ans, x, template, dim, index, size) return nil end,
+   })
+   module.gradient("indexAdd", {
+      function(g, ans, x, template, dim, index)
+         return torch.index(g, dim, index)
+      end,
+      function(g, ans, x, template, dim, index) return nil end,
+      function(g, ans, x, template, dim, index) return nil end,
+      function(g, ans, x, template, dim, index) return nil end,
+   })
+   module.gradient("makeContiguous", zeroGradient())
    module.gradient("cat", functions.catGradient)
-   module.gradient("newTensorLike", zeroGradient())
-   module.gradient("zerosLike", zeroGradient())
    module.static("lt")
    module.static("le")
    module.static("gt")
    module.static("ge")
    module.static("eq")
    module.initializer("newTensorLike", "zerosLike")
-   module.dynamic("setNotEqual", "fillSameSizeAs", "narrowCopy", "selectCopy", "selectSliceCopy", "narrowSliceCopy", "makeContiguous", "indexAdd", "catTable")
 end)
 
 

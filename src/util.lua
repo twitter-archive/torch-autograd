@@ -106,11 +106,11 @@ function util.dropout(state, dropout)
    return torch.cmul(state, keep)
 end
 
+-- NOTE
+-- Made inefficient for grads of grads
 function util.setNotEqual(a, b, c, v)
-   local mask = torch.ne(a, b)
-   local copy = v:clone()
-   copy[mask] = 0
-   return copy
+   local mask = torch.eq(a, b)
+   return torch.cmul(v,torch.typeAs(mask,v))
 end
 
 function util.setNotEqualInPlace(o, a, b, c, v)
@@ -121,15 +121,17 @@ function util.setNotEqualInPlace(o, a, b, c, v)
 end
 
 function util.newTensorLike(a)
-   return a.new(a:size())
+   return a.new(torch.size(a))
 end
 
 function util.newTensorLikeInPlace(o, a)
    return o
 end
 
+-- TODO: this is now implemented as torch.fill,
+-- which is overloaded in support.lua to be functional
 function util.fillSameSizeAs(a, b)
-   return a.new(a:size()):fill(b)
+   return torch.fill(a,b)
 end
 
 function util.fillSameSizeAsInPlace(o, a, b)
@@ -138,27 +140,11 @@ end
 
 function util.zerosLike(a, b)
    b = b or a
-   return a.new(b:size()):zero()
+   return a.new(torch.size(b)):fill(0)
 end
 
 function util.zerosLikeInPlace(o, a, b)
    return o:zero()
-end
-
-function util.narrowCopy(a, dim, index, size)
-   return a:narrow(dim, index, size):clone()
-end
-
-function util.narrowCopyInPlace(a, dim, index, size)
-   return o:copy(a:narrow(dim, index, size))
-end
-
-function util.selectCopy(o, a, dim, index)
-   return a:select(dim, index):clone()
-end
-
-function util.selectCopyInPlace(o, a, dim, index)
-   return o:copy(a:select(dim, index))
 end
 
 function util.selectSliceCopy(g, x, dim, index)
@@ -301,6 +287,30 @@ function util.deepCopy(tbl)
    else
       return tbl
    end
+end
+
+function util.fillInPlace(o,A,b)
+   return o:fill(b)
+end
+
+function util.cloneInPlace(o,A)
+   return o:copy(A)
+end
+
+function util.newInPlace(o,s)
+   return o
+end
+
+function util.typeAsIfNeeded(A, B)
+   if torch.type(A) ~= torch.type(B) then
+      return torch.typeAs(A, B)
+   end
+   return A
+end
+
+function util.typeAsInPlace(o, A, B)
+   o:copy(B)
+   return o
 end
 
 return util
