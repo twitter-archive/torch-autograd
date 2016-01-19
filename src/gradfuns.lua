@@ -472,8 +472,8 @@ overload.module("torch", torch, function(module)
 
    module.gradient("repeatTensor", {
       function(g, ans, x, ...)
-         Dg = torch.nDimension(g)
-         Dx = torch.nDimension(x)
+         local Dg = torch.nDimension(g)
+         local Dx = torch.nDimension(x)
          for i=Dx,1,-1 do
             local D = torch.nDimension(g)
             local c = torch.cat(torch.split(g,torch.size(x,i), Dg-Dx+i), D+1)
