@@ -110,8 +110,7 @@ end
 -- Made inefficient for grads of grads
 function util.setNotEqual(a, b, c, v)
    local mask = torch.eq(a, b)
-   local copy = torch.clone(v)
-   return torch.cmul(copy,torch.typeAs(mask,copy))
+   return torch.cmul(v,torch.typeAs(mask,v))
 end
 
 function util.setNotEqualInPlace(o, a, b, c, v)
@@ -299,6 +298,18 @@ function util.cloneInPlace(o,A)
 end
 
 function util.newInPlace(o,s)
+   return o
+end
+
+function util.typeAsIfNeeded(A, B)
+   if torch.type(A) ~= torch.type(B) then
+      return torch.typeAs(A, B)
+   end
+   return A
+end
+
+function util.typeAsInPlace(o, A, B)
+   o:copy(B)
    return o
 end
 

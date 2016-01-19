@@ -33,6 +33,7 @@ local reusableFunctionsMap = {
    ["util.fillInPlace"] = true,
    ["util.cloneInPlace"] = true,
    ["util.newInPlace"] = true,
+   ["util.typeAsInPlace"] = true,
 }
 
 local reusableFunctionTransforms = {
@@ -49,6 +50,7 @@ local reusableFunctionTransforms = {
    ["torch.DoubleTensor.new"] = "util.newInPlace",
    ["torch.FloatTensor.new"] = "util.newInPlace",
    ["torch.CudaTensor.new"] = "util.newInPlace",
+   ["torch.typeAs"] = "util.typeAsInPlace",
 }
 
 local function canReuseOutput(node)
