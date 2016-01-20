@@ -28,16 +28,15 @@ function Source:symbolPath(rootSymbols)
 		end
 	elseif self.type == Source.CONSTANT then
 		if type(self.val) == "userdata" and self.val.totable ~= nil then
+			if rootSymbols[self] then
+				return rootSymbols[self]
+			end
 			if torch.isTensor(self.val) then
-				if rootSymbols[self] then
-					return rootSymbols[self]
-				else
-					local tt = self.val:totable()
-					return self.val:type() .. "({" .. table.concat(tt, ", ") .. "})"
-				end
+				local tt = self.val:totable()
+				return self.val:type() .. "({" .. table.concat(tt, ", ") .. "})"
 			else
 				local tt = self.val:totable()
-				return table.concat(tt, ", ")
+				return torch.type(self.val) .. "({" .. table.concat(tt, ", ") .. "})"
 			end
 		elseif type(self.val) == "table" then
 			local Value = require 'autograd.runtime.codegen.Value'
