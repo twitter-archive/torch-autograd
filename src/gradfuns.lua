@@ -374,6 +374,16 @@ overload.module("torch", torch, function(module)
          return util.narrowSliceCopy(g, x, dim, index, size)
       end
    })
+   module.gradient("reshape", {
+      function(g, ans, x, ...)
+         return torch.viewAs(g, x)
+      end,
+      function(g, ans, x, ...) return nil end,
+      function(g, ans, x, ...) return nil end,
+      function(g, ans, x, ...) return nil end,
+      function(g, ans, x, ...) return nil end, -- 4D is enough. Beyond that have to use LongTensor for shape
+
+   })
    module.gradient("sum", {
       function(g, ans, x,axis)
          local repeater = repeatToMatchShape(x, axis)
@@ -572,6 +582,16 @@ overload.module("util", util, function(module)
       function(g, ans, x, template, dim, index) return nil end,
       function(g, ans, x, template, dim, index) return nil end,
       function(g, ans, x, template, dim, index) return nil end,
+   })
+   module.gradient("set", {
+      function(g, ans, x, k, v)
+         return util.set(g,k,0)
+      end,
+      function(g, ans, x, k, v) return nil end,
+      function(g, ans, x, k, v)
+         -- Currently support only integer selectors and settings
+         return torch.select(g,1,k) -- g[k]
+      end,
    })
    module.gradient("makeContiguous", zeroGradient())
    module.gradient("cat", functions.catGradient)

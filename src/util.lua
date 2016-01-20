@@ -229,6 +229,12 @@ function util.cat(x, y, dim)
    end
 end
 
+function util.set(x, k, v)
+   local out = torch.clone(x)
+   out[k] = v
+   return out
+end
+
 function util.makeContiguous(g)
    if not g:isContiguous() then
       g = g:contiguous()

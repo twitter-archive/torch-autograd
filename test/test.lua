@@ -197,6 +197,13 @@ local tests = {
       tester:assert(gradcheck(NarrowFn2D, {W=W,x=x2}), "Incorrect gradient")
    end,
 
+   Reshape = function()
+      local function f(params)
+         return torch.sum(torch.reshape(params.x,1,9)*3)
+      end
+      tester:assert(gradcheck(f, {x=torch.randn(3,3)}), "Incorrect gradient")
+   end,
+
    Clamp = function()
       local W = torch.Tensor(5,25):normal()
       local clampFn = function(inputs)
@@ -1450,7 +1457,14 @@ local tests = {
       hessian = torch.ger(x,x):mul(2)
       analyticalGradGrad = torch.sum(hessian,1)
       tester:assertTensorEq(analyticalGrad,numericalGrad,1e-8,'analytical and numerical solution do not match')
-      
+   end,
+
+   Assignment = function()
+      local f = function(params)
+         local x = autograd.util.set(params.x, 1, torch.sum(params.y)*2.0)
+         return torch.sum(x)
+      end
+      tester:assert(gradcheck(f,{x=torch.randn(10),y=torch.randn(3)}), "Incorrect gradient")
    end,
 
 
