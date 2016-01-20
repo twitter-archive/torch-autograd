@@ -309,8 +309,9 @@ function util.typeAsIfNeeded(A, B)
 end
 
 function util.typeAsInPlace(o, A, B)
-   o:copy(B)
+   o:copy(A)
    return o
 end
+
 
 return util
