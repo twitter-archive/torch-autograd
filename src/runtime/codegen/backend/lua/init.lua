@@ -150,6 +150,10 @@ local function tensorSig(t)
    return t:type() .. table.concat(t:size():totable(), ",")
 end
 
+local function storageSig(t)
+   return torch.type(t) .. table.concat(t:totable(), ",")
+end
+
 local function letterForType(val)
    if val.type == Value.TENSOR then
       return "t"
@@ -247,6 +251,7 @@ local function createSymbolTable(graph, execOrder, aliases, params, tensorPool, 
       symbols[params[i]] = "p" .. i
    end
 
+   local constantStorageMap = { }
    local constantTensorMap = { }
 
    local tensorPoolViews = { }
@@ -326,14 +331,25 @@ local function createSymbolTable(graph, execOrder, aliases, params, tensorPool, 
       for k = 1, #node.inputs do
          local input = node.inputs[k]
          local source = input.source:getRoot()
-         if source.type == Source.CONSTANT and symbols[source] == nil and torch.isTensor(source.val) then
-            local index = constantTensorMap[source.val]
-            if index == nil then
-               index = #constants + 1
-               constantTensorMap[source.val] = index
-               constants[index] = source
+         if source.type == Source.CONSTANT and symbols[source] == nil then
+            if torch.isTensor(source.val) then
+               local index = constantTensorMap[source.val]
+               if index == nil then
+                  index = #constants + 1
+                  constantTensorMap[source.val] = index
+                  constants[index] = source
+               end
+            elseif torch.isStorage(source.val) then
+               local sig = storageSig(source.val)
+               if constantStorageMap[sig] then
+                  symbols[source] = "c" .. constantStorageMap[sig]
+               else
+                  index = #constants + 1
+                  constants[index] = source
+                  constantStorageMap[sig] = index
+                  symbols[source] = "c" .. index
+               end
             end
-            symbols[source] = "c" .. index
          end
       end
    end

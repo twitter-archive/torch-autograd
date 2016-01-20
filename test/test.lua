@@ -1351,7 +1351,7 @@ local tests = {
       tester:assert(gradcheck(f,{a = torch.eye(1)}), "Incorrect gradient")
    end,
 
-   CatNumber = function() 
+   CatNumber = function()
       local function f(params)
          local tbl = {}
          tbl[#tbl+1] = params.a
@@ -1419,7 +1419,7 @@ local tests = {
    end,
 
    GradGrad = function()
-      
+
       local numFeatures = 5
       local params = torch.randn(numFeatures)
 
@@ -1440,7 +1440,7 @@ local tests = {
       --analytical expression
       local residual = y - params*x
       analyticalGrad = x:clone():mul(-2*residual)
-      
+
       tester:assertTensorEq(analyticalGrad,numericalGrad,1e-8,'analytical and numerical solution do not match')
 
       --the outer function computes the sum of the gradient of the neural network. Therefore, differentiating yields the sum of each column of the Hessian
@@ -1470,11 +1470,11 @@ local tests = {
          return torch.sum(x)
       end
       tester:assert(gradcheck(f2,{x=torch.randn(10,10),y=torch.randn(3)}), "Incorrect gradient")
-      -- local f3 = function(params)
-      --    local x = autograd.util.set(params.x, torch.LongStorage{2,2}, torch.sum(params.y))
-      --    return torch.sum(x)
-      -- end
-      -- tester:assert(gradcheck(f3,{x=torch.randn(10,10),y=torch.randn(3)}), "Incorrect gradient")
+      local f3 = function(params)
+         local x = autograd.util.set(params.x, torch.LongStorage{2,2}, torch.sum(params.y))
+         return torch.sum(x)
+      end
+      tester:assert(gradcheck(f3,{x=torch.randn(10,10),y=torch.randn(3)}), "Incorrect gradient")
    end,
 
 
