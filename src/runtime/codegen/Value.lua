@@ -76,9 +76,9 @@ function Value:__index(i)
 	elseif rtype == Value.TENSOR then
 		local raw = rawget(self, "raw")
 		if raw[i] ~= nil then
-			if type(i) ~= "string" then
-				error("tensor __index [] operator not supported by autograd")
-			end
+			-- if type(i) ~= "string" then
+			-- 	error("tensor __index [] operator not supported by autograd")
+			-- end
 			return raw[i]
 		end
 	end

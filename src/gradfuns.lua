@@ -590,8 +590,15 @@ overload.module("util", util, function(module)
       function(g, ans, x, k, v) return nil end,
       function(g, ans, x, k, v)
          -- Currently support only integer selectors and settings
-         return torch.select(g,1,k) -- g[k]
+         return util.get(g, k)
       end,
+   })
+   module.gradient("get", {
+      function(g, ans, x, k)
+         local out = util.zerosLike(x)
+         return util.set(out, k, g)
+      end, 
+      function(g, ans, x, k) return nil end,
    })
    module.gradient("makeContiguous", zeroGradient())
    module.gradient("cat", functions.catGradient)

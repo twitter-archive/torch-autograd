@@ -1460,11 +1460,21 @@ local tests = {
    end,
 
    Assignment = function()
-      local f = function(params)
+      local f1 = function(params)
          local x = autograd.util.set(params.x, 1, torch.sum(params.y)*2.0)
          return torch.sum(x)
       end
-      tester:assert(gradcheck(f,{x=torch.randn(10),y=torch.randn(3)}), "Incorrect gradient")
+      tester:assert(gradcheck(f1,{x=torch.randn(10),y=torch.randn(3)}), "Incorrect gradient")
+      local f2 = function(params)
+         local x = autograd.util.set(params.x, {1,1}, torch.sum(params.y)*2.0)
+         return torch.sum(x)
+      end
+      tester:assert(gradcheck(f2,{x=torch.randn(10,10),y=torch.randn(3)}), "Incorrect gradient")
+      -- local f3 = function(params)
+      --    local x = autograd.util.set(params.x, torch.LongStorage{2,2}, torch.sum(params.y))
+      --    return torch.sum(x)
+      -- end
+      -- tester:assert(gradcheck(f3,{x=torch.randn(10,10),y=torch.randn(3)}), "Incorrect gradient")
    end,
 
 

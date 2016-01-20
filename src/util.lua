@@ -235,6 +235,10 @@ function util.set(x, k, v)
    return out
 end
 
+function util.get(x, k)
+   return x[k]
+end
+
 function util.makeContiguous(g)
    if not g:isContiguous() then
       g = g:contiguous()
