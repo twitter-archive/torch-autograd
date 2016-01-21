@@ -506,7 +506,7 @@ overload.module("torch", torch, function(module)
       end
    })
    -- module.gradient("split", {
-   --    function(g, ans, x, size, dim) 
+   --    function(g, ans, x, size, dim)
    --       -- TODO: untested, not sure if we support table output
    --       return torch.cat(g, dim)
    --    end,
@@ -543,6 +543,26 @@ overload.module("Value", Value, function(module)
    for k, v in pairs(operators) do
       module.operator(k, v)
    end
+   module.gradient("__internal_set", {
+      function(g, ans, x, k, v)
+         g[k] = 0
+         return g
+      end,
+      function(g, ans, x, k, v)
+         return nil
+      end,
+      function(g, ans, x, k, v)
+         return g[k]
+      end,
+   })
+   module.gradient("__internal_get", {
+      function(g, ans, x, k)
+         local out = util.zerosLike(x)
+         out[k] = g
+         return out
+      end,
+      function(g, ans, x, k) return nil end,
+   })
 end)
 
 overload.module("DirectNode", DirectNode, function(module)
@@ -582,23 +602,6 @@ overload.module("util", util, function(module)
       function(g, ans, x, template, dim, index) return nil end,
       function(g, ans, x, template, dim, index) return nil end,
       function(g, ans, x, template, dim, index) return nil end,
-   })
-   module.gradient("set", {
-      function(g, ans, x, k, v)
-         return util.set(g,k,0)
-      end,
-      function(g, ans, x, k, v) return nil end,
-      function(g, ans, x, k, v)
-         -- Currently support only integer selectors and settings
-         return util.get(g, k)
-      end,
-   })
-   module.gradient("get", {
-      function(g, ans, x, k)
-         local out = util.zerosLike(x)
-         return util.set(out, k, g)
-      end, 
-      function(g, ans, x, k) return nil end,
    })
    module.gradient("makeContiguous", zeroGradient())
    module.gradient("cat", functions.catGradient)
