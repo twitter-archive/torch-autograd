@@ -2,8 +2,6 @@ Autograd
 ========
 [![Slack Status](https://autograd.herokuapp.com/badge.svg)](https://autograd.herokuapp.com/)
 
-[![Autograd Slack channel](https://mysterious-anchorage-40538.herokuapp.com/badge.svg)](https://mysterious-anchorage-40538.herokuapp.com/)
-
 [![Join the chat at https://gitter.im/twitter/torch-autograd](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/twitter/torch-autograd?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 [![Build Status](https://travis-ci.org/twitter/torch-autograd.svg?branch=master)](https://travis-ci.org/twitter/torch-autograd)
