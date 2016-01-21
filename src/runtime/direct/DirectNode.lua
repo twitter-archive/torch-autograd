@@ -5,7 +5,6 @@ local DirectNode = { }
 
 function DirectNode:init(value, fun, gradFun, args, values, tape)
    local o = {}
-   o.tape = tape
    tape[tape.nextIndex] = o
    tape.nextIndex = tape.nextIndex + 1
    o.value = value
