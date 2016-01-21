@@ -18,19 +18,18 @@ function Value.create(type, val, source)
 	return v
 end
 
-function Value.from(v, source, skipWrapTables)
+function Value.from(v, source, skipWrapTables, mutationFlow)
 	if v == nil then
 		error("nil parameter value")
 	elseif Value.isValue(v) then
+		if mutationFlow ~= nil then
+			return mutationFlow:remap(v)
+		end
 		return v
 	elseif type(v) == "table" then
 		local vcopy = { }
 		for k,v in pairs(v) do
-			if Value.isValue(v) then
-				vcopy[k] = v
-			else
-				vcopy[k] = Value.from(v, Source.table(source, k), skipWrapTables)
-			end
+			vcopy[k] = Value.from(v, Source.table(source, k), skipWrapTables, mutationFlow)
 		end
 		if skipWrapTables then
 			return vcopy
@@ -66,6 +65,15 @@ function Value:get()
 	return self.raw
 end
 
+function Value.__internal_set(s, k, v)
+	s[k] = v
+	return s
+end
+
+function Value.__internal_get(s, k)
+	return s[k]
+end
+
 function Value:__index(i)
 	local rtype = rawget(self, "type")
 	if rtype == Value.TABLE then
@@ -75,11 +83,12 @@ function Value:__index(i)
 		end
 	elseif rtype == Value.TENSOR then
 		local raw = rawget(self, "raw")
-		if raw[i] ~= nil then
-			if type(i) ~= "string" then
-				error("tensor __index [] operator not supported by autograd")
+		if type(i) ~= "string" then
+			return Value.__internal_get(self, i)
+		else
+			if raw[i] ~= nil then
+				return raw[i]
 			end
-			return raw[i]
 		end
 	end
 	return rawget(Value, i)
@@ -91,8 +100,9 @@ function Value:__newindex(k, v)
 		local raw = rawget(self, "raw")
 		return rawset(raw, k, v)
 	elseif rtype == Value.TENSOR then
+		local raw = rawget(self, "raw")
 		if type(k) ~= "string" then
-			error("tensor __newindex [] operator not supported by autograd")
+			return Value.__internal_set(self, k, v)
 		end
 	end
 	return rawset(self, k, v)

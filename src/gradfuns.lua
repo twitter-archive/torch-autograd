@@ -134,6 +134,28 @@ functions.catGradient = {
    end
 }
 
+functions.get = {
+   function(g, ans, x, k)
+      local out = util.zerosLike(x)
+      out[k] = g
+      return out
+   end,
+   function(g, ans, x, k) return nil end,
+}
+
+functions.set = {
+   function(g, ans, x, k, v)
+      g[k] = 0
+      return g
+   end,
+   function(g, ans, x, k, v)
+      return nil
+   end,
+   function(g, ans, x, k, v)
+      return g[k]
+   end,
+}
+
 -- Shared operators
 
 local operators = { }
@@ -374,6 +396,16 @@ overload.module("torch", torch, function(module)
          return util.narrowSliceCopy(g, x, dim, index, size)
       end
    })
+   module.gradient("reshape", {
+      function(g, ans, x, ...)
+         return torch.viewAs(g, x)
+      end,
+      function(g, ans, x, ...) return nil end,
+      function(g, ans, x, ...) return nil end,
+      function(g, ans, x, ...) return nil end,
+      function(g, ans, x, ...) return nil end, -- 4D is enough. Beyond that have to use LongTensor for shape
+
+   })
    module.gradient("sum", {
       function(g, ans, x,axis)
          local repeater = repeatToMatchShape(x, axis)
@@ -496,7 +528,7 @@ overload.module("torch", torch, function(module)
       end
    })
    -- module.gradient("split", {
-   --    function(g, ans, x, size, dim) 
+   --    function(g, ans, x, size, dim)
    --       -- TODO: untested, not sure if we support table output
    --       return torch.cat(g, dim)
    --    end,
@@ -533,12 +565,16 @@ overload.module("Value", Value, function(module)
    for k, v in pairs(operators) do
       module.operator(k, v)
    end
+   module.gradient("__internal_get", functions.get)
+   module.gradient("__internal_set", functions.set)
 end)
 
 overload.module("DirectNode", DirectNode, function(module)
    for k, v in pairs(operators) do
       module.operator(k, v)
    end
+   module.gradient("__internal_get", functions.get)
+   module.gradient("__internal_set", functions.set)
 end)
 
 overload.module("util", util, function(module)

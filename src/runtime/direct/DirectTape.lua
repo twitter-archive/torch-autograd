@@ -3,6 +3,9 @@ local overload = require 'autograd.overload'
 local DirectNode = require 'autograd.runtime.direct.DirectNode'
 
 local DirectTape = { }
+local assignmentMap = { }
+local reverseAssignmentMap = { }
+local currentTape = { }
 
 -- A wrapper for a function
 -- Anytime we try to apply a function to some arguments,
@@ -17,8 +20,15 @@ function nodeApply(fun, gradFun, ...)
    for k = 1, ln do
       local v = arg[k]
       if getmetatable(v) == DirectNode then
-         parent = v
-         values[#values + 1] = v.value
+         local alias = assignmentMap[v]
+         if alias ~= nil then
+            arg[k] = alias
+            parent = alias
+            values[#values + 1] = alias.value
+         else
+            parent = v
+            values[#values + 1] = v.value
+         end
       elseif type(v) == "table" then
          local tableValue = {}
          for j,element in pairs(v) do
@@ -40,10 +50,9 @@ function nodeApply(fun, gradFun, ...)
       end
       local value = fun.fn(table.unpack(values))
       local node = nil
-      local tape = parent.tape
+      local tape = currentTape
       local o = tape[tape.nextIndex]
       if o ~= nil then
-         o.tape = tape
          o.value = value
          o.fun = fun
          o.gradFun = gradFun
@@ -51,9 +60,25 @@ function nodeApply(fun, gradFun, ...)
          o.outgrad = nil
          o.argValues = values
          tape.nextIndex = tape.nextIndex + 1
+         if fun.name == "DirectNode.__internal_set" then
+            local reverse = reverseAssignmentMap[arg[1]]
+            if reverse ~= nil then
+               assignmentMap[reverse] = o
+            end
+            reverseAssignmentMap[o] = arg[1]
+            assignmentMap[arg[1]] = o
+         end
          return o
       end
-      return DirectNode:init(value, fun, gradFun, arg, values, tape)
+      local newNode = DirectNode:init(value, fun, gradFun, arg, values, tape)
+      if fun.name == "DirectNode.__internal_set" then
+         local reverse = reverseAssignmentMap[arg[1]]
+         if reverse ~= nil then
+            assignmentMap[reverse] = newNode
+         end
+         assignmentMap[arg[1]] = newNode
+      end
+      return newNode
    else
       local values = {fun.fn(table.unpack(values))}
       return table.unpack(values)
@@ -68,10 +93,13 @@ function DirectTape.funOnly(fun, tape, argnum, ...)
    -- If our target argument is a table, we'll need to walk its members and node-ify them.
    -- For now, if we see a number or a tensor, we'll node-ify it, otherwise,
    -- if it's a table, we'll try to walk it
+   currentTape = tape
    arg[argnum] = DirectNode.newStartNode(arg[argnum], tape)
 
    overload.install(nodeApply)
 
+   assignmentMap = { }
+   reverseAssignmentMap = { }
    local allAns = {fun(table.unpack(arg))}
 
    overload.uninstall()
@@ -99,7 +127,7 @@ function DirectTape.gradOnly(tape, arg, argnum, allAns, gradOutput)
    ans.outgrad = gradOutput
    for i=tape.nextIndex-1,1,-1 do
       local node = tape[i]
-      for iarg=1,#node.args do
+      for iarg=#node.args,1,-1 do
          local thisArg = node.args[iarg]
          if getmetatable(thisArg) == DirectNode then
             if node.outgrad == nil then

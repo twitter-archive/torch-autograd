@@ -197,6 +197,13 @@ local tests = {
       tester:assert(gradcheck(NarrowFn2D, {W=W,x=x2}), "Incorrect gradient")
    end,
 
+   Reshape = function()
+      local function f(params)
+         return torch.sum(torch.reshape(params.x,1,9)*3)
+      end
+      tester:assert(gradcheck(f, {x=torch.randn(3,3)}), "Incorrect gradient")
+   end,
+
    Clamp = function()
       local W = torch.Tensor(5,25):normal()
       local clampFn = function(inputs)
@@ -1344,7 +1351,7 @@ local tests = {
       tester:assert(gradcheck(f,{a = torch.eye(1)}), "Incorrect gradient")
    end,
 
-   CatNumber = function() 
+   CatNumber = function()
       local function f(params)
          local tbl = {}
          tbl[#tbl+1] = params.a
@@ -1412,7 +1419,7 @@ local tests = {
    end,
 
    GradGrad = function()
-      
+
       local numFeatures = 5
       local params = torch.randn(numFeatures)
 
@@ -1433,7 +1440,7 @@ local tests = {
       --analytical expression
       local residual = y - params*x
       analyticalGrad = x:clone():mul(-2*residual)
-      
+
       tester:assertTensorEq(analyticalGrad,numericalGrad,1e-8,'analytical and numerical solution do not match')
 
       --the outer function computes the sum of the gradient of the neural network. Therefore, differentiating yields the sum of each column of the Hessian
@@ -1450,7 +1457,34 @@ local tests = {
       hessian = torch.ger(x,x):mul(2)
       analyticalGradGrad = torch.sum(hessian,1)
       tester:assertTensorEq(analyticalGrad,numericalGrad,1e-8,'analytical and numerical solution do not match')
-      
+   end,
+
+   Assignment = function()
+      local f1 = function(params)
+         local xc = torch.clone(params.x)
+         xc[1] = torch.sum(params.y)*2.0
+         return torch.sum(xc)
+      end
+      tester:assert(gradcheck(f1,{x=torch.randn(10),y=torch.randn(3)}), "Incorrect gradient")
+      local f2 = function(params)
+         local xc = torch.clone(params.x)
+         xc[1] = torch.sum(params.y)*2.0
+         xc[2] = torch.sum(params.y)*3.0
+         return torch.sum(xc)
+      end
+      tester:assert(gradcheck(f2,{x=torch.randn(10),y=torch.randn(3)}), "Incorrect gradient")
+      local f3 = function(params)
+         local xc = torch.clone(params.x)
+         xc[{1,1}] = torch.sum(params.y)*2.0
+         return torch.sum(xc)
+      end
+      tester:assert(gradcheck(f3,{x=torch.randn(10,10),y=torch.randn(3)}), "Incorrect gradient")
+      local f4 = function(params)
+         local xc = torch.clone(params.x)
+         xc[torch.LongStorage{2,2}] = torch.sum(params.y)
+         return torch.sum(xc)
+      end
+      tester:assert(gradcheck(f4,{x=torch.randn(10,10),y=torch.randn(3)}), "Incorrect gradient")
    end,
 
 

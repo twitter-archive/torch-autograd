@@ -4,29 +4,25 @@ local Source = require 'autograd.runtime.codegen.Source'
 Node = { }
 Node.__index = Node
 
-function Node.new(forwardFn, gradientFn, inputs)
+function Node.new(forwardFn, gradientFn, inputs, mutationFlow)
 	local v = { }
 	setmetatable(v, Node)
-	v:init(forwardFn, gradientFn, inputs)
+	v:init(forwardFn, gradientFn, inputs, mutationFlow)
 	return v
 end
 
-function Node:init(forwardFn, gradientFn, inputs)
+function Node:init(forwardFn, gradientFn, inputs, mutationFlow)
 	self.forwardFn = forwardFn
 	self.gradientFn = gradientFn
 	self.inputs = { }
 	for i = 1, #inputs do
 		local input = inputs[i]
-		if Value.isValue(input) then
-			self.inputs[i] = input
-		else
-			if torch.isTensor(input) then
-				if torch.nDimension(input) > 1 then
-					error("constant tensor with more than one dimension. is this an upvalue that should be a function argument?")
-				end
+		if not Value.isValue(input) then
+			if torch.isTensor(v) and torch.nDimension(v) > 1 then
+				error("constant tensor with more than one dimension. is this an upvalue that should be a function argument?")
 			end
-			self.inputs[i] = Value.from(input, Source.constant(input))
 		end
+		self.inputs[i] = Value.from(input, Source.constant(input), false, mutationFlow)
 	end
 	self.gradients = { }
 	self.outputs = { }
@@ -50,7 +46,7 @@ function Node:differentiable()
 	end
 end
 
-function Node:evaluateForward()
+function Node:evaluateForward(mutationFlow)
 	local evalArgs = { }
 	for i = 1, #self.inputs do
 		local input = self.inputs[i]
@@ -72,19 +68,29 @@ function Node:evaluateForward()
 	self.outputs = { }
 	self.outputTargets = { }
 	local outputs = {self.forwardFn.fn(table.unpack(evalArgs))}
-	for i = 1, #outputs do
-		self.outputs[i] = Value.from(outputs[i], Source.computed(self, i))
-		self.outputTargets[i] = { }
+	if self.forwardFn.name == "Value.__internal_set" then
+		-- This was an mutation in the form of x[k] = v
+		-- The output of the assignment is simply the input param x wrapped in a new Value pointing to this node, x'
+		-- All future user references to x will be remapped to x', to preserve the order of operations in the graph.
+		local valueAlias = Value.from(outputs[1], Source.computed(self, 1))
+		mutationFlow:alias(self.inputs[1], valueAlias)
+		self.outputs[1] = valueAlias
+		self.outputTargets[1] = { }
+	else
+		for i = 1, #outputs do
+			self.outputs[i] = Value.from(outputs[i], Source.computed(self, i))
+			self.outputTargets[i] = { }
+		end
 	end
 	return table.unpack(self.outputs)
 end
 
-function Node:evaluateBackward()
+function Node:evaluateBackward(mutationFlow)
 	-- Only eval one gradient for now?
 	local numGrads = 1 --#self.outputs
 	for o = 1, numGrads do
 		local output = self.outputs[o]
-		for i = 1, #self.inputs do
+		for i = #self.inputs, 1, -1 do
 			local input = self.inputs[i]
 			local source = input.source
 			if source:differentiable() then
@@ -101,24 +107,27 @@ function Node:evaluateBackward()
 						local gradUpdates = (self.gradientFn[i])(self.gradients[o], output, table.unpack(self.inputs))
 						if gradUpdates then
 							for k, v in pairs(input:get()) do
-								local gradUpdate = gradUpdates[k]
-								local subArg = v
-								local source = subArg.source
-								local sourceIndex = source.index or 1
-								local gradSource = source.node or source
-								if gradSource.gradients == nil then
-									gradSource.gradients = { }
-								end
-								if gradSource.gradients[sourceIndex] == nil or gradSource.gradients[sourceIndex] == 0 then
-									gradSource.gradients[sourceIndex] = gradUpdate
-								else
-									gradSource.gradients[sourceIndex] = gradSource.gradients[sourceIndex] + gradUpdate
+								local gradUpdate = mutationFlow:remap(gradUpdates[k])
+								if gradUpdate ~= nil then
+									local subArg = v
+									local source = subArg.source
+									local sourceIndex = source.index or 1
+									local gradSource = source.node or source
+									if gradSource.gradients == nil then
+										gradSource.gradients = { }
+									end
+									if gradSource.gradients[sourceIndex] == nil or gradSource.gradients[sourceIndex] == 0 then
+										gradSource.gradients[sourceIndex] = gradUpdate
+									else
+										gradSource.gradients[sourceIndex] = gradSource.gradients[sourceIndex] + gradUpdate
+									end
 								end
 							end
 						end
 					else
 						local gradUpdate = (self.gradientFn[i])(self.gradients[o], output, table.unpack(self.inputs))
 						if gradUpdate then
+							gradUpdate = mutationFlow:remap(gradUpdate)
 							local sourceIndex = source.index or 1
 							local gradSource = source.node or source
 							if gradSource.gradients == nil then

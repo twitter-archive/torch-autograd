@@ -57,8 +57,8 @@ local function canReuseOutput(node)
    return reusableFunctionsMap[node.forwardFn.name] ~= nil and #node.outputs == 1 and node.outputs[1].type == Value.TENSOR
 end
 
-local function canInline(node, outputNodes, debugger)
-   return #node.outputs == 1 and #node.outputTargets[1] == 1 and outputNodes[node] == nil and debugger == nil
+local function canInline(node, hazardNodes, debugger)
+   return #node.outputs == 1 and #node.outputTargets[1] == 1 and hazardNodes[node] == nil and debugger == nil
 end
 
 local function writeLiteralTable(wtable, out, symbols, depth)
@@ -107,7 +107,7 @@ local function writeExpr(state, node, debugger)
    local inputSymbols = { }
    for k = 1, #node.inputs do
       local input = node.inputs[k]
-      if input.source.type == Source.COMPUTED and canInline(input.source.node, state.outputNodes, debugger) then
+      if input.source.type == Source.COMPUTED and canInline(input.source.node, state.hazardNodes, debugger) then
          local subExpr = writeExpr(state, input.source.node, debugger)
          inputSymbols[k] = "(" .. subExpr .. ")"
       else
@@ -119,6 +119,18 @@ local function writeExpr(state, node, debugger)
       local op = node.forwardFn.operator
       if op == "unm" then
          out.write("-", inputSymbols[1])
+      elseif op == "index" then
+         out.write(inputSymbols[1])
+         out.write("[")
+         out.write(inputSymbols[2])
+         out.write("]")
+      elseif op == "newindex" then
+         out.write(inputSymbols[1])
+         out.write("[")
+         out.write(inputSymbols[2])
+         out.write("]")
+         out.write(" = ")
+         out.write(inputSymbols[3])
       else
          out.write(inputSymbols[1])
          out.write(" ")
@@ -148,6 +160,10 @@ end
 
 local function tensorSig(t)
    return t:type() .. table.concat(t:size():totable(), ",")
+end
+
+local function storageSig(t)
+   return torch.type(t) .. table.concat(t:totable(), ",")
 end
 
 local function letterForType(val)
@@ -247,6 +263,7 @@ local function createSymbolTable(graph, execOrder, aliases, params, tensorPool, 
       symbols[params[i]] = "p" .. i
    end
 
+   local constantStorageMap = { }
    local constantTensorMap = { }
 
    local tensorPoolViews = { }
@@ -326,14 +343,26 @@ local function createSymbolTable(graph, execOrder, aliases, params, tensorPool, 
       for k = 1, #node.inputs do
          local input = node.inputs[k]
          local source = input.source:getRoot()
-         if source.type == Source.CONSTANT and symbols[source] == nil and torch.isTensor(source.val) then
-            local index = constantTensorMap[source.val]
-            if index == nil then
-               index = #constants + 1
-               constantTensorMap[source.val] = index
-               constants[index] = source
+         if source.type == Source.CONSTANT and symbols[source] == nil then
+            if torch.isTensor(source.val) then
+               local index = constantTensorMap[source.val]
+               if index == nil then
+                  index = #constants + 1
+                  constantTensorMap[source.val] = index
+                  constants[index] = source
+               end
+               symbols[source] = "c" .. index
+            elseif torch.isStorage(source.val) then
+               local sig = storageSig(source.val)
+               if constantStorageMap[sig] then
+                  symbols[source] = "c" .. constantStorageMap[sig]
+               else
+                  index = #constants + 1
+                  constants[index] = source
+                  constantStorageMap[sig] = index
+                  symbols[source] = "c" .. index
+               end
             end
-            symbols[source] = "c" .. index
          end
       end
    end
@@ -405,6 +434,11 @@ local function createSymbolTable(graph, execOrder, aliases, params, tensorPool, 
       symbols[node.outputs[1].source] = symbols[aliasNode.outputs[1].source]
    end
 
+   for i = 1, #graph.mutationFlow.history do
+      local aliasOp = graph.mutationFlow.history[i]
+      symbols[aliasOp.to.source] = symbols[aliasOp.from.source]
+   end
+
    return symbols, undefined, constants, tensorPoolViews
 end
 
@@ -444,7 +478,7 @@ local function changeToReuseFunctions(execOrder)
    end
 end
 
-local function aliasFreeTensors(execOrder, aliases, outputNodes)
+local function aliasFreeTensors(execOrder, aliases, hazardNodes)
    local availableTensorMap = { }
    local availableCount = 0
    local refCounts = { }
@@ -453,7 +487,7 @@ local function aliasFreeTensors(execOrder, aliases, outputNodes)
       local node = execOrder[i]
       if canReuseOutput(node) then
          refCounts[node.outputs[1]] = #node.outputTargets[1]
-         if aliases[node] == nil and outputNodes[node] == nil then
+         if aliases[node] == nil and hazardNodes[node] == nil then
             if availableCount > 0 then
                local sig = tensorSig(node.outputs[1]:get())
                local matchingList = availableTensorMap[sig]
@@ -492,6 +526,15 @@ local function aliasFreeTensors(execOrder, aliases, outputNodes)
    end
 end
 
+local function addNodeTargets(node, hazardNodes)
+   local targetArray = node.outputTargets[1]
+   for k = 1, #targetArray do
+      local target = targetArray[k]
+      local targetNode = target.node
+      hazardNodes[targetNode] = true
+   end
+end
+
 local function generateCode(graph, opt)
    local optimize = opt.optimize or true
    local withForward = util.defaultBool(opt.withForward, true)
@@ -500,13 +543,23 @@ local function generateCode(graph, opt)
    local tensorLocals = opt.tensorLocals or { }
    local debugger = opt.debugger
 
-   local execOrder, outputNodes = graph:walkExecutionOrder(withForward, withGradients)
+   local execOrder, hazardNodes = graph:walkExecutionOrder(withForward, withGradients)
+
+   -- Don't allow any reordering or inlining of operations near assignment flow.
+   for i = 1, #graph.mutationFlow.history do
+      local aliasOp = graph.mutationFlow.history[i]
+      addNodeTargets(aliasOp.from.source.node, hazardNodes)
+      addNodeTargets(aliasOp.to.source.node, hazardNodes)
+      hazardNodes[aliasOp.from.source.node] = true
+      hazardNodes[aliasOp.to.source.node] = true
+   end
+
    changeToReuseFunctions(execOrder)
    local params = collectParams(graph.params)
    local aliases = { }
    if opt.reduceFootprint then
       if opt.stableGradients then
-         aliasFreeTensors(execOrder, aliases, outputNodes)
+         aliasFreeTensors(execOrder, aliases, hazardNodes, graph.mutationFlow)
       else
          aliasFreeTensors(execOrder, aliases, { })
       end
@@ -517,6 +570,7 @@ local function generateCode(graph, opt)
    local out = StringBuilder()
    local outerArgNames = {"locals", "rlocals", "vlocals"}
    local outerArgs = { tensorLocals, tensorPool, tensorPoolViews }
+
 
    if debugger then
       debugger.setMain(symbols, graph.grads, graph.answers)
@@ -534,6 +588,12 @@ local function generateCode(graph, opt)
    local functionRemap = { }
    for i = 1, #execOrder do
       local node = execOrder[i]
+      if node.forwardFn.name == "Value.__internal_get" then
+         node.forwardFn = { operator = "index", name = "op.__index" }
+      end
+      if node.forwardFn.name == "Value.__internal_set" then
+         node.forwardFn = { operator = "newindex", name = "op.__newindex" }
+      end
       if node.forwardFn.operator == nil and functionRemap[node.forwardFn.name] == nil then
          functionRemap[node.forwardFn.name] = string.gsub(node.forwardFn.name, "%.", "_")
       end
@@ -541,7 +601,7 @@ local function generateCode(graph, opt)
 
    local state = {
       symbols = symbols,
-      outputNodes = outputNodes,
+      hazardNodes = hazardNodes,
       functionRemap = functionRemap,
       objects = objects
    }
@@ -586,9 +646,9 @@ local function generateCode(graph, opt)
       for k = 1, #node.outputs do
          outputSymbols[k] = symbols[node.outputs[k].source]
       end
-      if not canInline(node, outputNodes, debugger) then
+      if not canInline(node, hazardNodes, debugger) then
          out.write("    ")
-         if not canReuseOutput(node) then
+         if (not canReuseOutput(node)) and (node.forwardFn.operator ~= "newindex") then
             if #outputSymbols > 0 then
                if undefined[node.outputs[1].source] then
                   out.write("local ")

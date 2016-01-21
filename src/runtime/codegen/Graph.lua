@@ -6,11 +6,13 @@ local overload = require 'autograd.overload'
 local Node = require 'autograd.runtime.codegen.Node'
 local Value = require 'autograd.runtime.codegen.Value'
 local Source = require 'autograd.runtime.codegen.Source'
+local MutationFlow = require 'autograd.runtime.codegen.MutationFlow'
 local util = require 'autograd.util'
 
 local nodeDebugger
 local applyDepth = 0
 local reentryDepth = 0
+local mutationFlow = MutationFlow.new()
 
 local function overloadHook(fn, gradFn, ...)
    local inputs = {...}
@@ -19,8 +21,8 @@ local function overloadHook(fn, gradFn, ...)
       if fn.unsupported then
          error("function " .. fn.name .. " not currently supported by autograd")
       end
-      local n = Node.new(fn, gradFn, inputs)
-      local values = {n:evaluateForward()}
+      local n = Node.new(fn, gradFn, inputs, mutationFlow)
+      local values = {n:evaluateForward(mutationFlow)}
       if nodeDebugger then
          nodeDebugger.captureCallStack(n)
       end
@@ -248,6 +250,41 @@ function Graph:walkExecutionOrder(withForward, withGradients)
    if util.defaultBool(withForward, true) then
       walkOutputRoots(answers, execOrder, seen, outputNodes)
    end
+
+   local mutationRoots = { }
+
+   -- If this graph had any tensor mutations (x[k] = v), we have to make sure that any
+   -- uses of x before to the mutation also appear in the execution order before the mutation.
+   -- Usually walking the graph makes no guarantees on order.
+   for i = 1, #self.mutationFlow.history do
+      local aliasOp = self.mutationFlow.history[i]
+      local root = aliasOp.from.source:getRoot()
+      if root.type == Source.COMPUTED then
+         local node = root.node
+         local targetArray = node.outputTargets[1]
+         for k = 1, #targetArray do
+            local target = targetArray[k]
+            local targetNode = target.node
+            if seen[targetNode] and targetNode.forwardFn.name ~= "Value.__internal_set" then
+               mutationRoots[#mutationRoots + 1] = targetNode
+            end
+         end
+      end
+   end
+
+   -- Re-evaluate the execution order, starting with the mutation roots, then walk normally.
+   if #mutationRoots > 0 then
+      local prevExecOrder = execOrder
+      seen = { }
+      execOrder = { }
+      for i = 1, #mutationRoots do
+         walkNode(mutationRoots[i], execOrder, seen)
+      end
+      for i = 1, #prevExecOrder do
+         walkNode(prevExecOrder[i], execOrder, seen)
+      end
+   end
+
    return execOrder, outputNodes
 end
 
@@ -275,6 +312,9 @@ function Graph.record(fn, args, opt)
    overload.install(overloadHook)
    applyDepth = 0
    reentryDepth = reentryDepth + 1
+   if reentryDepth == 1 then
+      mutationFlow:clear()
+   end
    nodeDebugger = debugger
 
    -- Call user forward function.
@@ -298,7 +338,7 @@ function Graph.record(fn, args, opt)
 
          for i=#forwardExecOrder,1,-1 do
             local node = forwardExecOrder[i]
-            node:evaluateBackward()
+            node:evaluateBackward(mutationFlow)
          end
       end
       return true
@@ -324,6 +364,7 @@ function Graph.record(fn, args, opt)
    local grads = collectGradients(values[argnum])
 
    local graph = {
+      mutationFlow = mutationFlow,
       grads = grads,
       params = values,
       answers = answers
