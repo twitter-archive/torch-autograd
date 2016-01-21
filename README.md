@@ -25,13 +25,18 @@ Autograd has multiple goals:
   with multiple loss functions and/or inputs
 * graphs are dynamic, i.e. can be different at each function call: for loops,
   or conditional, can depend on intermediate results, or on input parameters
-* enable gradients of gradients for transparent computation of Hessians, ...
+* enable gradients of gradients for transparent computation of Hessians
 
 Updates
 -------
 
-Nov 16, 2015: major overhaul.
-
+*Jan 21, 2016:*
+Two big new user-facing features:
+ * First, we now support direct assignment (so you can now do `x[k] = v` inside autograd code, where k can be a number, table or `LongTensor`, and v can be a tensor or number, whichever is appropriate. [Here's a few examples](https://github.com/twitter/torch-autograd/blob/86a5963dd6e3cfd9c3b29fcddcf2edb7c3759ac4/test/test.lua#L1462-L1488).
+ * Second, you can now take 2nd-order and higher gradients (supported in optimized mode. Either run `autograd.optimize(true)` or take the derivative of your function using `df = autograd(f, {optimize = true})`. [Check out a simple example in our tests](https://github.com/twitter/torch-autograd/blob/86a5963dd6e3cfd9c3b29fcddcf2edb7c3759ac4/test/test.lua#L1421-L1460)
+ * Plus, lots of misc bugfixes and new utilities to help with tensor manipulation (`autograd.util.cat` can work with numbers, or tensors of any time. `autograd.util.cast` can cast a nested table of tensors to any type you like).
+ 
+*Nov 16, 2015:*
 Runtime performance was improved dramatically, as well as ease of use with
 better debugging tools. Performance is now within 30% of a statically described
 version of an equivalent model (`nn` and `nngraph`).
@@ -575,17 +580,6 @@ pred = grad(f, {withForward=true, withGradients=false})(inputs)
 pred = f(inputs)
 -- ... but the function is compiled, and benefits from tensor re-use!
 ```
-
-TODO
-----
-
-Autograd is work in progress. Current list of things to be developed includes:
-
-- [x] Gradients of gradients (Hessian)
-- [ ] Add support for sparse gradients
-- [x] Add support for caching tape for a given input configuration
-- [x] Code generation
-- [x] Implement auto-buffering so that native torch functions can re-use memory
 
 License
 -------
