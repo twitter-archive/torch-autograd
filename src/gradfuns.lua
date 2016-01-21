@@ -134,6 +134,28 @@ functions.catGradient = {
    end
 }
 
+functions.get = {
+   function(g, ans, x, k)
+      local out = util.zerosLike(x)
+      out[k] = g
+      return out
+   end,
+   function(g, ans, x, k) return nil end,
+}
+
+functions.set = {
+   function(g, ans, x, k, v)
+      g[k] = 0
+      return g
+   end,
+   function(g, ans, x, k, v)
+      return nil
+   end,
+   function(g, ans, x, k, v)
+      return g[k]
+   end,
+}
+
 -- Shared operators
 
 local operators = { }
@@ -543,32 +565,16 @@ overload.module("Value", Value, function(module)
    for k, v in pairs(operators) do
       module.operator(k, v)
    end
-   module.gradient("__internal_set", {
-      function(g, ans, x, k, v)
-         g[k] = 0
-         return g
-      end,
-      function(g, ans, x, k, v)
-         return nil
-      end,
-      function(g, ans, x, k, v)
-         return g[k]
-      end,
-   })
-   module.gradient("__internal_get", {
-      function(g, ans, x, k)
-         local out = util.zerosLike(x)
-         out[k] = g
-         return out
-      end,
-      function(g, ans, x, k) return nil end,
-   })
+   module.gradient("__internal_get", functions.get)
+   module.gradient("__internal_set", functions.set)
 end)
 
 overload.module("DirectNode", DirectNode, function(module)
    for k, v in pairs(operators) do
       module.operator(k, v)
    end
+   module.gradient("__internal_get", functions.get)
+   module.gradient("__internal_set", functions.set)
 end)
 
 overload.module("util", util, function(module)

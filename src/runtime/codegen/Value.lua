@@ -95,22 +95,17 @@ function Value:__index(i)
 end
 
 function Value:__newindex(k, v)
-	if Value.isValue(self) then
-		local rtype = rawget(self, "type")
-		if rtype == Value.TABLE then
-			local raw = rawget(self, "raw")
-			return rawset(raw, k, v)
-		elseif rtype == Value.TENSOR then
-			local raw = rawget(self, "raw")
-			if type(k) ~= "string" then
-				return Value.__internal_set(self, k, v)
-			end
+	local rtype = rawget(self, "type")
+	if rtype == Value.TABLE then
+		local raw = rawget(self, "raw")
+		return rawset(raw, k, v)
+	elseif rtype == Value.TENSOR then
+		local raw = rawget(self, "raw")
+		if type(k) ~= "string" then
+			return Value.__internal_set(self, k, v)
 		end
-		return rawset(self, k, v)
-	else
-		self[k] = v
-		return self
 	end
+	return rawset(self, k, v)
 end
 
 function Value:__len()

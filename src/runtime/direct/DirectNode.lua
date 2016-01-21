@@ -5,7 +5,6 @@ local DirectNode = { }
 
 function DirectNode:init(value, fun, gradFun, args, values, tape)
    local o = {}
-   setmetatable(o, self)
    o.tape = tape
    tape[tape.nextIndex] = o
    tape.nextIndex = tape.nextIndex + 1
@@ -23,6 +22,7 @@ function DirectNode:init(value, fun, gradFun, args, values, tape)
    o.new = function(...)
       return o.value.new(...)
    end
+   setmetatable(o, self)
    return o
 end
 
@@ -74,15 +74,33 @@ function DirectNode.newStartNode(val, tape)
    end
 end
 
+function DirectNode.__internal_set(s, k, v)
+   s[k] = v
+   return s
+end
+
+function DirectNode.__internal_get(s, k)
+   return s[k]
+end
+
 function DirectNode:__index(i)
    local value = rawget(self, "value")
    if torch.isTensor(value) and value[i] ~= nil then
       if type(i) ~= "string" then
-         error("tensor [] operator currently not supported by autograd")
+         return DirectNode.__internal_get(self, i)
       end
-      return value[i]
    end
    return rawget(DirectNode, i)
+end
+
+function DirectNode:__newindex(k, v)
+   local value = rawget(self, "value")
+   if torch.isTensor(value) then
+      if type(k) ~= "string" then
+         return DirectNode.__internal_set(self, k, v)
+      end
+   end
+   return rawset(self, k, v)
 end
 
 -- These exist only to be overloaded and called with flattened tensor or number arguments
