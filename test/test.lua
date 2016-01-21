@@ -1418,6 +1418,23 @@ local tests = {
       tester:assert(gradcheck(f3to4, {x=torch.randn(3,3,3)}), "Incorrect gradient")
    end,
 
+   ZeroGrad = function()
+      --the output of this function does not depend on params, so its grad should be uniformly zero
+      local innerFn = function(params, x, y)
+         return torch.norm(torch.add(x,y))
+      end
+
+      local dneuralNet = autograd(innerFn)
+
+      local numFeatures = 5
+      local testParams = torch.randn(numFeatures)
+      local x = torch.randn(numFeatures)
+      local y = torch.randn(1)[1]
+
+      local analyticalGrad = testParams:clone():zero()
+      local numericalGrad = dneuralNet(testParams,x,y)
+      tester:assertTensorEq(analyticalGrad,numericalGrad,1e-8,'analytical and numerical solution do not match')
+   end,
 
    SimpleGradGrad = function()
 
