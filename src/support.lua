@@ -62,11 +62,6 @@ torch.typeAs = function(A, B)
    return A:type(B:type())
 end
 
-torch.fill = function(A,b)
-   return A.new(torch.size(A)):fill(b)
-end
-
-
 local numberMetatable = {
    __add = function(a,b)
       if type(a) == "number"  then

@@ -128,10 +128,8 @@ function util.newTensorLikeInPlace(o, a)
    return o
 end
 
--- TODO: this is now implemented as torch.fill,
--- which is overloaded in support.lua to be functional
 function util.fillSameSizeAs(a, b)
-   return torch.fill(a,b)
+   return util.fill(a,b)
 end
 
 function util.fillSameSizeAsInPlace(o, a, b)
@@ -287,6 +285,10 @@ function util.deepCopy(tbl)
    else
       return tbl
    end
+end
+
+function util.fill(A,b)
+   return A.new(torch.size(A)):fill(b)
 end
 
 function util.fillInPlace(o,A,b)

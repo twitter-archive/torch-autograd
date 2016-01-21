@@ -1,6 +1,7 @@
 -- Tester:
 local totem = require 'totem'
 local autograd = require 'autograd'
+local util = require 'autograd.util'
 local gradcheck = require 'autograd.gradcheck' {randomizeInput = true}
 local gradcheckConstant = require 'autograd.gradcheck' {randomizeInput = false}
 local tester = totem.Tester()
@@ -1368,7 +1369,7 @@ local tests = {
 
    FunctionalFill = function()
       local function f(params)
-         local o = torch.fill(params.a, torch.sum(params.a))
+         local o = util.fill(params.a, torch.sum(params.a))
          return torch.sum(o)
       end
       tester:assert(gradcheck(f,{a = torch.randn(5,5)}), "Incorrect gradient")

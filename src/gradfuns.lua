@@ -493,14 +493,6 @@ overload.module("torch", torch, function(module)
          return nil
       end
    })
-   module.gradient("fill", {
-      function(g, ans, template, x)
-         return nil
-      end,
-      function(g, ans, template, x)
-         return torch.sum(g)
-      end,
-   })
 
    module.gradient("repeatTensor", {
       function(g, ans, x, ...)
@@ -583,6 +575,14 @@ overload.module("util", util, function(module)
          local p = torch.cmul(1 - ans, ans)
          return torch.cmul(g, p)
       end
+   })
+   module.gradient("fill", {
+      function(g, ans, template, x)
+         return nil
+      end,
+      function(g, ans, template, x)
+         return torch.sum(g)
+      end,
    })
    module.gradient("selectSliceCopy", {
       function(g, ans, x, template, dim, index)
