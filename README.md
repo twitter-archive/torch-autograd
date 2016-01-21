@@ -1,5 +1,6 @@
 Autograd
 ========
+[![Slack Status](https://autograd.herokuapp.com/badge.svg)](https://autograd.herokuapp.com/)
 
 [![Autograd Slack channel](https://mysterious-anchorage-40538.herokuapp.com/badge.svg)](https://mysterious-anchorage-40538.herokuapp.com/)
 
