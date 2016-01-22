@@ -73,12 +73,15 @@ return function(opt, params)
          -- return last hidden code:
          return hs[#hs], newState
       else
+         -- print("=============================")
          -- return all:
          for i in ipairs(hs) do
-            hs[i] = torch.view(hs[i], batch,1,hiddenFeatures)
+            hs[i] = torch.view(hs[i], batch, 1, hiddenFeatures)
          end
+         local o = util.cat(hs, 2)
          return util.cat(hs, 2), newState
       end
+
    end
 
    -- layers

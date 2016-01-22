@@ -149,7 +149,7 @@ local lr = opt.learningRate
 local reportEvery = opt.reportEvery
 local valPerplexity = math.huge
 
-local df =  d(f, { optimize = true })
+local df =  d(f, { optimize = true }) -- , debugHook = function() end})
 
 for epoch = 1,opt.nEpochs do
    -- Train:
