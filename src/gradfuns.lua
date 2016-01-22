@@ -552,7 +552,7 @@ overload.module("torch", torch, function(module)
    module.gradient("sign", zeroGradient())
 
    module.initializer("new", "bernoulli", "uniform", "normal", "random", "zeros", "zero", "eye", "ones")
-   module.static("size", "isTensor", "nDimension", "nElement", "isSameSizeAs")
+   module.static("size", "isTensor", "nDimension", "nElement", "isSameSizeAs", "setmetatable", "getmetatable", "type")
 
    module.ignore("typename")
    module.dynamic("split")
