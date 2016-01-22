@@ -102,18 +102,36 @@ local function writeLiteralTable(wtable, out, symbols, depth)
    out.write(string.rep(" ", (depth-1) * 4), "}")
 end
 
-local function writeExpr(state, node, debugger)
+local writeExpr
+
+local function buildInputExpr(state, input)
+   if input.source.type == Source.CONSTANT and type(input.source.val) == "table" then
+      -- Literal table.
+      -- TODO: Only supports arrays.
+      local elements = { }
+      for k, v in pairs(input.source.val) do
+         if Value.isValue(v) then
+            elements[#elements + 1] = buildInputExpr(state, v)
+         else
+            elements[#elements + 1] = tostring(v)
+         end
+      end
+      return "{" .. table.concat(elements, ", ") .. "}"
+   elseif input.source.type == Source.COMPUTED and canInline(input.source.node, state.hazardNodes, state.debugger) then
+      local subExpr = writeExpr(state, input.source.node)
+      return "(" .. subExpr .. ")"
+   else
+      local symbol = input.source:symbolPath(state.symbols)
+      return symbol
+   end
+end
+
+writeExpr = function(state, node)
    local out = StringBuilder()
    local inputSymbols = { }
    for k = 1, #node.inputs do
       local input = node.inputs[k]
-      if input.source.type == Source.COMPUTED and canInline(input.source.node, state.hazardNodes, debugger) then
-         local subExpr = writeExpr(state, input.source.node, debugger)
-         inputSymbols[k] = "(" .. subExpr .. ")"
-      else
-         local symbol = input.source:symbolPath(state.symbols)
-         inputSymbols[k] = symbol
-      end
+      inputSymbols[k] = buildInputExpr(state, input)
    end
    if node.forwardFn.operator ~= nil then
       local op = node.forwardFn.operator
@@ -603,6 +621,7 @@ local function generateCode(graph, opt)
       symbols = symbols,
       hazardNodes = hazardNodes,
       functionRemap = functionRemap,
+      debugger = debugger,
       objects = objects
    }
 
@@ -656,7 +675,7 @@ local function generateCode(graph, opt)
                out.write(table.concat(outputSymbols, ", "), " = ")
             end
          end
-         out.write(writeExpr(state, node, debugger))
+         out.write(writeExpr(state, node))
          out.write("\n")
          if debugger then
             for k = 1, #node.outputs do
