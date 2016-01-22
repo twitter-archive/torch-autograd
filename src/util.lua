@@ -5,20 +5,21 @@ local Value = require 'autograd.runtime.codegen.Value'
 local cast
 function cast(tableOfParams, typeName)
    -- Some nice aliases
-   if typeName == "float" then typeName = "torch.FloatTensor" end
-   if typeName == "double" then typeName = "torch.DoubleTensor" end
-   if typeName == "cuda" then typeName = "torch.CudaTensor" end
+   local typeTensor = torch.DoubleTensor
+   if typeName == "float" then typeTensor = torch.FloatTensor() end
+   if typeName == "double" then typeTensor = torch.DoubleTensor() end
+   if typeName == "cuda" then typeTensor = torch.CudaTensor() end
 
    -- If we passed in a tensor, just cast it
    if torch.isTensor(tableOfParams) then
-      return tableOfParams:type(typeName)
+      return torch.typeAs(tableOfParams, typeTensor)
    end
 
    -- Recursively cast
    local out = {}
    for key,value in pairs(tableOfParams) do
       if torch.isTensor(value) then
-         out[key] = value:type(typeName)
+         out[key] = torch.typeAs(value, typeTensor)
       elseif type(value) == "table" then
          out[key] = cast(value,typeName)
       else
