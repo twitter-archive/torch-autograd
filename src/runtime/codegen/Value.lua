@@ -142,8 +142,8 @@ function Value.flattenGrads(v)
 	elseif v.type == Value.TABLE then
 		return Value.flattenGrads(v.raw)
 	else
-		if v.source.gradients then
-			return v.source.gradients[1]:flatten()
+		if v.source.gradient then
+			return v.source.gradient:flatten()
 		end
 		return nil
 	end
@@ -161,8 +161,8 @@ function Value.collectGrads(v)
 	elseif v.type == Value.TABLE then
 		return Value.collectGrads(v.raw)
 	else
-		if v.source.gradients then
-			return v.source.gradients[1]
+		if v.source.gradient then
+			return v.source.gradient
 		end
 		return nil
 	end

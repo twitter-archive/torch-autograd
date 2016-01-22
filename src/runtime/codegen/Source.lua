@@ -6,7 +6,6 @@ Source.COMPUTED = "computed"
 Source.PARAM = "param"
 Source.CONSTANT = "constant"
 Source.TABLE = "table"
-Source.GRADIENT = "gradient"
 
 function Source.new(type)
 	local v = { }
@@ -76,7 +75,7 @@ function Source:differentiable()
 	elseif self.type == Source.COMPUTED then
 		return self.node:differentiable()
 	elseif self.type == Source.PARAM then
-		return self.gradient
+		return self.differentiableParam
 	elseif self.type == Source.CONSTANT then
 		if type(self.val) == "table" then
 			local Value = require 'autograd.runtime.codegen.Value'
@@ -134,10 +133,10 @@ function Source.computed(node, index)
 	return s
 end
 
-function Source.param(name, gradient)
+function Source.param(name, differentiable)
 	local s = Source.new(Source.PARAM)
 	s.name = name
-	s.gradient = gradient
+	s.differentiableParam = differentiable
 	return s
 end
 
@@ -151,14 +150,6 @@ function Source.table(parent, key)
 	local s = Source.new(Source.TABLE)
 	s.parent = parent
 	s.key = key
-	return s
-end
-
-function Source.gradient(val, tensorType, dims)
-	local s = Source.new(Source.GRADIENT)
-	s.val = val
-	s.tensorType = tensorType
-	s.dims = dims
 	return s
 end
 
