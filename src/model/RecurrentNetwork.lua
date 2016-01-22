@@ -41,7 +41,7 @@ return function(opt, params)
          local hp = hs[t-1] or prevState.h or torch.zero(x.new(batch, hiddenFeatures))
 
          -- next h
-         hs[t] = torch.tanh( torch.cat(xt,hp,2) * p.W + torch.expand(p.b, batch, hiddenFeatures) )
+         hs[t] = torch.tanh( util.cat(xt,hp,2) * p.W + torch.expand(p.b, batch, hiddenFeatures) )
       end
 
       -- save state

@@ -29,8 +29,6 @@ local d = require 'autograd'
 local util = require 'autograd.util'
 local model = require 'autograd.model'
 
-d.optimize(true)
-
 -- Seed
 torch.manualSeed(1)
 
@@ -117,28 +115,16 @@ table.insert(params, {
 })
 
 -- Init weights + cast:
+params = util.cast(params, opt.type)
 for i,weights in ipairs(params) do
    for k,weight in pairs(weights) do
-      if opt.type == 'cuda' then
-         weights[k] = weights[k]:cuda()
-      elseif opt.type == 'double' then
-         weights[k] = weights[k]:double()
-      else
-         weights[k] = weights[k]:float()
-      end
       weights[k]:uniform(-opt.paramRange, opt.paramRange)
    end
 end
 
 -- Word dictionary to train:
 local words
-if opt.type == 'cuda' then
-   words = torch.CudaTensor(nTokens, opt.wordDim)
-elseif opt.type == 'double' then
-   words = torch.DoubleTensor(nTokens, opt.wordDim)
-else
-   words = torch.FloatTensor(nTokens, opt.wordDim)
-end
+words = util.cast(torch.zeros(nTokens, opt.wordDim), opt.type)
 words:uniform(-opt.paramRange, opt.paramRange)
 params.words = {W = words}
 

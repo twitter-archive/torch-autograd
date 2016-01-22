@@ -42,7 +42,7 @@ return function(opt, params)
          local cp = cs[t-1] or prevState.c or torch.zero(x.new(batch, hiddenFeatures))
 
          -- pack all dot products:
-         local dots = torch.cat(xt,hp,2) * p.W + torch.expand(p.b, batch, 4*hiddenFeatures)
+         local dots = util.cat(xt,hp,2) * p.W + torch.expand(p.b, batch, 4*hiddenFeatures)
 
          -- view as 4 groups:
          dots = torch.view(dots, batch, 4, hiddenFeatures)
@@ -77,7 +77,7 @@ return function(opt, params)
          for i in ipairs(hs) do
             hs[i] = torch.view(hs[i], batch,1,hiddenFeatures)
          end
-         return x.cat(hs, 2), newState
+         return util.cat(hs, 2), newState
       end
    end
 
