@@ -1562,5 +1562,5 @@ autograd.optimize(true)
 tester:add(prefixTests("Optimized_", tests, { })):run()
 autograd.optimize(false)
 tester = totem.Tester()
-tester:add(prefixTests("Direct_", tests, { GradGrad = true, AutoModule = true, DebuggerDivZero = true, StableGradients = true })):run()
+tester:add(prefixTests("Direct_", tests, { GradGrad = true, AutoModule = true, DebuggerDivZero = true, StableGradients = true, ZeroGrad = true, SimpleGradGrad = true })):run()
 
