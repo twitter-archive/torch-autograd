@@ -1419,6 +1419,62 @@ local tests = {
       tester:assert(gradcheck(f3to4, {x=torch.randn(3,3,3)}), "Incorrect gradient")
    end,
 
+   ZeroGrad = function()
+      --the output of this function does not depend on params, so its grad should be uniformly zero
+      local innerFn = function(params, x, y)
+         return torch.norm(torch.add(x,y))
+      end
+
+      local dneuralNet = autograd(innerFn)
+
+      local numFeatures = 5
+      local testParams = torch.randn(numFeatures)
+      local x = torch.randn(numFeatures)
+      local y = torch.randn(1)[1]
+
+      local analyticalGrad = testParams:clone():zero()
+      local numericalGrad = dneuralNet(testParams,x,y)
+      tester:assertTensorEq(analyticalGrad,numericalGrad,1e-8,'analytical and numerical solution do not match')
+   end,
+
+   SimpleGradGrad = function()
+
+      local innerFn = function(params, x, y)
+         local yHat = params*x
+         local squaredLoss = (y - yHat)
+         return squaredLoss
+      end
+
+      --autodiff
+      local dneuralNet = autograd(innerFn)
+
+      --the outer function computes the sum of the gradient of the neural network. Therefore, differentiating yields the sum of each column of the Hessian
+      local outerFn = function(params_2,x,y)
+         local grad = dneuralNet(params_2,x,y)
+         return torch.sum(grad)
+      end
+
+      --autodiff solution for sum of each column of Hessian
+      local ddf = autograd(outerFn)
+
+
+      local numFeatures = 1
+
+      local testParams = torch.randn(numFeatures)
+      local x = torch.randn(numFeatures)
+      local y = torch.randn(1)[1]
+
+      local analyticalGrad = x:clone():mul(-1)
+      local numericalGrad = dneuralNet(testParams,x,y)
+
+      tester:assertTensorEq(analyticalGrad,numericalGrad,1e-8,'analytical and numerical solution do not match')
+
+      local analyticalGradGrad = x:clone():zero()
+      local numericalGradGrad = ddf(testParams,x,y)
+
+      tester:assertTensorEq(analyticalGradGrad,numericalGradGrad,1e-8,'analytical and numerical solution do not match')
+   end,
+   
    GradGrad = function()
 
       local numFeatures = 5
@@ -1456,8 +1512,8 @@ local tests = {
 
       --analytical expression
       hessian = torch.ger(x,x):mul(2)
-      analyticalGradGrad = torch.sum(hessian,1)
-      tester:assertTensorEq(analyticalGrad,numericalGrad,1e-8,'analytical and numerical solution do not match')
+      analyticalGradGrad = torch.sum(hessian,2)
+      tester:assertTensorEq(analyticalGradGrad,numericalGradGrad,1e-8,'analytical and numerical solution do not match')
    end,
 
    Assignment = function()
