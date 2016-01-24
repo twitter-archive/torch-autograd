@@ -1474,7 +1474,7 @@ local tests = {
 
       tester:assertTensorEq(analyticalGradGrad,numericalGradGrad,1e-8,'analytical and numerical solution do not match')
    end,
-   
+
    GradGrad = function()
 
       local numFeatures = 5
@@ -1512,7 +1512,7 @@ local tests = {
 
       --analytical expression
       hessian = torch.ger(x,x):mul(2)
-      analyticalGradGrad = torch.sum(hessian,2)
+      analyticalGradGrad = torch.sum(hessian,2):squeeze()
       tester:assertTensorEq(analyticalGradGrad,numericalGradGrad,1e-8,'analytical and numerical solution do not match')
    end,
 
