@@ -18,7 +18,7 @@ end
 
 local function execUncached(fn, args, opt, nestedGradient)
    local graph = Graph.record(fn, args, opt)
-   local retValues = { Value.collectGrads(graph.params[opt.argnum]) }
+   local retValues = { Value.collectGrads(graph.params[opt.argnum], graph.intermediateGrads) }
    for i = 1, #graph.answers do
       retValues[#retValues + 1] = graph.answers[i]
    end

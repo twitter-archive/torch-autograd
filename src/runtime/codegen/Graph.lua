@@ -43,31 +43,33 @@ local function overloadHook(fn, gradFn, ...)
    end
 end
 
-local function collectGradients(val, grads)
+local function collectGradients(val, intermediateGrads, grads)
    grads = grads or { }
    if Value.isValue(val) then
       local rootSource = val.source:getRoot()
-      if val.source.gradient == nil and rootSource.type == Source.PARAM and rootSource.differentiableParam then
+      local gradient = intermediateGrads[val.source]
+      if gradient == nil and rootSource.type == Source.PARAM and rootSource.differentiableParam then
          -- This was a differentiable param, but we ended up with no gradient for it.
          -- Return a zero gradient, but this could also be an error.
          if val.type == Value.TENSOR then
-            val.source.gradient = Value.from(util.zerosLike(val), Source.constant(val))
+            gradient = Value.from(util.zerosLike(val), Source.constant(val))
          elseif output.type == Value.NUMBER then
-            val.source.gradient = Value.from(0.0, Source.constant(0))
+            gradient = Value.from(0.0, Source.constant(0))
          end
+         intermediateGrads[val.source] = gradient
       end
-      if val.source.gradient ~= nil then
+      if gradient ~= nil then
          grads[#grads + 1] = {
             param = val,
-            grad = val.source.gradient
+            grad = gradient
          }
       end
       if val.type == Value.TABLE then
-         collectGradients(val:get(), grads)
+         collectGradients(val:get(), intermediateGrads, grads)
       end
    elseif type(val) == "table" then
       for k, v in pairs(val) do
-         collectGradients(v, grads)
+         collectGradients(v, intermediateGrads, grads)
       end
    end
    return grads
@@ -328,6 +330,7 @@ function Graph.record(fn, args, opt)
    -- Call user forward function.
    local answers = { }
    local grads = { }
+   local intermediateGrads = { }
 
    local protectedFn = function()
       answers = {fn(table.unpack(values))}
@@ -338,19 +341,19 @@ function Graph.record(fn, args, opt)
       if withGradients then
          -- Walk the execution order backwards, chaining derivatives.
          if answers[1].type == Value.TENSOR and opt.partialGrad then
-            answers[1].source.gradient = values[#values]
+            intermediateGrads[answers[1].source] = values[#values]
          elseif answers[1].type == Value.NUMBER then
-            answers[1].source.gradient = Value.from(1, Source.constant(1))
+            intermediateGrads[answers[1].source] = Value.from(1, Source.constant(1))
          else
             error("invalid return value type from autograd function, autograd only supports scalar return values")
          end
 
          for i=#forwardExecOrder,1,-1 do
             local node = forwardExecOrder[i]
-            node:evaluateBackward(mutationFlow)
+            node:evaluateBackward(mutationFlow, intermediateGrads)
          end
 
-         grads = collectGradients(values[argnum])
+         grads = collectGradients(values[argnum], intermediateGrads)
       end
       return true
    end
@@ -376,7 +379,8 @@ function Graph.record(fn, args, opt)
       mutationFlow = mutationFlow,
       grads = grads,
       params = values,
-      answers = answers
+      answers = answers,
+      intermediateGrads = intermediateGrads
    }
 
    setmetatable(graph, Graph)

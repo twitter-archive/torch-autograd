@@ -743,7 +743,7 @@ local function generateCode(graph, opt)
    if debugger then
       debugger.setCode(code)
    end
-   local retValues = { Value.flattenGrads(graph.params[opt.argnum]) }
+   local retValues = { Value.flattenGrads(graph.params[opt.argnum], graph.intermediateGrads) }
    for i = 1, #graph.answers do
       retValues[#retValues + 1] = flattenAnswer(graph.answers[i])
    end

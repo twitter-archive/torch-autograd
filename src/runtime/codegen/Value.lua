@@ -130,41 +130,38 @@ function Value.flatten(v)
 	end
 end
 
-function Value.flattenGrads(v)
+function Value.flattenGrads(v, intermediateGrads)
 	if not Value.isValue(v) then
 		if type(v) == "table" then
 			local rawTable = { }
 			for k,v in pairs(v) do
-				rawTable[k] = Value.flattenGrads(v)
+				rawTable[k] = Value.flattenGrads(v, intermediateGrads)
 			end
 			return rawTable
 		end
 	elseif v.type == Value.TABLE then
-		return Value.flattenGrads(v.raw)
+		return Value.flattenGrads(v.raw, intermediateGrads)
 	else
-		if v.source.gradient then
-			return v.source.gradient:flatten()
+		local grad = intermediateGrads[v.source]
+		if grad ~= nil then
+			return intermediateGrads[v.source]:flatten()
 		end
-		return nil
 	end
 end
 
-function Value.collectGrads(v)
+function Value.collectGrads(v, intermediateGrads)
 	if not Value.isValue(v) then
 		if type(v) == "table" then
 			local rawTable = { }
 			for k,v in pairs(v) do
-				rawTable[k] = Value.collectGrads(v)
+				rawTable[k] = Value.collectGrads(v, intermediateGrads)
 			end
 			return rawTable
 		end
 	elseif v.type == Value.TABLE then
-		return Value.collectGrads(v.raw)
+		return Value.collectGrads(v.raw, intermediateGrads)
 	else
-		if v.source.gradient then
-			return v.source.gradient
-		end
-		return nil
+		return intermediateGrads[v.source]
 	end
 end
 

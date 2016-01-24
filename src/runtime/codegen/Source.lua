@@ -54,13 +54,6 @@ function Source:symbolPath(rootSymbols)
 			end
 			return tostring(self.val)
 		end
-	elseif self.type == Source.GRADIENT then
-		-- TODO TENSOR
-		if self.tensorType ~= nil then
-			return "(" .. self.tensorType .. "(" .. table.concat(self.dims:totable(), ", ") .. "):fill(" .. self.val .. ")" .. ")"
-		else
-			return tostring(self.val)
-		end
 	else
 		if rootSymbols[self] == nil then
 			error("unknown symbol for node")
