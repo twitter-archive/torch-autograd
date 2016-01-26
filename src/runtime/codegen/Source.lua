@@ -62,26 +62,30 @@ function Source:symbolPath(rootSymbols)
 	end
 end
 
-function Source:differentiable()
-	if self.type == Source.TABLE then
-		return self.parent:differentiable()
-	elseif self.type == Source.COMPUTED then
-		return self.node:differentiable()
-	elseif self.type == Source.PARAM then
-		return self.differentiableParam
-	elseif self.type == Source.CONSTANT then
-		if type(self.val) == "table" then
-			local Value = require 'autograd.runtime.codegen.Value'
-			for k, v in pairs(self.val) do
-				if Value.isValue(v) then
-					if v.source:differentiable() then
-						return true
+function Source:differentiable(differentiableMap)
+	local isDiff = differentiableMap[self]
+	if isDiff ~= nil then
+		return isDiff
+	else
+		if self.type == Source.TABLE then
+			isDiff = self.parent:differentiable(differentiableMap)
+		elseif self.type == Source.COMPUTED then
+			isDiff = self.node:differentiable(differentiableMap)
+		elseif self.type == Source.CONSTANT then
+			if type(self.val) == "table" then
+				local Value = require 'autograd.runtime.codegen.Value'
+				for k, v in pairs(self.val) do
+					if Value.isValue(v) then
+						if v.source:differentiable(differentiableMap) then
+							isDiff = true
+						end
 					end
 				end
 			end
 		end
+		differentiableMap[self] = isDiff
 	end
-	return false
+	return isDiff
 end
 
 function Source:getRoot()
@@ -126,10 +130,9 @@ function Source.computed(node, index)
 	return s
 end
 
-function Source.param(name, differentiable)
+function Source.param(name)
 	local s = Source.new(Source.PARAM)
 	s.name = name
-	s.differentiableParam = differentiable
 	return s
 end
 

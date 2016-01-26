@@ -57,8 +57,8 @@ local function canReuseOutput(node)
    return reusableFunctionsMap[node.forwardFn.name] ~= nil and #node.outputs == 1 and node.outputs[1].type == Value.TENSOR
 end
 
-local function canInline(node, hazardNodes, debugger)
-   return #node.outputs == 1 and #node.outputTargets[1] == 1 and hazardNodes[node] == nil and debugger == nil
+local function canInline(node, state)
+   return #node.outputs == 1 and #node.outputTargets[1] == 1 and state.hazardNodes[node] == nil and state.debugger == nil and state.inline
 end
 
 local function writeLiteralTable(wtable, out, symbols, depth)
@@ -117,7 +117,7 @@ local function buildInputExpr(state, input)
          end
       end
       return "{" .. table.concat(elements, ", ") .. "}"
-   elseif input.source.type == Source.COMPUTED and canInline(input.source.node, state.hazardNodes, state.debugger) then
+   elseif input.source.type == Source.COMPUTED and canInline(input.source.node, state) then
       local subExpr = writeExpr(state, input.source.node)
       return "(" .. subExpr .. ")"
    else
@@ -333,20 +333,19 @@ local function createSymbolTable(graph, execOrder, aliases, params, tensorPool, 
       if aliases[node] ~= nil or skip[node] ~= nil then
       elseif #node.outputs == 1 then
          local output = node.outputs[1]
-         if node.outputs[1].type == Value.TENSOR then
-            if canReuseOutput(node) then
+         if node.outputs[1].type == Value.TENSOR and canReuseOutput(node) then
                availableCount = mapReusableTensorNodeSymbol(node, symbols, tensorPool, availableTensorMap, remainingOutputs, availableCount, i)
-            else
-               -- Non-reusable local.
-               localCount = localCount + 1
-               tensorLocals[localCount] = 0
-               symbols[output.source] = "locals[" .. localCount .. "]"
-            end
          else
-            -- One output, not a tensor.
-            undefined[output.source] = true
-            symbols[output.source] = letterForType(node.outputs[1]) .. i
+            -- Non-reusable local.
+            localCount = localCount + 1
+            tensorLocals[localCount] = 0
+            symbols[output.source] = "locals[" .. localCount .. "]"
          end
+         -- else
+         --    -- One output, not a tensor.
+         --    undefined[output.source] = true
+         --    symbols[output.source] = letterForType(node.outputs[1]) .. i
+         -- end
       else
          -- More than one output.
          -- TODO, currently uncached.
@@ -557,6 +556,7 @@ local function generateCode(graph, opt)
    local optimize = opt.optimize or true
    local withForward = util.defaultBool(opt.withForward, true)
    local withGradients = util.defaultBool(opt.withGradients, true)
+   local inline = util.defaultBool(opt.inline, true)
    local tensorPool = opt.tensorPool or { }
    local tensorLocals = opt.tensorLocals or { }
    local debugger = opt.debugger
@@ -622,6 +622,7 @@ local function generateCode(graph, opt)
       hazardNodes = hazardNodes,
       functionRemap = functionRemap,
       debugger = debugger,
+      inline = inline,
       objects = objects
    }
 
@@ -665,7 +666,7 @@ local function generateCode(graph, opt)
       for k = 1, #node.outputs do
          outputSymbols[k] = symbols[node.outputs[k].source]
       end
-      if not canInline(node, hazardNodes, debugger) then
+      if not canInline(node, state) then
          out.write("    ")
          if (not canReuseOutput(node)) and (node.forwardFn.operator ~= "newindex") then
             if #outputSymbols > 0 then

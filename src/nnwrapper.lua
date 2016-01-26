@@ -1,3 +1,5 @@
+local util = require 'autograd.util'
+
 local nodeApply
 local function directApply(fun, gradFun, ...)
    return fun.fn(...)

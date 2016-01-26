@@ -1,5 +1,6 @@
 local Value = require 'autograd.runtime.codegen.Value'
 local Source = require 'autograd.runtime.codegen.Source'
+local util = require 'autograd.util'
 
 Node = { }
 Node.__index = Node
@@ -28,20 +29,22 @@ function Node:init(forwardFn, gradientFn, inputs, mutationFlow)
 	self.outputTargets = { }
 end
 
-function Node:differentiable()
-	if self.__differentiable == nil then
+function Node:differentiable(differentiableMap)
+	local outputSource = self.outputs[1].source
+	local isDiff = differentiableMap[outputSource]
+	if isDiff == nil then
 		if self.gradientFn or self.forwardFn.differentiable then
 			for i = 1, #self.inputs do
-				if self.inputs[i].source:differentiable() then
-					self.__differentiable = true
+				if self.inputs[i].source:differentiable(differentiableMap) then
+					differentiableMap[outputSource] = true
 					return true
 				end
 			end
 		end
-		self.__differentiable = false
+		differentiableMap[outputSource] = false
 		return false
 	else
-		return self.__differentiable
+		return isDiff
 	end
 end
 
@@ -84,7 +87,7 @@ function Node:evaluateForward(mutationFlow)
 	return table.unpack(self.outputs)
 end
 
-function Node:evaluateBackward(mutationFlow, intermediateGrads)
+function Node:evaluateBackward(mutationFlow, intermediateGrads, differentiableMap)
 	-- Only eval one gradient for now?
 	local numGrads = 1 --#self.outputs
 	for o = 1, numGrads do
@@ -92,13 +95,12 @@ function Node:evaluateBackward(mutationFlow, intermediateGrads)
 		for i = #self.inputs, 1, -1 do
 			local input = self.inputs[i]
 			local source = input.source
-			if source:differentiable() then
+			if source:differentiable(differentiableMap) then
 				if self.gradientFn ~= nil and self.gradientFn[i] ~= nil then
 					local outputGradient = intermediateGrads[output.source]
 					if outputGradient == nil then
-						print("** make output grad")
 						if output.type == Value.TENSOR then
-						   outputGradient = Value.from(util.zerosLike(val), Source.constant(0, torch.type(output), torch.size(output)))
+						   outputGradient = Value.from(util.zerosLike(output), Source.constant(0, torch.type(output), torch.size(output)))
 						elseif output.type == Value.NUMBER then
 						   outputGradient = Value.from(0.0, Source.constant(0))
 						end

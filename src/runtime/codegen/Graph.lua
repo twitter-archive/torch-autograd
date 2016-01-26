@@ -43,17 +43,17 @@ local function overloadHook(fn, gradFn, ...)
    end
 end
 
-local function collectGradients(val, intermediateGrads, grads)
+local function collectGradients(val, intermediateGrads, differentiableMap, grads)
    grads = grads or { }
    if Value.isValue(val) then
       local rootSource = val.source:getRoot()
       local gradient = intermediateGrads[val.source]
-      if gradient == nil and rootSource.type == Source.PARAM and rootSource.differentiableParam then
+      if gradient == nil and rootSource.type == Source.PARAM and differentiableMap[rootSource] then
          -- This was a differentiable param, but we ended up with no gradient for it.
          -- Return a zero gradient, but this could also be an error.
          if val.type == Value.TENSOR then
             gradient = Value.from(util.zerosLike(val), Source.constant(val))
-         elseif output.type == Value.NUMBER then
+         elseif val.type == Value.NUMBER then
             gradient = Value.from(0.0, Source.constant(0))
          end
          intermediateGrads[val.source] = gradient
@@ -65,11 +65,11 @@ local function collectGradients(val, intermediateGrads, grads)
          }
       end
       if val.type == Value.TABLE then
-         collectGradients(val:get(), intermediateGrads, grads)
+         collectGradients(val:get(), intermediateGrads, differentiableMap, grads)
       end
    elseif type(val) == "table" then
       for k, v in pairs(val) do
-         collectGradients(v, intermediateGrads, grads)
+         collectGradients(v, intermediateGrads, differentiableMap, grads)
       end
    end
    return grads
@@ -302,20 +302,37 @@ function Graph.reentryDepth()
    return reentryDepth
 end
 
+function markDifferentiable(value, differentiableMap, args)
+   if Value.isValue(value) then
+      if value.type == Value.TABLE then
+         markDifferentiable(value:get(), differentiableMap)
+      else
+         differentiableMap[value.source] = true
+      end
+   elseif type(value) == "table" then
+      for k, v in pairs(value) do
+         markDifferentiable(v, differentiableMap)
+      end
+   end
+end
+
 function Graph.record(fn, args, opt)
    local argnum = opt.argnum or 1
    local debugger = opt.debugger
    local partialGrad = util.defaultBool(opt.partialGrad, false)
    local withGradients = util.defaultBool(opt.withGradients, true)
    local values = { }
-   local tensorDims = { }
+   local differentiableMap = { }
 
    for i = 1, #args do
       -- Don't wrap the outer tables in Values, since it would interfere with the use of the # operator.
       -- This creates some problems when referring to an entire param table in the generated code - it'll
       -- be represented as a new literal table, but it's a good tradeoff until we move entirely to Lua 5.2
       -- and can overload # on Value.
-      values[i] = Value.from(args[i], Source.param(i, i == argnum), true)
+      values[i] = Value.from(args[i], Source.param(i), true)
+      if (i == argnum) then
+         markDifferentiable(values[i], differentiableMap, args)
+      end
    end
 
    -- Begin recording all torch operations.
@@ -350,10 +367,10 @@ function Graph.record(fn, args, opt)
 
          for i=#forwardExecOrder,1,-1 do
             local node = forwardExecOrder[i]
-            node:evaluateBackward(mutationFlow, intermediateGrads)
+            node:evaluateBackward(mutationFlow, intermediateGrads, differentiableMap)
          end
 
-         grads = collectGradients(values[argnum], intermediateGrads)
+         grads = collectGradients(values[argnum], intermediateGrads, differentiableMap)
       end
       return true
    end
