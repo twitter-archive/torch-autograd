@@ -1544,6 +1544,102 @@ local tests = {
       tester:assert(gradcheck(f4,{x=torch.randn(10,10),y=torch.randn(3)}), "Incorrect gradient")
    end,
 
+   ReversibleDynamics = function()
+      --This implements a very simple example of the concepts in:
+      --Maclaurin, Duvenaud, and Adams. "Gradient-based Hyperparameter Optimization through Reversible Learning."
+      --We learn a linear regression model with SGD, and differentiate the test set performance of the model with respect to the learning rate used at train time
+      --Ideally this would be used to learn the learning rate using gradient descent. This test is more simple. 
+      --It just evaluates the gradient of the loss with respect to the learningRate for a few different learning rate values. 
+      --Also, Maclaurin et al. use SGD with momentum, but this test uses simple SGD. 
+
+      -- define trainable parameters:
+      local numFeatures = 10
+      local numOutputs = 3
+      local numSamples = 250
+      local numEpochs = 10
+
+      --this sets up the true model from which the data is drawn
+      local trueParams = {
+         W = torch.randn(numFeatures,numOutputs),
+         b = torch.randn(numOutputs)
+      }
+
+      --this is used to generate train and test datasets
+      local function genDataset()
+         local dataset = {}
+         for tt = 1,numSamples do
+            local x = torch.randn(1,numFeatures)
+            local y = x*trueParams.W + trueParams.b
+            table.insert(dataset,{x = x,y = y})
+         end
+         return dataset
+      end
+      local trainingSet = genDataset()
+      local testSet = genDataset()
+
+
+      -- define loss for linear regression model 
+      local linearRegressionLoss = function(params, x, y)
+         local yhat = x*params.W + params.b
+         local residual = y - yhat
+         local loss = 0.5*torch.sum(torch.cmul(residual,residual))
+         return loss
+      end
+
+      -- gradient of loss
+      local dLinearRegressionLoss = autograd(linearRegressionLoss)
+
+
+      --we learn the regression parameters using SGD with a fixed step size
+      function gradientUpdate(metaParams,params,grads)
+         torch.add(params.W,params.W,-metaParams.learningRate,grads.W)
+         torch.add(params.b,params.b,-metaParams.learningRate,grads.b)
+      end
+
+      --this initializes the params that are optimized by learning. 
+      function getInitParams()
+         local p =  {
+            W = torch.zero(torch.Tensor(numFeatures,numOutputs)),
+            b = torch.zero(torch.Tensor(numOutputs))
+         }
+         return p
+      end
+
+      --this learns a regression model on the train set and evaluates its squared loss on the test set
+      --its behavior depends on the value of learningRate in metaParams
+      function learn(metaParams)
+         local params = getInitParams()
+         for epoch = 1,numEpochs do
+            for _,sample in ipairs(trainingSet) do
+               local grads, loss = dLinearRegressionLoss(params, sample.x, sample.y)
+                gradientUpdate(metaParams,params,grads)
+            end
+         end
+
+         local testLoss = torch.zero(torch.Tensor(1))
+         local numSamples = #testSet
+         for _,sample in ipairs(testSet) do
+            local g, tL = dLinearRegressionLoss(params,sample.x,sample.y)
+            torch.add(testLoss,testLoss,tL)
+         end
+         return testLoss[1]
+      end
+
+
+      --this is the gradient of the test loss with respect to the learning rate used on the train data
+      local dLearn = autograd(learn)
+
+      --this just evaluates dLearn for a few choices of the learning rate. Eventually, we would like to learn the learningRate with gradient descent.
+      for _,lr in ipairs({0.001,0.01,0.1}) do
+
+         --this just evaluates the 'learn' function directly, in order to demonstrate that this code path works
+         local testLoss1 = learn({learningRate = lr})
+
+         --this evaluates the derivative of the 'learn function.' Currently it is failing. 
+         local testLoss2, dMetaParams = dLearn({learningRate = lr})
+         tester:assert(testLoss1 == testLoss2,"value computed using 'learn' function does not match value computed by 'dLearn'")
+      end
+   end
 
 }
 
@@ -1562,5 +1658,5 @@ autograd.optimize(true)
 tester:add(prefixTests("Optimized_", tests, { })):run()
 autograd.optimize(false)
 tester = totem.Tester()
-tester:add(prefixTests("Direct_", tests, { GradGrad = true, AutoModule = true, DebuggerDivZero = true, StableGradients = true, ZeroGrad = true, SimpleGradGrad = true })):run()
+tester:add(prefixTests("Direct_", tests, { GradGrad = true, AutoModule = true, DebuggerDivZero = true, StableGradients = true, ZeroGrad = true, SimpleGradGrad = true , ReversibleDynamics = true})):run()
 
