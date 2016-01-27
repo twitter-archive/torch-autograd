@@ -20,8 +20,8 @@ return function(moduleName)
          parent.__init(self)
          local mt = getmetatable(self)
          self.fn = fn or error('An autograd function must be specified as input to AutoModule')
-         self.weight,self.gradWeight = weight and weight, weight:clone()
-         self.bias,self.gradBias = bias and bias, bias:clone()
+         self.weight,self.gradWeight = weight and weight, weight and weight:clone()
+         self.bias,self.gradBias = bias and bias, bias and bias:clone()
          self.fnWrapper = function(params)
             return self.fn(params.input, params.weight, params.bias)
          end
@@ -55,11 +55,13 @@ return function(moduleName)
       end
 
       function module:accGradParameters(input, gradOutput, scale)
-         if not self.grads then
-            self.grads = self.b({input=input, weight=self.weight, bias=self.bias}, gradOutput)
+         if self.weight then
+            if not self.grads then
+               self.grads = self.b({input=input, weight=self.weight, bias=self.bias}, gradOutput)
+            end
+            self.gradWeight:add(scale, self.grads.weight)
+            self.gradBias:add(scale, self.grads.bias)
          end
-         self.gradWeight:add(scale, self.grads.weight)
-         self.gradBias:add(scale, self.grads.bias)
       end
    end
    local module = auto[moduleName]
