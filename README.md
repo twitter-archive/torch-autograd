@@ -263,7 +263,7 @@ local sigmoid = autograd.functionalize(model)
 -- The sigmoid can now be used as part of a regular autograd function:
 local loss = autograd.nn.MSECriterion()
 neuralNet = function(params, x, y)
-   local h = modelf(x) -- please note the absence of params arg
+   local h = sigmoid(x) -- please note the absence of params arg
    return loss(h, y)
 end
 
