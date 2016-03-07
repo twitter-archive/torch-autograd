@@ -500,7 +500,7 @@ overload.module("torch", torch, function(module)
          local Dx = torch.nDimension(x)
          for i=Dx,1,-1 do
             local D = torch.nDimension(g)
-            local c = torch.cat(torch.split(g,torch.size(x,i), Dg-Dx+i), D+1)
+            local c = util.cat(torch.split(g,torch.size(x,i), Dg-Dx+i), D+1)
             g = torch.squeeze(torch.sum(c,D+1))
          end
          for i=1,Dg-Dx do

@@ -1399,6 +1399,10 @@ local tests = {
          return torch.sum(y)
       end
       tester:assert(gradcheck(f2to2, {x=torch.randn(3,3)}), "Incorrect gradient")
+      x = torch.randn(3,3)
+      local o_double = autograd(f2to2)({x=x}).x
+      local o_float = autograd(f2to2)({x=x:float()}).x
+      tester:assertTensorEq(o_double, o_float:double(), 1e-10, "Incorrect floating point gradient")
 
       local function f3to3(params)
          local y = torch.repeatTensor(params.x, 2, 2, 2)*3
