@@ -1167,9 +1167,6 @@ local tests = {
          return torch.sum(v)
       end
 
-      -- Move to Float
-      params = autograd.util.cast(params, "double")
-
       -- Test on sequence data:
       local o = loss(params, i)
       local g = autograd(loss)(params, i)
