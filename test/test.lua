@@ -1176,6 +1176,7 @@ local tests = {
 
       -- Checks
       tester:asserteq(type(g), 'table', 'gradients could not be computed')
+      tester:assert(gradcheck(loss, params, i), 'incorrect gradients')
    end,
 
    DebuggerDivZero = function()
