@@ -224,6 +224,50 @@ operators.pow = {
    end
 }
 
+-- Define some gradients that will be shared by the class and the torch module
+-- e.g. torch.view(x,3,3) and x:view(3,3)
+local viewGradients = {
+   function(g, ans, x,sizes)
+      return torch.view(util.makeContiguous(g), torch.size(x))
+   end
+}
+local viewAsGradients = {
+   function(g, ans, x,template)
+      return torch.clone(torch.viewAs(g,x))
+   end,
+   function(g, ans, x,template)
+      return nil -- g.new(template:size()):zero()
+   end
+}
+local expandGradients = {
+   function(g, ans, x,...)
+      local xSizes = torch.size(x):totable()
+      local out = g
+      for dim,size in pairs(xSizes) do
+         if size == 1 then
+            out = torch.sum(out,dim)
+         end
+      end
+      return out
+   end
+}
+local expandAsGradients = {
+   function(g, ans, x, template)
+      local sizes = torch.size(x):totable()
+      local out = g
+      for dim,size in pairs(sizes) do
+         if size == 1 then
+            out = torch.sum(out, dim)
+         end
+      end
+      return out
+   end,
+   function(g, ans, x,template)
+      return nil
+   end
+}
+
+
 overload.module("torch", torch, function(module)
    local tensorTypes = {"FloatTensor", "DoubleTensor", "CudaTensor"}
    for i = 1, #tensorTypes do
@@ -236,6 +280,10 @@ overload.module("torch", torch, function(module)
             class.gradient("cat", functions.catGradient)
             class.initializer("new")
             class.static("dim", "size", "nDimension", "nElement")
+            class.gradient("view", viewGradients)
+            class.gradient("viewAs", viewAsGradients)
+            class.gradient("expand", expandGradients)
+            class.gradient("expandAs", expandAsGradients)
             class.defaultUnsupported()
          end)
       end
@@ -328,46 +376,10 @@ overload.module("torch", torch, function(module)
       end
    })
    module.gradient("cat", functions.catGradient)
-   module.gradient("expand", {
-      function(g, ans, x,...)
-         local xSizes = torch.size(x):totable()
-         local out = g
-         for dim,size in pairs(xSizes) do
-            if size == 1 then
-               out = torch.sum(out,dim)
-            end
-         end
-         return out
-      end
-   })
-   module.gradient("expandAs", {
-      function(g, ans, x, template)
-         local sizes = torch.size(x):totable()
-         local out = g
-         for dim,size in pairs(sizes) do
-            if size == 1 then
-               out = torch.sum(out, dim)
-            end
-         end
-         return out
-      end,
-      function(g, ans, x,template)
-         return nil
-      end
-   })
-   module.gradient("view", {
-      function(g, ans, x,sizes)
-         return torch.view(util.makeContiguous(g), torch.size(x))
-      end
-   })
-   module.gradient("viewAs", {
-      function(g, ans, x,template)
-         return torch.clone(torch.viewAs(g,x))
-      end,
-      function(g, ans, x,template)
-         return nil -- g.new(template:size()):zero()
-      end
-   })
+   module.gradient("expand", expandGradients)
+   module.gradient("expandAs", expandAsGradients)
+   module.gradient("view", viewGradients)
+   module.gradient("viewAs", viewAsGradients)
    module.gradient("clone", {
       function(g, ans, x)
          return g

@@ -242,19 +242,35 @@ local tests = {
       tester:assert(gradcheck(f, {x=x}), "Incorrect gradient")
    end,
 
-   -- ViewAndExpand = function()
-   --    local function f(params)
-   --       local X = params.X
-   --       local x = X:view(X:size(1), 1, X:size(2))
-   --       x = x:expand(X:size(1), X:size(2), X:size(2))
-   --       local z = Z:view(Z:size(1), Z:size(2), 1)
-   --       z = z:expandAs(x)
-   --       local diffs = torch.sum(x - z, 3)
-   --       local sq = torch.cmul(diffs, diffs)
-   --       return torch.sum(sq)
-   --    end
-   --    local X = torch.randn(10,10)
-   -- end,
+   SelfView = function()
+      local W = torch.Tensor(5,5):normal()
+      local x = torch.Tensor(1,25):normal()
+
+      -- Function:
+      local viewFn = function(inputs)
+         return torch.sum(inputs.x:view(5,5) + inputs.W)
+      end
+      local viewAsFn = function(inputs)
+         return torch.sum(inputs.x:viewAs(inputs.W) + inputs.W)
+      end
+
+      -- Check grads:
+      tester:assert(gradcheck(viewFn, {W=W,x=x}), "Incorrect gradient")
+      tester:assert(gradcheck(viewAsFn, {W=W,x=x}), "Incorrect gradient")
+
+      -- Check floating point
+      gd = autograd(viewFn)({W=W,x=x})
+      gf = autograd(viewFn)({W=W:float(),x=x:float()})
+      tester:assertTensorEq(gd.W, gf.W:double(), 1e-8, "Incorrect floating point gradient")
+      tester:assertTensorEq(gd.x, gf.x:double(), 1e-8, "Incorrect floating point gradient")
+
+      gd = autograd(viewAsFn)({W=W,x=x})
+      gf = autograd(viewAsFn)({W=W:float(),x=x:float()})
+      tester:assertTensorEq(gd.W, gf.W:double(), 1e-8, "Incorrect floating point gradient")
+      tester:assertTensorEq(gd.x, gf.x:double(), 1e-8, "Incorrect floating point gradient")
+
+
+   end,
 
    View = function()
       local W = torch.Tensor(5,5):normal()
@@ -279,6 +295,35 @@ local tests = {
       tester:assertTensorEq(gd.x, gf.x:double(), 1e-8, "Incorrect floating point gradient")
 
    end,
+
+   SelfExpand = function()
+      local W = torch.Tensor(32,100):normal()
+      local x1 = torch.Tensor(1,100):normal()
+      local x2 = torch.Tensor(32,1):normal()
+      local x3 = torch.Tensor(1,1):normal()
+
+      -- Function:
+      local expandFn = function(inputs)
+         return torch.sum(torch.sum(inputs.x:expand(32,100) + inputs.W, 2))
+      end
+      local expandAsFn = function(inputs)
+         return torch.sum(torch.sum(inputs.x:expandAs(inputs.W) + inputs.W, 2))
+      end
+
+      -- Check grads:
+      for ix,x in pairs({x1,x2,x3}) do
+         tester:assert(gradcheck(expandFn, {W=W, x=x}), "Incorrect gradient")
+         tester:assert(gradcheck(expandAsFn, {W=W, x=x}), "Incorrect gradient")
+      end
+      -- Check floating point
+      for ix,x in pairs({x1,x2,x3}) do
+         gd = autograd(expandFn)({W=W,x=x})
+         gf = autograd(expandFn)({W=W:float(),x=x:float()})
+         tester:assertTensorEq(gd.W, gf.W:double(), 1e-8, "Incorrect floating point gradient")
+         tester:assertTensorEq(gd.x, gf.x:double(), 1e-8, "Incorrect floating point gradient")
+      end
+
+ end,
 
    Expand = function()
       local W = torch.Tensor(32,100):normal()

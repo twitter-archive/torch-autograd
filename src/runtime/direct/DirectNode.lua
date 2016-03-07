@@ -21,6 +21,18 @@ function DirectNode:init(value, fun, gradFun, args, values, tape)
    o.new = function(...)
       return o.value.new(...)
    end
+   o.view = function(...)
+      return torch.view(...)
+   end
+   o.viewAs = function(...)
+      return torch.viewAs(...)
+   end
+   o.expand = function(...)
+      return torch.expand(...)
+   end
+   o.expandAs = function(...)
+      return torch.expandAs(...)
+   end
    setmetatable(o, self)
    return o
 end
