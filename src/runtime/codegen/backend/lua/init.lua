@@ -214,7 +214,7 @@ local function findParamSource(val)
       end
    elseif type(val) == "table" then
       for k, v in pairs(val) do
-         local paramSource = findParamSource(v, params, seen, whichParam)
+         local paramSource = findParamSource(v)
          if paramSource ~= nil then
             return paramSource
          end
@@ -744,7 +744,10 @@ local function generateCode(graph, opt)
    if debugger then
       debugger.setCode(code)
    end
-   local retValues = { Value.flattenGrads(graph.params[opt.argnum], graph.intermediateGrads) }
+   local retValues = { }
+   if withGradients then
+      retValues = { Value.flattenGrads(graph.params[opt.argnum], graph.intermediateGrads) }
+   end
    for i = 1, #graph.answers do
       retValues[#retValues + 1] = flattenAnswer(graph.answers[i])
    end
