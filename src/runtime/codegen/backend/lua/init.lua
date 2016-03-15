@@ -461,28 +461,21 @@ end
 
 local function collectObjects(execOrder)
    -- Find all the nn objects we need to create or pass in.
-   local objects = { }
-   local count = 1
+   local objectMap = { }
+   local objectTable = { }
    for i = 1, #execOrder do
       local node = execOrder[i]
       local obj = node.forwardFn.object
-      if obj ~= nil and objects[obj] == nil then
-         if node.forwardFn.ctor then
-            objects[obj] = {
-               ctor = node.forwardFn.package .. "." .. node.forwardFn.ctor,
-               name = string.lower(node.forwardFn.ctor .. count),
-               args = node.forwardFn.args
-            }
-         else
-            objects[obj] = {
-               object = obj,
-               name = node.forwardFn.name .. count
-            }
-         end
-         count = count + 1
+      if obj ~= nil and objectMap[obj] == nil then
+         objectTable[#objectTable + 1] = obj
+         objectMap[obj] = {
+            object = obj,
+            index = objectTable[#objectTable],
+            name = "objects[" .. #objectTable .. "]"
+         }
       end
    end
-   return objects
+   return objectMap, objectTable
 end
 
 local function changeToReuseFunctions(execOrder)
@@ -583,7 +576,7 @@ local function generateCode(graph, opt)
       end
    end
    local symbols, undefined, constants, tensorPoolViews = createSymbolTable(graph, execOrder, aliases, params, tensorPool, tensorLocals, opt)
-   local objects = collectObjects(execOrder)
+   local objectMap, objectTable = collectObjects(execOrder)
 
    local out = StringBuilder()
    local outerArgNames = {"locals", "rlocals", "vlocals"}
@@ -596,11 +589,9 @@ local function generateCode(graph, opt)
       outerArgs[#outerArgs + 1] = debugger
    end
 
-   for k, v in pairs(objects) do
-      if v.ctor == nil then
-         outerArgNames[#outerArgNames + 1] = v.name
-         outerArgs[#outerArgs + 1] = k
-      end
+   if #objectTable > 0 then
+      outerArgNames[#outerArgNames + 1] = "objects"
+      outerArgs[#outerArgs + 1] = objectTable
    end
 
    local functionRemap = { }
@@ -623,7 +614,7 @@ local function generateCode(graph, opt)
       functionRemap = functionRemap,
       debugger = debugger,
       inline = inline,
-      objects = objects
+      objects = objectMap
    }
 
    -- Generate code.
@@ -633,12 +624,6 @@ local function generateCode(graph, opt)
    out.write("\n")
    out.write("local util = require('autograd.util')")
    out.write("\n")
-   for k, v in pairs(objects) do
-      if v.ctor ~= nil then
-         out.write("local ", v.name, " = ", v.ctor, "(", table.concat(v.args, ", "), ")")
-         out.write("\n")
-      end
-   end
    for k, v in pairs(functionRemap) do
       out.write("local ", v, " = ", k)
       out.write("\n")
