@@ -245,6 +245,11 @@ local function flattenAnswer(val)
    end
 end
 
+local function storageSize(tensor)
+   local storage = tensor:storage()
+   return storage and storage:size() or 0
+end
+
 local function mapReusableTensorNodeSymbol(node, symbols, tensorPool, availableTensorMap, remainingOutputs, availableCount, index)
    local output = node.outputs[1]
    local tensor = output:get()
@@ -334,7 +339,7 @@ local function createSymbolTable(graph, execOrder, aliases, params, tensorPool, 
       elseif #node.outputs == 1 then
          local output = node.outputs[1]
          if node.outputs[1].type == Value.TENSOR and canReuseOutput(node) then
-               availableCount = mapReusableTensorNodeSymbol(node, symbols, tensorPool, availableTensorMap, remainingOutputs, availableCount, i)
+            availableCount = mapReusableTensorNodeSymbol(node, symbols, tensorPool, availableTensorMap, remainingOutputs, availableCount, i)
          else
             -- Non-reusable local.
             localCount = localCount + 1
@@ -394,8 +399,11 @@ local function createSymbolTable(graph, execOrder, aliases, params, tensorPool, 
       for k, v in pairs(availableTensorMap) do
          for i = 1, #v do
             local idx = v[i]
-            availableTensors[#availableTensors + 1] = idx
-            availableTensorSizes[idx] = tensorPool[idx]:storage():size()
+            local size = storageSize(tensorPool[idx])
+            if size > 0 then
+               availableTensors[#availableTensors + 1] = idx
+               availableTensorSizes[idx] = size
+            end
          end
       end
 
@@ -409,7 +417,7 @@ local function createSymbolTable(graph, execOrder, aliases, params, tensorPool, 
       for i = 1, #remainingOutputs do
          local idx = remainingOutputs[i]
          local output = execOrder[idx].outputs[1]
-         remainingOutputSizes[idx] = output:get():storage():size()
+         remainingOutputSizes[idx] = storageSize(output:get())
       end
 
       function sortTensorSize(a, b)
@@ -428,7 +436,7 @@ local function createSymbolTable(graph, execOrder, aliases, params, tensorPool, 
          local poolTensor = tensorPool[tensorIdx]
          table.remove(availableTensors, matchingIndex) -- typically the last element
          local poolStorage = poolTensor:storage()
-         if outputTensor:storage():size() > poolStorage:size() then
+         if storageSize(outputTensor) > poolStorage:size() then
             -- We don't care about the data in the pool tensor, so resize it to zero before growing to avoid a realloc/copy.
             poolStorage:resize(0)
          end
