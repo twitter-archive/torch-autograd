@@ -86,7 +86,7 @@ local tests = {
    AutoModuleLoaded = function()
       local inputSize = 24
       local outputSize = 848
-      local version = (jit and 'JIT') or (_VERSION:find('5%.1') and '51') or (_VERSION:find('5%.2') and '52') or assert('version of Lua not supported: ', _VERSION)
+      local version = (jit and 'JIT') or (_VERSION:find('5%.1') and '51') or (_VERSION:find('5%.2') and '52') or (_VERSION:find('5%.3') and '53') or assert('version of Lua not supported: ', _VERSION)
       local mseCriterion = torch.load(sys.fpath()..'/data/criterion.th.'..version)
       local model = torch.load(sys.fpath()..'/data/model.th.'..version)
       local autoModel = torch.load(sys.fpath()..'/data/autoModel.th.'..version)
@@ -1301,8 +1301,7 @@ local tests = {
             loss3 = loss3 + loss / nData
          end
       end
-
-      tester:asserteq(loss1, loss3, 'sgd wrapper should produce same loss')
+      tester:assert(math.abs(loss1 - loss3) < 1e-6, 'sgd wrapper should produce same loss')
    end,
 
    OptimNN = function()

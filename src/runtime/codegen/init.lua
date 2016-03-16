@@ -104,6 +104,8 @@ local function create(fn, opt)
                end
             end
             return table.unpack(retValues)
+         elseif opt.withForward and not opt.debugHook then
+            return table.unpack(retValues)
          end
       end
       if opt.stableGradients then

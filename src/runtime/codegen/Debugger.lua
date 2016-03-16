@@ -1,6 +1,6 @@
 local Source = require 'autograd.runtime.codegen.Source'
 local Value = require 'autograd.runtime.codegen.Value'
-local StringBuilder = require 'autograd.StringBuilder'
+local StringBuilder = require 'autograd.runtime.codegen.StringBuilder'
 local stringx = require 'pl.stringx'
 
 local function Debugger(opt)
@@ -132,7 +132,7 @@ local function Debugger(opt)
             color = "red"
          end
       end
-      out.write('\t' .. valueKey(value) .. ' [label="<' .. table.concat(parts, '<BR/>') .. '>" color="' .. color .. '" shape="' .. shape .. '"];\n')
+      out:write('\t' .. valueKey(value) .. ' [label="<' .. table.concat(parts, '<BR/>') .. '>" color="' .. color .. '" shape="' .. shape .. '"];\n')
    end
 
    local function generateDotNode(out, node)
@@ -150,21 +150,21 @@ local function Debugger(opt)
             end
          end
       end
-      out.write('\tnode' .. node.debug.index .. ' [label="<' .. label .. '>" color="'..color..'" shape="box"];\n')
+      out:write('\tnode' .. node.debug.index .. ' [label="<' .. label .. '>" color="'..color..'" shape="box"];\n')
    end
 
    local function generateEdge(out, node, value, reverse)
       local color = (node.debug.isForward and 'green') or 'blue'
       if reverse then
-         out.write('\t' .. valueKey(value) .. ' -> node' .. node.debug.index .. ' [color="'..color..'"];\n')
+         out:write('\t' .. valueKey(value) .. ' -> node' .. node.debug.index .. ' [color="'..color..'"];\n')
       else
-         out.write('\tnode' .. node.debug.index .. ' -> ' .. valueKey(value) .. ' [color="'..color..'"];\n')
+         out:write('\tnode' .. node.debug.index .. ' -> ' .. valueKey(value) .. ' [color="'..color..'"];\n')
       end
    end
 
    local function generateDot(fileName, value, node)
-      local out = StringBuilder(fileName)
-      out.write('digraph graphname {\n')
+      local out = StringBuilder.new()
+      out:write('digraph graphname {\n')
       local seen = { }
       local function callback(value, node, parentNode)
          if value and not seen[value] then
@@ -194,8 +194,10 @@ local function Debugger(opt)
             walkGraph(answer, nil, nil, callback)
          end
       end
-      out.write('}\n')
-      return out.finish()
+      out:write('}\n')
+      local f = io.open(fileName, "w")
+      f:write(out:finish())
+      f:close()
    end
 
    local function generateJson(fileName, value, node)
@@ -312,9 +314,9 @@ local function Debugger(opt)
       end
       local output = node.outputs[outputIndex]
       if output.type == Value.TENSOR then
-         out.write("    debugger.outputCheckTensor(" .. table.concat({ node.debug.index, outputIndex, symbol }, ", ") .. ")\n")
+         out:write("    debugger.outputCheckTensor(" .. table.concat({ node.debug.index, outputIndex, symbol }, ", ") .. ")\n")
       elseif output.type == Value.NUMBER then
-         out.write("    debugger.outputCheckNumber(" .. table.concat({ node.debug.index, outputIndex, symbol }, ", ") .. ")\n")
+         out:write("    debugger.outputCheckNumber(" .. table.concat({ node.debug.index, outputIndex, symbol }, ", ") .. ")\n")
       end
    end
 
@@ -331,9 +333,9 @@ local function Debugger(opt)
    local function generateInputCheck(value, symbol, out)
       debugValue(value)
       if value.type == Value.TENSOR then
-         out.write("    debugger.inputCheckTensor(" .. table.concat({ value.debug.index, symbol }, ", ") .. ")\n")
+         out:write("    debugger.inputCheckTensor(" .. table.concat({ value.debug.index, symbol }, ", ") .. ")\n")
       elseif value.type == Value.NUMBER then
-         out.write("    debugger.inputCheckNumber(" .. table.concat({ value.debug.index, symbol }, ", ") .. ")\n")
+         out:write("    debugger.inputCheckNumber(" .. table.concat({ value.debug.index, symbol }, ", ") .. ")\n")
       elseif value.type == Value.TABLE then
          for k,v in pairs(value.raw) do
             generateInputCheck(v, symbol .. "." .. k, out)

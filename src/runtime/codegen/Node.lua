@@ -19,7 +19,7 @@ function Node:init(forwardFn, gradientFn, inputs, mutationFlow)
 	for i = 1, #inputs do
 		local input = inputs[i]
 		if not Value.isValue(input) then
-			if torch.isTensor(v) and torch.nDimension(v) > 1 then
+			if torch.isTensor(input) and torch.nDimension(input) > 1 then
 				error("constant tensor with more than one dimension. is this an upvalue that should be a function argument?")
 			end
 		end
