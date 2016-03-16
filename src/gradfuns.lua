@@ -476,6 +476,24 @@ overload.module("torch", torch, function(module)
          return out
       end
    })
+
+   module.gradient("cmin", {
+      function(g, ans, x, y)
+         return util.setNotEqual(x, ans, 0, g)
+      end,
+      function(g, ans, x, y)
+         return util.setNotEqual(y, ans, 0, g)
+      end
+   })
+   module.gradient("cmax", {
+      function(g, ans, x, y)
+         return util.setNotEqual(x, ans, 0, g)
+      end,
+      function(g, ans, x, y)
+         return util.setNotEqual(y, ans, 0, g)
+      end
+   })
+
    module.gradient("transpose", {
       function(g, ans, x, d1, d2)
          return torch.transpose(g, d1, d2)

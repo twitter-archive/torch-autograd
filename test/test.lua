@@ -593,6 +593,24 @@ local tests = {
       end
    end,
 
+   CMinCMax = function()
+      local fns = {"cmin", "cmax"}
+      local preds = {{1,5},{2,10}}
+
+      for i=1,2 do
+         local A = torch.eye(5)
+         local B = torch.eye(5)*2
+         local fn = fns[i]
+
+         local fn = function(inputs)
+            return torch.sum(torch[fn](inputs.A,inputs.B))
+         end
+
+         tester:assert(gradcheck(fn, {A=A,B=B}), 'incorrect gradients')
+
+      end
+   end,
+
    GradCheck_Scale = function()
       -- Parameters:
       local W = torch.Tensor(32,100):normal()
