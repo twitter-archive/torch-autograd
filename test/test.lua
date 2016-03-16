@@ -1283,8 +1283,7 @@ local tests = {
             loss3 = loss3 + loss / nData
          end
       end
-
-      tester:asserteq(loss1, loss3, 'sgd wrapper should produce same loss')
+      tester:assert(math.abs(loss1 - loss3) < 1e-6, 'sgd wrapper should produce same loss')
    end,
 
    OptimNN = function()

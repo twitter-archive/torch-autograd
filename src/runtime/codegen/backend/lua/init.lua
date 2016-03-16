@@ -1,6 +1,6 @@
 local Value = require 'autograd.runtime.codegen.Value'
 local Source = require 'autograd.runtime.codegen.Source'
-local StringBuilder = require 'autograd.StringBuilder'
+local StringBuilder = require 'autograd.runtime.codegen.StringBuilder'
 local Debugger = require 'autograd.runtime.codegen.Debugger'
 local util = require 'autograd.util'
 
@@ -63,7 +63,7 @@ end
 
 local function writeLiteralTable(wtable, out, symbols, depth)
    depth = depth or 1
-   out.write("{", "\n")
+   out:writeln("{")
    local keys = { }
    local numeric = true
    for k, v in pairs(wtable) do
@@ -83,23 +83,23 @@ local function writeLiteralTable(wtable, out, symbols, depth)
    for i = si, ei, di do
       local k = keys[i]
       local v = wtable[k]
-      out.write(string.rep(" ", depth * 4))
+      out:write(string.rep(" ", depth * 4))
       if type(k) == 'number' or tostring(tonumber(k)) == k then
-         out.write("[", tostring(k), "]")
+         out:write("[", tostring(k), "]")
       else
-         out.write(tostring(k))
+         out:write(tostring(k))
       end
-      out.write(" = ")
+      out:write(" = ")
       if Value.isValue(v) then
-         out.write(v.source:symbolPath(symbols))
+         out:write(v.source:symbolPath(symbols))
       elseif type(v) == 'table' then
          writeLiteralTable(v, out, symbols, depth + 1)
       else
-         out.write(tostring(v))
+         out:write(tostring(v))
       end
-      out.write(",\n")
+      out:write(",\n")
    end
-   out.write(string.rep(" ", (depth-1) * 4), "}")
+   out:write(string.rep(" ", (depth-1) * 4), "}")
 end
 
 local writeExpr
@@ -127,7 +127,7 @@ local function buildInputExpr(state, input)
 end
 
 writeExpr = function(state, node)
-   local out = StringBuilder()
+   local out = StringBuilder.new()
    local inputSymbols = { }
    for k = 1, #node.inputs do
       local input = node.inputs[k]
@@ -136,44 +136,44 @@ writeExpr = function(state, node)
    if node.forwardFn.operator ~= nil then
       local op = node.forwardFn.operator
       if op == "unm" then
-         out.write("-", inputSymbols[1])
+         out:write("-", inputSymbols[1])
       elseif op == "index" then
-         out.write(inputSymbols[1])
-         out.write("[")
-         out.write(inputSymbols[2])
-         out.write("]")
+         out:write(inputSymbols[1])
+         out:write("[")
+         out:write(inputSymbols[2])
+         out:write("]")
       elseif op == "newindex" then
-         out.write(inputSymbols[1])
-         out.write("[")
-         out.write(inputSymbols[2])
-         out.write("]")
-         out.write(" = ")
-         out.write(inputSymbols[3])
+         out:write(inputSymbols[1])
+         out:write("[")
+         out:write(inputSymbols[2])
+         out:write("]")
+         out:write(" = ")
+         out:write(inputSymbols[3])
       else
-         out.write(inputSymbols[1])
-         out.write(" ")
+         out:write(inputSymbols[1])
+         out:write(" ")
          if op == "add" then
-            out.write("+")
+            out:write("+")
          elseif op == "sub" then
-            out.write("-")
+            out:write("-")
          elseif op == "mul" then
-            out.write("*")
+            out:write("*")
          elseif op == "div" then
-            out.write("/")
+            out:write("/")
          end
-         out.write(" ")
-         out.write(inputSymbols[2])
+         out:write(" ")
+         out:write(inputSymbols[2])
       end
    elseif node.forwardFn.object ~= nil then
-      out.write(state.objects[node.forwardFn.object].name, ".", node.forwardFn.method, "(", table.concat(inputSymbols, ", "), ")")
+      out:write(state.objects[node.forwardFn.object].name, ".", node.forwardFn.method, "(", table.concat(inputSymbols, ", "), ")")
    else
       local fnName = node.forwardFn.name
       if canReuseOutput(node) then
          table.insert(inputSymbols, 1, node.outputs[1].source:symbolPath(state.symbols))
       end
-      out.write(state.functionRemap[fnName], "(", table.concat(inputSymbols, ", "), ")")
+      out:write(state.functionRemap[fnName], "(", table.concat(inputSymbols, ", "), ")")
    end
-   return out.finish()
+   return out:finish()
 end
 
 local function tensorSig(t)
@@ -586,7 +586,7 @@ local function generateCode(graph, opt)
    local symbols, undefined, constants, tensorPoolViews = createSymbolTable(graph, execOrder, aliases, params, tensorPool, tensorLocals, opt)
    local objectMap, objectTable = collectObjects(execOrder)
 
-   local out = StringBuilder()
+   local out = StringBuilder.new()
    local outerArgNames = {"locals", "rlocals", "vlocals"}
    local outerArgs = { tensorLocals, tensorPool, tensorPoolViews }
 
@@ -626,28 +626,23 @@ local function generateCode(graph, opt)
    }
 
    -- Generate code.
-   out.write("return function(", table.concat(outerArgNames, ", "), ")")
-   out.write("\n")
-   out.write("local nn = require('autograd').nn")
-   out.write("\n")
-   out.write("local util = require('autograd.util')")
-   out.write("\n")
+   out:writeln("return function(", table.concat(outerArgNames, ", "), ")")
+   out:writeln("local nn = require('autograd').nn")
+   out:writeln("local util = require('autograd.util')")
+
    for k, v in pairs(functionRemap) do
-      out.write("local ", v, " = ", k)
-      out.write("\n")
+      out:writeln("local ", v, " = ", k)
    end
    for i = 1, #constants do
-      out.write("local ", constants[i]:symbolPath(symbols), " = ", constants[i]:symbolPath({}))
-      out.write("\n")
+      out:writeln("local ", constants[i]:symbolPath(symbols), " = ", constants[i]:symbolPath({}))
    end
-   out.write("return function(")
+
    local paramSymbols = { }
    for i = 1, #params do
       paramSymbols[i] = symbols[params[i]]
    end
-   out.write(table.concat(paramSymbols, ", "))
-   out.write(")")
-   out.write("\n")
+   out:writeln("return function(", table.concat(paramSymbols, ", "), ")")
+
    if debugger then
       for i = 1, #graph.params do
          debugger.generateInputCheck(graph.params[i], paramSymbols[i], out)
@@ -660,17 +655,16 @@ local function generateCode(graph, opt)
          outputSymbols[k] = symbols[node.outputs[k].source]
       end
       if not canInline(node, state) then
-         out.write("    ")
+         out:indent(1)
          if (not canReuseOutput(node)) and (node.forwardFn.operator ~= "newindex") then
             if #outputSymbols > 0 then
                if undefined[node.outputs[1].source] then
-                  out.write("local ")
+                  out:write("local ")
                end
-               out.write(table.concat(outputSymbols, ", "), " = ")
+               out:write(table.concat(outputSymbols, ", "), " = ")
             end
          end
-         out.write(writeExpr(state, node))
-         out.write("\n")
+         out:writeln(writeExpr(state, node))
          if debugger then
             for k = 1, #node.outputs do
                debugger.generateOutputCheck(node, k, outputSymbols[k], out)
@@ -678,16 +672,17 @@ local function generateCode(graph, opt)
          end
       end
    end
-   out.write("    ")
-   out.write("return ")
+
+   out:indent(1)
+   out:write("return ")
    local grads = graph.grads
    local answers = graph.answers
    if withGradients then
       if #grads == 1 and grads[1].grad.type == Value.TABLE then
          -- This doesn't feel quite right, should be possible to unify this with the other path.
-         out.write(grads[1].grad.source:symbolPath(symbols))
+         out:write(grads[1].grad.source:symbolPath(symbols))
       elseif #grads == 1 and grads[1].grad.type == Value.TENSOR and grads[1].param.source.type == Source.PARAM then
-         out.write(grads[1].grad.source:symbolPath(symbols))
+         out:write(grads[1].grad.source:symbolPath(symbols))
       else
          local retTable = { }
          for i = 1, #grads do
@@ -714,26 +709,24 @@ local function generateCode(graph, opt)
    end
    if withForward then
       if withGradients then
-         out.write(", ")
+         out:write(", ")
       end
       for i = 1, #answers do
          if i ~= 1 then
-            out.write(", ")
+            out:write(", ")
          end
          local answer = answers[i]
          if Value.isValue(answer) then
-            out.write(answers[i].source:symbolPath(symbols))
+            out:write(answers[i].source:symbolPath(symbols))
          elseif type(answer) == "table" then
             writeLiteralTable(answer, out, symbols, 2)
          end
       end
    end
-   out.write("\n")
-   out.write("end")
-   out.write("\n")
-   out.write("end")
-   out.write("\n")
-   local code = out.finish()
+   out:writeln()
+   out:writeln("end")
+   out:writeln("end")
+   local code = out:finish()
    if debugger then
       debugger.setCode(code)
    end
