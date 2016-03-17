@@ -48,6 +48,8 @@ function Source:symbolPath(rootSymbols)
 				end
 			end
 			return "{" .. table.concat(elements, ", ") .. "}"
+		elseif type(self.val) == "string" then
+			return '"' .. self.val .. '"'
 		else
 			if self.val == math.huge then
 				return "math.huge"

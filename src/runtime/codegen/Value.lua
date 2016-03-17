@@ -7,6 +7,7 @@ Value.TENSOR = "tensor"
 Value.NUMBER = "number"
 Value.LONG_STORAGE = "long_storage"
 Value.BOOLEAN = "boolean"
+Value.STRING = "string"
 
 function Value.create(type, val, source)
 	local v = {
@@ -42,10 +43,12 @@ function Value.from(v, source, skipWrapTables, mutationFlow)
 		return Value.create(Value.NUMBER, v, source)
 	elseif type(v) == "boolean" then
 		return Value.create(Value.BOOLEAN, v, source)
+	elseif type(v) == "string" then
+		return Value.create(Value.STRING, v, source)
 	elseif v.totable then
 		return Value.create(Value.LONG_STORAGE, v, source)
 	else
-		error("unknown type " .. type(v))
+		error("unknown type " .. type(v) .. " for value '" .. tostring(v) .. "'")
 	end
 end
 
