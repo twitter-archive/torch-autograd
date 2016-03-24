@@ -1194,6 +1194,59 @@ local tests = {
       tester:assert(gradcheck(loss, params, i), 'incorrect gradients')
    end,
 
+   Models_RecurrentGRUNetwork = function()
+      -- Define RNN:
+      local f,params = autograd.model.RecurrentGRUNetwork({
+         inputFeatures = 10,
+         hiddenFeatures = 10,
+         outputType = 'last',
+      })
+
+      -- Params:
+      params[1].W:normal(0,0.01)
+      params[1].b:normal(0,0.01)
+      params[1].V:normal(0,0.01)
+      params[1].c:normal(0,0.01)
+
+      -- Loss
+      local loss = function(params, input)
+         local v = f(params, input)
+         return torch.sum(v)
+      end
+
+      -- Test on sequence data:
+      local i = torch.randn(13, 10)
+      local o = loss(params, i)
+      local g = autograd(loss)(params, i)
+
+      -- Checks
+      tester:asserteq(type(g), 'table', 'gradients could not be computed')
+
+      -- Gradcheck:
+      tester:assert(gradcheck(loss, params, i), 'incorrect gradients')
+
+      -- Define RNN with all states exposed:
+      local f,params = autograd.model.RecurrentGRUNetwork({
+         inputFeatures = 10,
+         hiddenFeatures = 10,
+         outputType = 'all',
+      })
+
+      -- Loss
+      local loss = function(params, input)
+         local v = f(params, input)
+         return torch.sum(v)
+      end
+
+      -- Test on sequence data:
+      local o = loss(params, i)
+      local g = autograd(loss)(params, i)
+
+      -- Checks
+      tester:asserteq(type(g), 'table', 'gradients could not be computed')
+      tester:assert(gradcheck(loss, params, i), 'incorrect gradients')
+   end,
+
    DebuggerDivZero = function()
       -- Parameters:
       local W = torch.Tensor(32,100):fill(.5)
