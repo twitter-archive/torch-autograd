@@ -6,6 +6,7 @@ local DirectTape = { }
 local assignmentMap = { }
 local reverseAssignmentMap = { }
 local currentTape = { }
+local currentProfiler = nil
 
 -- A wrapper for a function
 -- Anytime we try to apply a function to some arguments,
@@ -48,7 +49,14 @@ function nodeApply(fun, gradFun, ...)
       if fun.unsupported then
          error("function " .. fun.name .. " not currently supported by autograd")
       end
+      local profileId = nil
+      local startTime = sys.clock()
       local value = fun.fn(table.unpack(values))
+      if currentProfiler ~= nil then
+         local elapsedTime = sys.clock() - startTime
+         profileId = currentProfiler:mark(fun.name, 2)
+         currentProfiler:measureForward(profileId, elapsedTime)
+      end
       local node = nil
       local tape = currentTape
       local o = tape[tape.nextIndex]
@@ -57,6 +65,7 @@ function nodeApply(fun, gradFun, ...)
          o.fun = fun
          o.gradFun = gradFun
          o.args = arg
+         o.profileId = profileId
          o.outgrad = nil
          o.argValues = values
          tape.nextIndex = tape.nextIndex + 1
@@ -71,6 +80,7 @@ function nodeApply(fun, gradFun, ...)
          return o
       end
       local newNode = DirectNode:init(value, fun, gradFun, arg, values, tape)
+      newNode.profileId = profileId
       if fun.name == "DirectNode.__internal_set" then
          local reverse = reverseAssignmentMap[arg[1]]
          if reverse ~= nil then
@@ -127,6 +137,7 @@ function DirectTape.gradOnly(tape, arg, argnum, allAns, gradOutput)
    ans.outgrad = gradOutput
    for i=tape.nextIndex-1,1,-1 do
       local node = tape[i]
+      local elapsedTime = 0
       for iarg=#node.args,1,-1 do
          local thisArg = node.args[iarg]
          if getmetatable(thisArg) == DirectNode then
@@ -139,7 +150,9 @@ function DirectTape.gradOnly(tape, arg, argnum, allAns, gradOutput)
             end
             local gf = (node.gradFun or {})[iarg]
             if gf ~= nil then
+               local startTime = sys.clock()
                local gradUpdate = (gf)(node.outgrad, node.value, table.unpack(node.argValues))
+               elapsedTime = elapsedTime + (sys.clock() - startTime)
                if gradUpdate then
                   if thisArg.outgrad == nil or thisArg.outgrad == 0 then
                      thisArg.outgrad = gradUpdate
@@ -168,7 +181,9 @@ function DirectTape.gradOnly(tape, arg, argnum, allAns, gradOutput)
                      node.outgrad = 0.0
                   end
                end
+               local startTime = sys.clock()
                local gradUpdate = (node.gradFun[iarg])(node.outgrad, node.value, table.unpack(node.argValues))
+               elapsedTime = elapsedTime + (sys.clock() - startTime)
                local la = #thisArg
                for isubArg=1,la do
                   if gradUpdate[isubArg] then
@@ -185,6 +200,9 @@ function DirectTape.gradOnly(tape, arg, argnum, allAns, gradOutput)
             end
          end
       end
+      if currentProfiler ~= nil and node.profileId ~= nil then
+         currentProfiler:measureBackward(node.profileId, elapsedTime)
+      end
    end
    -- Now spit out the grads
    local out = DirectNode.getOutgrad(arg[argnum])
@@ -194,7 +212,8 @@ end
 local lastTape = { }
 
 -- Step through the computation graph and find the gradient
-function DirectTape.grad(fun, argnum, partialGrad, ...)
+function DirectTape.grad(fun, argnum, partialGrad, profiler, ...)
+   currentProfiler = profiler
    local all  = {DirectTape.funOnly(fun, lastTape, argnum, ...)}
    local arg, allAns, tape, out = all[1], all[2], all[3], all[4]
    local ans = allAns[1]
@@ -216,6 +235,10 @@ function DirectTape.grad(fun, argnum, partialGrad, ...)
    else
       fout[2] = ansVal
    end
+   if currentProfiler ~= nil then
+      currentProfiler:markCycle()
+   end
+   currentProfiler = nil
    return table.unpack(fout)
 end
 

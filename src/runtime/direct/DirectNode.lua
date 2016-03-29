@@ -99,6 +99,8 @@ function DirectNode:__index(i)
    if torch.isTensor(value) and value[i] ~= nil then
       if type(i) ~= "string" then
          return DirectNode.__internal_get(self, i)
+      else
+         return value[i]
       end
    end
    return rawget(DirectNode, i)

@@ -271,6 +271,18 @@ function util.sortedFlatten(tbl, flat, noRecurse)
    return flat
 end
 
+function util.shallowCopy(tbl)
+   if type(tbl) == "table" then
+      local copy = { }
+      for k, v in pairs(tbl) do
+         copy[k] = v
+      end
+      return copy
+   else
+      return tbl
+   end
+end
+
 function util.deepCopy(tbl)
    if type(tbl) == "table" then
       local copy = { }
