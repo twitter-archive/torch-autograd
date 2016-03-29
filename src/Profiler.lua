@@ -3,16 +3,24 @@ local util = require 'autograd.util'
 local Profiler = { }
 Profiler.__index = Profiler
 
-function Profiler.new()
+function Profiler.new(autoreport)
    local p = { }
    p.lineMap = { }
    p.entries = { }
    p.times = 0
+   p.autoreport = autoreport
    setmetatable(p, Profiler)
    return p
 end
 
-function Profiler:mark(name, level)
+function Profiler:mark(fun, level)
+   local name = fun.name
+   if fun.raw then
+      name = fun.raw.__typename
+      if name == nil or name == "" then
+         name = "(nn object)"
+      end
+   end
    local di = debug.getinfo(level + 1)
    local line = di.short_src .. ":" .. di.currentline
    local fnMap = self.lineMap[line]
@@ -36,7 +44,16 @@ function Profiler:mark(name, level)
 end
 
 function Profiler:markCycle()
+   if self.autoreport ~= nil then
+      if math.fmod(self.times, self.autoreport) == 0 then
+         self:printReport()
+      end
+   end
    self.times = self.times + 1
+end
+
+function Profiler:autoReport(cycles)
+   self.autoreport = cycles
 end
 
 function Profiler:measureForward(id, time)

@@ -54,7 +54,7 @@ function nodeApply(fun, gradFun, ...)
       local value = fun.fn(table.unpack(values))
       if currentProfiler ~= nil then
          local elapsedTime = sys.clock() - startTime
-         profileId = currentProfiler:mark(fun.name, 2)
+         profileId = currentProfiler:mark(fun, 2)
          currentProfiler:measureForward(profileId, elapsedTime)
       end
       local node = nil

@@ -720,6 +720,8 @@ local function generateCode(graph, opt)
             out:write(answers[i].source:symbolPath(symbols))
          elseif type(answer) == "table" then
             writeLiteralTable(answer, out, symbols, 2)
+         else
+            out:write(answer)
          end
       end
    end

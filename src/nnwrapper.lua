@@ -95,6 +95,7 @@ local function wrapCriterion(nnObject)
    local fn = function(x, y)
       local backFnDesc = {
          object = mod,
+         raw = nnObject,
          method = "backward",
          name = "criterion",
          fn = backward,
@@ -111,6 +112,7 @@ local function wrapCriterion(nnObject)
       }
       local fnDesc = {
          object = mod,
+         raw = nnObject,
          method = "forward",
          name = "criterion",
          fn = forward,
@@ -153,6 +155,7 @@ local function wrapModuleWithoutParams(nnObject)
       local grads = nil
       local backFnDesc = {
          object = mod,
+         raw = nnObject,
          method = "backward",
          name = "model",
          fn = backward,
@@ -165,6 +168,7 @@ local function wrapModuleWithoutParams(nnObject)
       }
       local fnDesc = {
          object = mod,
+         raw = nnObject,
          method = "forward",
          name = "model",
          fn = forward,
@@ -223,6 +227,7 @@ local function wrapModuleWithParams(nnObject)
       local grads = nil
       local backFnDesc = {
          object = mod,
+         raw = nnObject,
          method = "backward",
          name = "model",
          fn = backward,
@@ -244,6 +249,7 @@ local function wrapModuleWithParams(nnObject)
       }
       local fnDesc = {
          object = mod,
+         raw = nnObject,
          method = "forward",
          name = "model",
          fn = forward,

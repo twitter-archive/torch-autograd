@@ -82,7 +82,7 @@ function util.logSoftMax(array)
 end
 
 function util.sigmoid(array)
-   return torch.pow(torch.exp(-array) + 1, -1)
+   return torch.sigmoid(array)
 end
 
 function util.sigmoidInPlace(output, input)
