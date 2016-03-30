@@ -23,6 +23,12 @@ local function protected(prot)
    defaultProtected = prot
 end
 
+local profile = {
+   SUMMARY = "summary",
+   DETAILED = "detailed",
+   OFF = "off"
+}
+
 local function grad(fn, gradOpt)
    gradOpt = gradOpt or { }
    local opt = util.shallowCopy(gradOpt)
@@ -33,9 +39,11 @@ local function grad(fn, gradOpt)
    opt.withForward = util.defaultBool(opt.withForward, true)
    opt.withGradients = util.defaultBool(opt.withGradients, true)
    opt.partialGrad = util.defaultBool(opt.partialGrad, false)
+   opt.profile = opt.profile or profile.OFF
+   opt.profileReportFrequency = opt.profileReportFrequency or 10
    if opt.optimize then
-      if opt.profiler ~= nil then
-         error("profiler not supported in optimized mode")
+      if opt.profile == profile.DETAILED then
+         error("detailed profile not available in optimized mode")
       end
       return RuntimeCodegen.create(fn, opt)
    else
@@ -52,7 +60,12 @@ local autograd = {
    overload = overload,
    optimize = optimize,
    optimizing = optimizing,
-   protected = protected
+   protected = protected,
+   profile = {
+      SUMMARY = "summary",
+      DETAILED = "detailed",
+      OFF = "off"
+   }
 }
 
 -- Shortcut:

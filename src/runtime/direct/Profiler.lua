@@ -3,12 +3,11 @@ local util = require 'autograd.util'
 local Profiler = { }
 Profiler.__index = Profiler
 
-function Profiler.new(autoreport)
+function Profiler.new()
    local p = { }
    p.lineMap = { }
    p.entries = { }
    p.times = 0
-   p.autoreport = autoreport
    setmetatable(p, Profiler)
    return p
 end
@@ -44,16 +43,7 @@ function Profiler:mark(fun, level)
 end
 
 function Profiler:markCycle()
-   if self.autoreport ~= nil then
-      if math.fmod(self.times, self.autoreport) == 0 then
-         self:printReport()
-      end
-   end
    self.times = self.times + 1
-end
-
-function Profiler:autoReport(cycles)
-   self.autoreport = cycles
 end
 
 function Profiler:measureForward(id, time)
@@ -75,7 +65,7 @@ function padMin(s, min)
    return s
 end
 
-function Profiler:printReport()
+function Profiler:printReport(type)
    local totalForward = 0
    local totalBackward = 0
    for i = 1, #self.entries do
@@ -89,16 +79,18 @@ function Profiler:printReport()
       return (a.forwardTime + a.backwardTime) > (b.forwardTime + b.backwardTime)
    end)
    print("")
-   print(string.format("Average forward time: %.2fms", (totalForward / (self.times + 1)) * 1000.0))
-   print(string.format("Average backward time: %.2fms", (totalBackward / (self.times + 1)) * 1000.0))
-   print(string.format("Average overall time: %.2fms", ((totalForward + totalBackward) / (self.times + 1)) * 1000.0))
-   print("Top operations:")
-   print(string.rep("=", 80))
-   print(padMin("name", 20), "fwd", "bwd", "ovr", "line")
-   print(string.rep("=", 80))
-   for i = 1, math.min(10, #timeSorted) do
-      local t = timeSorted[i]
-      print(padMin(t.name, 20), pctStr(t.forwardTime, totalForward), pctStr(t.backwardTime, totalBackward), pctStr(t.forwardTime + t.backwardTime, totalForward + totalBackward), t.line)
+   print(string.format("[autograd] average forward time: %.2fms", (totalForward / (self.times + 1)) * 1000.0))
+   print(string.format("[autograd] average backward time: %.2fms", (totalBackward / (self.times + 1)) * 1000.0))
+   print(string.format("[autograd] average overall time: %.2fms", ((totalForward + totalBackward) / (self.times + 1)) * 1000.0))
+   print("[autograd] top operations:")
+   if type == "detailed" then
+      print("[autograd] " .. string.rep("=", 80))
+      print("[autograd] " .. padMin("name", 20), "fwd", "bwd", "ovr", "line")
+      print("[autograd] " .. string.rep("=", 80))
+      for i = 1, math.min(10, #timeSorted) do
+         local t = timeSorted[i]
+         print("[autograd] " .. padMin(t.name, 20), pctStr(t.forwardTime, totalForward), pctStr(t.backwardTime, totalBackward), pctStr(t.forwardTime + t.backwardTime, totalForward + totalBackward), t.line)
+      end
    end
    print("")
 end

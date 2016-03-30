@@ -69,16 +69,60 @@ local function copyStableTensors(retValues, stableGrads)
    end
 end
 
+function pctStr(n, tot)
+   return tostring(math.floor((n / tot) * 100.0)) .. "%"
+end
+
+function padMin(s, min)
+   if #s < min then
+      return s .. string.rep(" ", min - #s)
+   end
+   return s
+end
+
+
+local function printProfile(stats)
+   print(" ")
+   --print(string.format("[autograd] calls: %i", stats.calls))
+   print(string.format("[autograd] code cache hit rate: %i%%", math.floor((stats.cacheHits / stats.calls) * 100.0)))
+   print(string.format("[autograd] generated code paths: %i", stats.cacheMisses))
+   local averageCodegen = (stats.codegenTime / stats.cacheMisses) * 1000.0
+   local averageExec = (stats.executionTime / stats.cacheHits) * 1000.0
+   -- codegen always executes the code once
+   local totalCodegen = stats.codegenTime - ((averageExec * stats.cacheMisses) / 1000.0)
+   local totalAll = stats.codegenTime + stats.executionTime + stats.externalTime
+   print(string.format("[autograd] code gen time: average=%.2fms total=%.2fs pct=%s", averageCodegen - averageExec, totalCodegen, pctStr(totalCodegen, totalAll))) 
+   print(string.format("[autograd] exec time:     average=%.2fms total=%.2fs pct=%s", averageExec, stats.executionTime, pctStr(stats.executionTime, totalAll)))
+   print(string.format("[autograd] external time: average=%.2fms total=%.2fs pct=%s", (stats.externalTime / stats.calls) * 1000.0, stats.externalTime, pctStr(stats.externalTime, totalAll)))
+   print(" ")
+end
+
 local function create(fn, opt)
    local generatedFunctions = { }
    opt.tensorPool = { }
    opt.tensorLocals = { }
    local stableGradTensors = nil
+   local stats = {
+      cacheHits = 0,
+      cacheMisses = 0,
+      calls = 0,
+      externalTime = 0,
+      codegenTime = 0,
+      executionTime = 0,
+      prevTimestamp = nil
+   }
    return function(...)
       local args = {...}
       if Graph.reentryDepth() > 0 then
          -- If we're in the middle of building the graph for a parent function, include this one in the parent, don't codegen.
          return execUncached(fn, args, opt, true)
+      end
+      stats.calls = stats.calls + 1
+      if opt.profile == 'summary' and math.fmod(stats.calls, opt.profileReportFrequency) == 0 then
+         printProfile(stats)
+      end
+      if stats.prevTimestamp ~= nil then
+         stats.externalTime = stats.externalTime + (sys.clock() - stats.prevTimestamp)
       end
       local sigFun = opt.signatureFn or function(params)
          local tensorDims = { }
@@ -87,12 +131,17 @@ local function create(fn, opt)
       end
       local signature = sigFun(args)
       if signature == nil then
+         stats.cacheMisses = stats.cacheMisses + 1
+         stats.prevTimestamp = sys.clock()
          return execUncached(fn, args, opt, false)
       end
       if generatedFunctions[signature] == nil then
+         local genStart = sys.clock()
          local gradFn, retValues, code = generateFn(fn, args, opt)
-         --print(code)
+         stats.codegenTime = stats.codegenTime + (sys.clock() - genStart)
          generatedFunctions[signature] = gradFn
+         stats.cacheMisses = stats.cacheMisses + 1
+         stats.prevTimestamp = sys.clock()
          -- We already have the answers, don't run it all over again.
          if opt.withGradients and opt.withForward and not opt.debugHook then
             if opt.stableGradients then
@@ -108,13 +157,15 @@ local function create(fn, opt)
             return table.unpack(retValues)
          end
       end
+      stats.cacheHits = stats.cacheHits + 1
+      local execStart = sys.clock()
+      local retValues = {generatedFunctions[signature](table.unpack(args))}
+      stats.executionTime = stats.executionTime + (sys.clock() - execStart)
       if opt.stableGradients then
-         local retValues = {generatedFunctions[signature](table.unpack(args))}
          copyStableTensors(retValues[1], stableGradTensors)
-         return table.unpack(retValues)
-      else
-         return generatedFunctions[signature](table.unpack(args))
       end
+      stats.prevTimestamp = sys.clock()
+      return table.unpack(retValues)
    end
 end
 
