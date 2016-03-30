@@ -8,7 +8,7 @@ local function create(fn, opt)
       pf = Profiler.new()
    end
    return function(...)
-      if math.fmod(pf.times + 1, opt.profileReportFrequency) == 0 then
+      if pf ~= nil and math.fmod(pf.times + 1, opt.profileReportFrequency) == 0 then
          pf:printReport(opt.profile)
       end
       if opt.withForward and opt.withGradients then
