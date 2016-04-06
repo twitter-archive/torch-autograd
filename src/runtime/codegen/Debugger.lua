@@ -6,6 +6,7 @@ local stringx = require 'pl.stringx'
 local function Debugger(opt)
    opt = opt or { }
    local debugHook = opt.debugHook
+   local newlineChar = opt.newlineChar or "\n"
 
    local debugNodes = { }
    local function debugNode(node)
@@ -132,7 +133,7 @@ local function Debugger(opt)
             color = "red"
          end
       end
-      out:write('\t' .. valueKey(value) .. ' [label="<' .. table.concat(parts, '<BR/>') .. '>" color="' .. color .. '" shape="' .. shape .. '"];\n')
+      out:write('\t' .. valueKey(value) .. ' [label="<' .. table.concat(parts, newlineChar) .. '>" color="' .. color .. '" shape="' .. shape .. '"];\n')
    end
 
    local function generateDotNode(out, node)
@@ -145,7 +146,7 @@ local function Debugger(opt)
             local forwardNode = rcsvFindCallStack(node)
             if forwardNode then
                for i,info in ipairs(forwardNode.debug.callStack) do
-                  label = label .. "<BR/>" .. i .. ": " .. tostring(info.name) .. info.source .. ":" .. info.currentline
+                  label = label .. newlineChar .. i .. ": " .. tostring(info.name) .. info.source .. ":" .. info.currentline
                end
             end
          end
@@ -165,21 +166,45 @@ local function Debugger(opt)
    local function generateDot(fileName, value, node)
       local out = StringBuilder.new()
       out:write('digraph graphname {\n')
-      local seen = { }
+      local seenNodes = { }
+      local seenEdges = { }
       local function callback(value, node, parentNode)
-         if value and not seen[value] then
-            seen[value] = true
+         if value and not seenNodes[value] then
+            seenNodes[value] = true
             generateDotValue(out, value)
          end
-         if node and not seen[node] then
-            seen[node] = true
+         if node and not seenNodes[node] then
+            seenNodes[node] = true
             generateDotNode(out, node)
          end
+
          if node and value then
-            generateEdge(out, node, value)
+            local shouldDraw = false
+            if seenEdges[node] and not seenEdges[node][value] then
+               seenEdges[node][value] = true
+               shouldDraw = true
+            elseif not seenEdges[node] then
+               seenEdges[node] = {}
+               seenEdges[node][value] = true
+               shouldDraw = true
+            end
+            if shouldDraw then
+               generateEdge(out, node, value)
+            end
          end
+
          if parentNode and value then
-            generateEdge(out, parentNode, value, true)
+            local shouldDraw = false
+            if not seenEdges[parentNode] then
+               seenEdges[parentNode] = {}
+            end
+            if not seenEdges[parentNode][value] then
+               seenEdges[parentNode][value] = true
+               shouldDraw = true
+            end
+            if shouldDraw then
+               generateEdge(out, parentNode, value, true)
+            end
          end
       end
       if value then
@@ -188,10 +213,10 @@ local function Debugger(opt)
       else
          -- Walk the entire graph
          for _,grad in ipairs(main.grads) do
-            walkGraph(grad.grad, nil, nil, callback)
+            walkGraph(grad.grad, grad.grad.source.node, nil, callback)
          end
          for _,answer in ipairs(main.answers) do
-            walkGraph(answer, nil, nil, callback)
+            walkGraph(answer, answer.source.node, nil, callback)
          end
       end
       out:write('}\n')
