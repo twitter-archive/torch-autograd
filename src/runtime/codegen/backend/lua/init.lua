@@ -160,6 +160,8 @@ writeExpr = function(state, node)
             out:write("*")
          elseif op == "div" then
             out:write("/")
+         elseif op == 'pow' then
+            out:write('^')
          end
          out:write(" ")
          out:write(inputSymbols[2])
@@ -744,10 +746,15 @@ end
 
 local function generateFn(graph, opt)
    local code, outerArgs, retValues = generateCode(graph, opt)
-   local outer = (loadstring or load)(code)
+   local outer, err = (loadstring or load)(code)
    if outer == nil then
       print(code)
-      error("failed to parse generated code")
+
+      if err ~= nil then
+        print(err)
+      end
+
+      error("failed to parse generated code.")
    end
    return outer()(table.unpack(outerArgs)), retValues, code
 end
