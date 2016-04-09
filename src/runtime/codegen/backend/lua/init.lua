@@ -160,6 +160,8 @@ writeExpr = function(state, node)
             out:write("*")
          elseif op == "div" then
             out:write("/")
+         elseif op == 'pow' then
+            out:write('^')
          end
          out:write(" ")
          out:write(inputSymbols[2])
