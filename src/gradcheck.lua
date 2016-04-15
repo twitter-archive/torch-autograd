@@ -78,6 +78,7 @@ local function gradcheckvar2(func, inputs, var, randomizeInput)
    local noise = jacobian:view(-1):clone():zero()
    local idx = math.random(1, noise:size(1))
 
+   local originalVar = var:clone()
    noise:narrow(1,idx,1):uniform(-perturbation, perturbation)
    var:add(torch.view(noise, var:size()))
 
@@ -96,6 +97,7 @@ local function gradcheckvar2(func, inputs, var, randomizeInput)
       print('approximated perturbed loss = '..approxPerturbed)
       print('error = ' .. err)
    end
+   var:copy(originalVar)
    return pass, err
 end
 
