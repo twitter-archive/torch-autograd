@@ -87,7 +87,7 @@ local function gradcheckvar2(func, inputs, var, randomizeInput)
 
    -- Error:
    local err = math.abs((perturbedLoss - approxPerturbed)) /
-      (math.max(perturbedLoss, originalLoss)+perturbation)
+      (math.max(math.abs(perturbedLoss), math.abs(originalLoss))+perturbation)
 
    -- Threhold?
    local pass = err < threshold
