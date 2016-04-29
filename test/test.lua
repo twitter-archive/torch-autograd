@@ -1689,6 +1689,15 @@ local tests = {
       tester:assert(gradcheck(f4,{x=torch.randn(10,10),y=torch.randn(3)}), "Incorrect gradient")
    end,
 
+   ScalarSigmoid = function()
+      params = {w = 1}
+      f = function(params, x)
+         return torch.sigmoid(params.w * x)
+      end
+      df = autograd(f)
+      dparams, loss = df(params, 2)
+   end
+
 
 }
 

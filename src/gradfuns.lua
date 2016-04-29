@@ -331,7 +331,7 @@ overload.module("torch", torch, function(module)
    })
    module.gradient("tanh", {
       function(g, ans, x)
-         local mzz = 1 - torch.cmul(ans, ans)
+         local mzz = 1 - elemwiseMul(ans,ans)
          return elemwiseMul(g, mzz)
       end
    })
@@ -361,7 +361,7 @@ overload.module("torch", torch, function(module)
       function(g, ans, x, minVal, maxVal)
          -- NOTE: could do a casting and then multiply for 2nd order divs. This is more efficient for now.
          local mask = torch.typeAs(torch.eq(torch.ne(ans,minVal),torch.ne(ans,maxVal)), g)
-         return torch.cmul(g, mask)
+         return elemwiseMul(g, mask)
       end,
       function(g, ans, x, minVal, maxVal)
          error("Gradient not implemented w.r.t. min and max values of torch.clamp")
@@ -551,8 +551,8 @@ overload.module("torch", torch, function(module)
    })
    module.gradient("sigmoid", {
       function(g, ans, x)
-         local p = torch.cmul(1 - ans, ans)
-         return torch.cmul(g, p)
+         local p = elemwiseMul(1-ans,ans)
+         return elemwiseMul(g, p)
       end
    })
    -- module.gradient("split", {
