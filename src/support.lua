@@ -67,24 +67,21 @@ local numberMetatable = {
       if type(a) == "number"  then
          return b + a
       else
-         error("attempt to perform an addition between a number and a " ..
-            type(a) .. ".", 2)
+         error("attempt to perform arithmetic on a " .. type(a) .. " value", 2)
       end
    end,
    __sub = function(a,b)
       if type(a) == "number"  then
          return -b + a
       else
-         error("attempt to perform a substraction between a number and a " ..
-            type(a) .. ".", 2)
+         error("attempt to perform arithmetic on a " .. type(a) .. " value", 2)
       end
    end,
    __mul = function(a,b)
       if type(a) == "number"  then
          return b * a
       else
-         error("attempt to perform an multiplication between a number and a " ..
-            type(a) .. ".", 2)
+         error("attempt to perform arithmetic on a " .. type(a) .. " value", 2)
       end
    end
 }
