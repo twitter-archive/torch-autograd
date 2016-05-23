@@ -13,7 +13,6 @@ description = {
 
 dependencies = {
    "torch >= 7.0",
-   "totem"
 }
 
 build = {

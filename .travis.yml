@@ -44,7 +44,6 @@ before_script:
 - export CMAKE_LIBRARY_PATH=$HOME/OpenBlasInstall/include:$HOME/OpenBlasInstall/lib:$CMAKE_LIBRARY_PATH
 - cmake .. -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" -DCMAKE_BUILD_TYPE=Release -DWITH_${TORCH_LUA_VERSION}=ON
 - make && make install
-- ${INSTALL_PREFIX}/bin/luarocks install totem
 - ${INSTALL_PREFIX}/bin/luarocks install trepl
 - ${INSTALL_PREFIX}/bin/luarocks install nn
 - git clone https://github.com/torch/xlua && cd xlua && ${INSTALL_PREFIX}/bin/luarocks make xlua-1.1-0.rockspec
