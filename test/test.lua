@@ -1,4 +1,5 @@
 -- Tester:
+local torch = require 'torch'
 local autograd = require 'autograd'
 local util = require 'autograd.util'
 local gradcheck = require 'autograd.gradcheck' {randomizeInput = true}

@@ -227,13 +227,6 @@ function util.cat(x, y, dim)
    end
 end
 
-function util.makeContiguous(g)
-   if not g:isContiguous() then
-      g = g:contiguous()
-   end
-   return g
-end
-
 function util.defaultBool(b, db)
    if b == nil then
       return db

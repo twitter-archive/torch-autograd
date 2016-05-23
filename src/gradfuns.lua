@@ -639,7 +639,6 @@ overload.module("util", util, function(module)
       function(g, ans, x, template, dim, index) return nil end,
       function(g, ans, x, template, dim, index) return nil end,
    })
-   -- module.gradient("makeContiguous", zeroGradient())
    module.gradient("cat", functions.catGradient)
    module.static("lt")
    module.static("le")
