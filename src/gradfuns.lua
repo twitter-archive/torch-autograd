@@ -228,7 +228,7 @@ operators.pow = {
 -- e.g. torch.view(x,3,3) and x:view(3,3)
 local viewGradients = {
    function(g, ans, x,sizes)
-      return torch.view(util.makeContiguous(g), torch.size(x))
+      return torch.view(torch.contiguous(g), torch.size(x))
    end
 }
 local viewAsGradients = {
@@ -236,7 +236,7 @@ local viewAsGradients = {
       return torch.clone(torch.viewAs(g,x))
    end,
    function(g, ans, x,template)
-      return nil -- g.new(template:size()):zero()
+      return nil
    end
 }
 local expandGradients = {
@@ -639,7 +639,6 @@ overload.module("util", util, function(module)
       function(g, ans, x, template, dim, index) return nil end,
       function(g, ans, x, template, dim, index) return nil end,
    })
-   module.gradient("makeContiguous", zeroGradient())
    module.gradient("cat", functions.catGradient)
    module.static("lt")
    module.static("le")

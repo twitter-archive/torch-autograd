@@ -1,10 +1,10 @@
 -- Tester:
-local totem = require 'totem'
+local torch = require 'torch'
 local autograd = require 'autograd'
 local util = require 'autograd.util'
 local gradcheck = require 'autograd.gradcheck' {randomizeInput = true}
 local gradcheckConstant = require 'autograd.gradcheck' {randomizeInput = false}
-local tester = totem.Tester()
+local tester = torch.Tester()
 local stringx = require 'pl.stringx'
 
 autograd.protected(true)
@@ -1696,6 +1696,20 @@ local tests = {
       end
       df = autograd(f)
       dparams, loss = df(params, 2)
+   end,
+
+   Contiguous = function()
+         -- Parameters:
+      local W = torch.Tensor(32,100):fill(.5)
+      local x = torch.Tensor(100):fill(.5)
+
+      -- Function:
+      local f1 = function(inputs)
+         return torch.sum(torch.contiguous(torch.contiguous(inputs.W)) * torch.contiguous(torch.contiguous(inputs.x)))
+      end
+
+      -- Tests:
+      tester:assert(gradcheck(f1,{W=torch.Tensor(32,100):fill(.5),x=torch.Tensor(100):fill(.5)}), "Incorrect gradient")
    end
 
 
@@ -1703,18 +1717,26 @@ local tests = {
 
 local function prefixTests(pf, t, skip)
    local nt = { }
-   for k, v in pairs(t) do
-      if not skip[k] then
-         nt[pf .. k] = v
+   if type(t) == "table" then
+      for k, v in pairs(t) do
+         if not skip[k] then
+            nt[pf .. k] = v
+         end
       end
+   elseif type(t) == "string" then
+      nt = pf .. t
+   elseif type(t) == "nil" then
+      nt = nil
    end
    return nt
 end
 
+
 -- Run tests:
+print(prefixTests("Optimized_", tests, { }))
 autograd.optimize(true)
-tester:add(prefixTests("Optimized_", tests, { })):run()
+tester:add(prefixTests("Optimized_", tests, { })):run(prefixTests("Optimized_", arg[1]))
 autograd.optimize(false)
-tester = totem.Tester()
-tester:add(prefixTests("Direct_", tests, { GradGrad = true, AutoModule = true, DebuggerDivZero = true, StableGradients = true, ZeroGrad = true, SimpleGradGrad = true })):run()
+tester = torch.Tester()
+tester:add(prefixTests("Direct_", tests, { GradGrad = true, AutoModule = true, DebuggerDivZero = true, StableGradients = true, ZeroGrad = true, SimpleGradGrad = true })):run(arg[1])
 
