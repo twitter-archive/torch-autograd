@@ -1687,6 +1687,11 @@ local tests = {
          return torch.sum(xc)
       end
       tester:assert(gradcheck(f4,{x=torch.randn(10,10),y=torch.randn(3)}), "Incorrect gradient")
+      local f5 = function(params)
+         params.x[2] = params.y*2.0
+         return torch.sum(params.x)
+      end
+      tester:assert(gradcheck(f5,{x=torch.randn(10,10),y=torch.randn(10)}), "Incorrect gradient")
    end,
 
    ScalarSigmoid = function()

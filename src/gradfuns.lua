@@ -152,7 +152,12 @@ functions.set = {
       return nil
    end,
    function(g, ans, x, k, v)
-      return g[k]
+      local gk = getValue(g[k])
+      if type(gk) == 'number' then
+        return gk
+      else
+        return torch.clone(gk)
+      end
    end,
 }
 
