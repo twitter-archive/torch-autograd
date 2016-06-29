@@ -409,7 +409,7 @@ local function createSymbolTable(graph, execOrder, aliases, params, tensorPool, 
          end
       end
 
-      function sortLocalSize(a, b)
+      local function sortLocalSize(a, b)
         return availableTensorSizes[a] < availableTensorSizes[b]
       end
 
@@ -422,7 +422,7 @@ local function createSymbolTable(graph, execOrder, aliases, params, tensorPool, 
          remainingOutputSizes[idx] = storageSize(output:get())
       end
 
-      function sortTensorSize(a, b)
+      local function sortTensorSize(a, b)
         return remainingOutputSizes[a] < remainingOutputSizes[b]
       end
 
