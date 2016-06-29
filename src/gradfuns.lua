@@ -16,7 +16,7 @@ end
 -- Utility for defining gradients that are zero
 local function zeroGradient(nArgs)
    nArgs = nArgs or 2
-   zeroGrads = {}
+   local zeroGrads = {}
    for i=1,nArgs do
       zeroGrads[i] = function(...) return nil end
    end
