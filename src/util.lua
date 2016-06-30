@@ -310,6 +310,16 @@ function util.nestedGet(tbl, nestedKey, startInd)
    end
 end
 
+function util.nestedSet(tbl, nestedKey, val, startInd)
+   local startInd = startInd or 1
+   if startInd == #nestedKey then
+      tbl[nestedKey[startInd]] = val
+      return nil
+   else
+      return util.nestedSet(tbl[nestedKey[startInd]], nestedKey, val, startInd+1)
+   end
+end
+
 function util.shallowCopy(tbl)
    if type(tbl) == "table" then
       local copy = { }
