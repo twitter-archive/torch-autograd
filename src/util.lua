@@ -264,6 +264,62 @@ function util.sortedFlatten(tbl, flat, noRecurse)
    return flat
 end
 
+function util.sortedFlattenKeys(tbl, flat, flatKeys, parentKey, noRecurse)
+   flat = flat or { }
+   flatKeys = flatKeys or { }
+   parentKey = parentKey or { }
+   if type(tbl) == "table" then
+      local keys = { }
+      for k, v in pairs(tbl) do
+         keys[#keys + 1] = k
+      end
+      local ok = pcall(function()
+         return table.sort(keys)
+      end)
+      if not ok then
+         table.sort(keys, function(a, b)
+            return tostring(a) < tostring(b)
+         end)
+      end
+      for i = 1, #keys do
+         local val = tbl[keys[i]]
+         parentKey[#parentKey + 1] = keys[i]
+         if type(val) == "table" and not noRecurse then
+            util.sortedFlattenKeys(val, flat, flatKeys, parentKey)
+         else
+            flat[#flat + 1] = val
+            flatKeys[#flatKeys + 1] = util.shallowCopy(parentKey)
+         end
+         parentKey[#parentKey] = nil
+      end
+   else
+      flat[#flat + 1] = tbl
+      flatKeys[#flatKeys + 1] = util.shallowCopy(parentKey)
+   end
+
+   return flat, flatKeys
+end
+
+function util.nestedGet(tbl, nestedKey, startInd)
+   nestedKey = nestedKey or { }
+   startInd = startInd or 1
+   if startInd > #nestedKey then
+      return tbl
+   else
+      return util.nestedGet(tbl[nestedKey[startInd]], nestedKey, startInd+1)
+   end
+end
+
+function util.nestedSet(tbl, nestedKey, val, startInd)
+   local startInd = startInd or 1
+   if startInd == #nestedKey then
+      tbl[nestedKey[startInd]] = val
+      return nil
+   else
+      return util.nestedSet(tbl[nestedKey[startInd]], nestedKey, val, startInd+1)
+   end
+end
+
 function util.shallowCopy(tbl)
    if type(tbl) == "table" then
       local copy = { }
