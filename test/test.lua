@@ -1710,9 +1710,40 @@ local tests = {
 
       -- Tests:
       tester:assert(gradcheck(f1,{W=torch.Tensor(32,100):fill(.5),x=torch.Tensor(100):fill(.5)}), "Incorrect gradient")
+   end,
+
+   Bmm = function()
+      local X = torch.randn(5, 4, 3)
+      local Y = torch.randn(5, 3, 2)
+
+      local bmmFn = function(inputs)
+         return torch.sum(torch.bmm(inputs.X, inputs.Y))
+      end
+      tester:assert(gradcheck(bmmFn, {X=X, Y=Y}), "Incorrect gradient")
+   end,
+
+   Baddbmm = function()
+      local v1 = torch.randn(1)[1]
+      local v2 = torch.randn(1)[1]
+      local M = torch.randn(5, 4, 2)
+      local X = torch.randn(5, 4, 3)
+      local Y = torch.randn(5, 3, 2)
+
+      local baddbmm3argFn = function(inputs)
+         return torch.sum(torch.baddbmm(inputs.M, inputs.X, inputs.Y))
+      end
+      tester:assert(gradcheck(baddbmm3argFn, {M=M, X=X, Y=Y}), "Incorrect gradient")
+
+      local baddbmm4argFn = function(inputs)
+         return torch.sum(torch.baddbmm(inputs.v1, inputs.M, inputs.X, inputs.Y))
+      end
+      tester:assert(gradcheck(baddbmm4argFn, {v1=v1, M=M, X=X, Y=Y}), "Incorrect gradient")
+
+      local baddbmm5argFn = function(inputs)
+         return torch.sum(torch.baddbmm(inputs.v1, inputs.M, inputs.v2, inputs.X, inputs.Y))
+      end
+      tester:assert(gradcheck(baddbmm5argFn, {v1=v1, v2=v2, M=M, X=X, Y=Y}), "Incorrect gradient")
    end
-
-
 }
 
 local function prefixTests(pf, t, skip)
