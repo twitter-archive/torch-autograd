@@ -462,6 +462,9 @@ overload.module("torch", torch, function(module)
    module.gradient("log", {
       function(g, ans, x) return elemwiseDiv(g,x) end
    })
+   module.gradient("log1p", {
+      function(g, ans, x) return elemwiseDiv(g,x + 1) end
+   })
    module.gradient("min", {
       function(g, ans, x,axis)
          local repeater = repeatToMatchShape(x,axis)
