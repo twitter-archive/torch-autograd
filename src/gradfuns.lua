@@ -16,7 +16,7 @@ end
 -- Utility for defining gradients that are zero
 local function zeroGradient(nArgs)
    nArgs = nArgs or 2
-   zeroGrads = {}
+   local zeroGrads = {}
    for i=1,nArgs do
       zeroGrads[i] = function(...) return nil end
    end
@@ -228,7 +228,7 @@ operators.pow = {
 -- e.g. torch.view(x,3,3) and x:view(3,3)
 local viewGradients = {
    function(g, ans, x,sizes)
-      return torch.view(util.makeContiguous(g), torch.size(x))
+      return torch.view(torch.contiguous(g), torch.size(x))
    end
 }
 local viewAsGradients = {
@@ -236,7 +236,7 @@ local viewAsGradients = {
       return torch.clone(torch.viewAs(g,x))
    end,
    function(g, ans, x,template)
-      return nil -- g.new(template:size()):zero()
+      return nil
    end
 }
 local expandGradients = {
@@ -331,7 +331,7 @@ overload.module("torch", torch, function(module)
    })
    module.gradient("tanh", {
       function(g, ans, x)
-         local mzz = 1 - torch.cmul(ans, ans)
+         local mzz = 1 - elemwiseMul(ans,ans)
          return elemwiseMul(g, mzz)
       end
    })
@@ -361,7 +361,7 @@ overload.module("torch", torch, function(module)
       function(g, ans, x, minVal, maxVal)
          -- NOTE: could do a casting and then multiply for 2nd order divs. This is more efficient for now.
          local mask = torch.typeAs(torch.eq(torch.ne(ans,minVal),torch.ne(ans,maxVal)), g)
-         return torch.cmul(g, mask)
+         return elemwiseMul(g, mask)
       end,
       function(g, ans, x, minVal, maxVal)
          error("Gradient not implemented w.r.t. min and max values of torch.clamp")
@@ -462,6 +462,9 @@ overload.module("torch", torch, function(module)
    module.gradient("log", {
       function(g, ans, x) return elemwiseDiv(g,x) end
    })
+   module.gradient("log1p", {
+      function(g, ans, x) return elemwiseDiv(g,x + 1) end
+   })
    module.gradient("min", {
       function(g, ans, x,axis)
          local repeater = repeatToMatchShape(x,axis)
@@ -551,8 +554,8 @@ overload.module("torch", torch, function(module)
    })
    module.gradient("sigmoid", {
       function(g, ans, x)
-         local p = torch.cmul(1 - ans, ans)
-         return torch.cmul(g, p)
+         local p = elemwiseMul(1-ans,ans)
+         return elemwiseMul(g, p)
       end
    })
    -- module.gradient("split", {
@@ -564,6 +567,65 @@ overload.module("torch", torch, function(module)
    --    function(g, ans, x, size, dim) return nil end,
 
    -- })
+
+   module.gradient("bmm", {
+      function(g, ans, x, y) return torch.bmm(g, torch.transpose(y, 3, 2)) end,
+      function(g, ans, x, y) return torch.bmm(torch.transpose(x, 3, 2), g) end,
+   })
+   module.gradient("baddbmm", {
+      -- baddbmm has three possible patterns:
+      -- 1.)  M  X  Y
+      -- 2.) v1  M  X  Y
+      -- 3.) v1  M v2  X  Y
+      function(g, ans, a1, a2, a3, a4, a5)
+         -- grad wrt a1
+         if torch.isTensor(a1) then
+            -- pattern 1
+            return g
+         else
+            -- patterns 2 and 3
+            return torch.sum(elemwiseMul(g, a2))
+         end
+      end,
+      function(g, ans, a1, a2, a3, a4, a5)
+         -- grad wrt a2
+         if torch.isTensor(a1) then
+            -- pattern 1
+            return torch.bmm(g, torch.transpose(a3, 3, 2))
+         else
+            -- patterns 2 and 3
+            return elemwiseMul(g, a1)
+         end
+      end,
+      function(g, ans, a1, a2, a3, a4, a5)
+         -- grad wrt a3
+         if torch.isTensor(a1) then
+            -- pattern 1
+            return torch.bmm(torch.transpose(a2, 3, 2), g)
+         elseif torch.isTensor(a3) then
+            -- pattern 2
+            return torch.bmm(g, torch.transpose(a4, 3, 2))
+         else
+            -- pattern 3
+            return torch.sum(elemwiseMul(g, torch.bmm(a4, a5)))
+         end
+      end,
+      function(g, ans, a1, a2, a3, a4, a5)
+         -- grad wrt a4
+         if torch.isTensor(a3) then
+            -- pattern 2
+            return torch.bmm(torch.transpose(a3, 3, 2), g)
+         else
+            -- pattern 3
+            return elemwiseMul(torch.bmm(g, torch.transpose(a5, 3, 2)), a3)
+         end
+      end,
+      function(g, ans, a1, a2, a3, a4, a5)
+         -- grad wrt a5
+         -- pattern 3
+         return elemwiseMul(torch.bmm(torch.transpose(a4, 3, 2), g), a3)
+      end,
+   })
 
    -- Zero gradients
    module.gradient("lt", zeroGradient())
@@ -639,7 +701,6 @@ overload.module("util", util, function(module)
       function(g, ans, x, template, dim, index) return nil end,
       function(g, ans, x, template, dim, index) return nil end,
    })
-   module.gradient("makeContiguous", zeroGradient())
    module.gradient("cat", functions.catGradient)
    module.static("lt")
    module.static("le")

@@ -1,10 +1,10 @@
 -- Tester:
-local totem = require 'totem'
+local torch = require 'torch'
 local autograd = require 'autograd'
 local util = require 'autograd.util'
 local gradcheck = require 'autograd.gradcheck' {randomizeInput = true}
 local gradcheckConstant = require 'autograd.gradcheck' {randomizeInput = false}
-local tester = totem.Tester()
+local tester = torch.Tester()
 local stringx = require 'pl.stringx'
 
 autograd.protected(true)
@@ -1689,23 +1689,85 @@ local tests = {
       tester:assert(gradcheck(f4,{x=torch.randn(10,10),y=torch.randn(3)}), "Incorrect gradient")
    end,
 
+   ScalarSigmoid = function()
+      params = {w = 1}
+      f = function(params, x)
+         return torch.sigmoid(params.w * x)
+      end
+      df = autograd(f)
+      dparams, loss = df(params, 2)
+   end,
 
+   Contiguous = function()
+         -- Parameters:
+      local W = torch.Tensor(32,100):fill(.5)
+      local x = torch.Tensor(100):fill(.5)
+
+      -- Function:
+      local f1 = function(inputs)
+         return torch.sum(torch.contiguous(torch.contiguous(inputs.W)) * torch.contiguous(torch.contiguous(inputs.x)))
+      end
+
+      -- Tests:
+      tester:assert(gradcheck(f1,{W=torch.Tensor(32,100):fill(.5),x=torch.Tensor(100):fill(.5)}), "Incorrect gradient")
+   end,
+
+   Bmm = function()
+      local X = torch.randn(5, 4, 3)
+      local Y = torch.randn(5, 3, 2)
+
+      local bmmFn = function(inputs)
+         return torch.sum(torch.bmm(inputs.X, inputs.Y))
+      end
+      tester:assert(gradcheck(bmmFn, {X=X, Y=Y}), "Incorrect gradient")
+   end,
+
+   Baddbmm = function()
+      local v1 = torch.randn(1)[1]
+      local v2 = torch.randn(1)[1]
+      local M = torch.randn(5, 4, 2)
+      local X = torch.randn(5, 4, 3)
+      local Y = torch.randn(5, 3, 2)
+
+      local baddbmm3argFn = function(inputs)
+         return torch.sum(torch.baddbmm(inputs.M, inputs.X, inputs.Y))
+      end
+      tester:assert(gradcheck(baddbmm3argFn, {M=M, X=X, Y=Y}), "Incorrect gradient")
+
+      local baddbmm4argFn = function(inputs)
+         return torch.sum(torch.baddbmm(inputs.v1, inputs.M, inputs.X, inputs.Y))
+      end
+      tester:assert(gradcheck(baddbmm4argFn, {v1=v1, M=M, X=X, Y=Y}), "Incorrect gradient")
+
+      local baddbmm5argFn = function(inputs)
+         return torch.sum(torch.baddbmm(inputs.v1, inputs.M, inputs.v2, inputs.X, inputs.Y))
+      end
+      tester:assert(gradcheck(baddbmm5argFn, {v1=v1, v2=v2, M=M, X=X, Y=Y}), "Incorrect gradient")
+   end
 }
 
 local function prefixTests(pf, t, skip)
    local nt = { }
-   for k, v in pairs(t) do
-      if not skip[k] then
-         nt[pf .. k] = v
+   if type(t) == "table" then
+      for k, v in pairs(t) do
+         if not skip[k] then
+            nt[pf .. k] = v
+         end
       end
+   elseif type(t) == "string" then
+      nt = pf .. t
+   elseif type(t) == "nil" then
+      nt = nil
    end
    return nt
 end
 
+
 -- Run tests:
+print(prefixTests("Optimized_", tests, { }))
 autograd.optimize(true)
-tester:add(prefixTests("Optimized_", tests, { })):run()
+tester:add(prefixTests("Optimized_", tests, { })):run(prefixTests("Optimized_", arg[1]))
 autograd.optimize(false)
-tester = totem.Tester()
-tester:add(prefixTests("Direct_", tests, { GradGrad = true, AutoModule = true, DebuggerDivZero = true, StableGradients = true, ZeroGrad = true, SimpleGradGrad = true })):run()
+tester = torch.Tester()
+tester:add(prefixTests("Direct_", tests, { GradGrad = true, AutoModule = true, DebuggerDivZero = true, StableGradients = true, ZeroGrad = true, SimpleGradGrad = true })):run(arg[1])
 

@@ -124,7 +124,7 @@ local function wrapCriterion(nnObject)
    mod.entry = fn
    mod.forward = forward
    mod.backward = backward
-
+   mod.module = nnObject
    -- Shortcut:
    setmetatable(mod, {
       __call = function(self, ...)
@@ -180,7 +180,7 @@ local function wrapModuleWithoutParams(nnObject)
    mod.entry = fn
    mod.forward = forward
    mod.backward = backward
-
+   mod.module = nnObject
    -- Shortcut:
    setmetatable(mod, {
       __call = function(self, ...)
@@ -261,7 +261,7 @@ local function wrapModuleWithParams(nnObject)
    mod.entry = fn
    mod.forward = forward
    mod.backward = backward
-
+   mod.module = nnObject
    -- Shortcut:
    setmetatable(mod, {
       __call = function(self, ...)

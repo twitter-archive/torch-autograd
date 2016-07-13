@@ -31,7 +31,7 @@ Updates
 
 *Jan 21, 2016:*
 Two big new user-facing features:
- * First, we now support direct assignment (so you can now do `x[k] = v` inside autograd code, where k can be a number, table or `LongTensor`, and v can be a tensor or number, whichever is appropriate. [Here's a few examples](https://github.com/twitter/torch-autograd/blob/86a5963dd6e3cfd9c3b29fcddcf2edb7c3759ac4/test/test.lua#L1462-L1488).
+ * First, we now support direct assignment (so you can now do `x[k] = v` inside optimize=true autograd code, where k can be a number, table or `LongTensor`, and v can be a tensor or number, whichever is appropriate. [Here's a few examples](https://github.com/twitter/torch-autograd/blob/86a5963dd6e3cfd9c3b29fcddcf2edb7c3759ac4/test/test.lua#L1462-L1488).
  * Second, you can now take 2nd-order and higher gradients (supported in optimized mode. Either run `autograd.optimize(true)` or take the derivative of your function using `df = autograd(f, {optimize = true})`. [Check out a simple example in our tests](https://github.com/twitter/torch-autograd/blob/86a5963dd6e3cfd9c3b29fcddcf2edb7c3759ac4/test/test.lua#L1421-L1460)
  * Plus, lots of misc bugfixes and new utilities to help with tensor manipulation (`autograd.util.cat` can work with numbers, or tensors of any time. `autograd.util.cast` can cast a nested table of tensors to any type you like).
  
@@ -156,6 +156,8 @@ Caveats:
 
 * The generated code is cached based on the dimensions of the input tensors. If your problem is such that you have thousands of unique tensors configurations, you won't see any benefit.
 * Each invocation of grad(f) produces a new context for caching, so be sure to only call this once.
+* *WARNING*: Variables that you close over in an autograd function in optimize mode will never be updated -- they are treated as static as soon as the function is defined.
+* *WARNING*: If you make extensive use of control flow (any if-statements, for-loops or while-loops), you're better off using direct mode. In the best case, the variables used for control flow will be passed in as arguments, and trigger recompilation for as many possible branches as exist in your code. In the worst case, the variables used for control flow will be either computed internally, closed over, or not change in size or rank, and control flow changes will be completely ignored.
 
 
 ### Wrapping nn modules
