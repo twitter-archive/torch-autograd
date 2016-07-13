@@ -590,6 +590,7 @@ local function generateCode(graph, opt)
 
 
    -- Print out a dotfile of the computation graph if requested
+   print(opt)
    if opt.dotFile then
       if not debugger then
          debugger = Debugger()
