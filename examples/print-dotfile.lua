@@ -50,7 +50,6 @@ target[1][3] = 1
 ----------------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------
 
-p = {W=params.W,B=p
 -- Get our function, just the forward pass, along with the DOT file showing the graph
 fileName = "/tmp/graph.dot"
 g = autograd(f,{dotFile=fileName,optimize=true,withGradients=false,withForward=true})
