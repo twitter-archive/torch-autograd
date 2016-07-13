@@ -38,6 +38,8 @@ local function grad(fn, gradOpt)
    opt.reduceFootprint = util.defaultBool(opt.reduceFootprint, false)
    opt.withForward = util.defaultBool(opt.withForward, true)
    opt.withGradients = util.defaultBool(opt.withGradients, true)
+   opt.showCode = util.defaultBool(opt.showCode, false)
+   opt.dotFile = opt.dotFile or nil
    opt.partialGrad = util.defaultBool(opt.partialGrad, false)
    opt.profile = opt.profile or profile.OFF
    opt.profileReportFrequency = opt.profileReportFrequency or 10

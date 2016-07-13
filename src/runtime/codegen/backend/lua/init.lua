@@ -757,6 +757,13 @@ end
 
 local function generateFn(graph, opt)
    local code, outerArgs, retValues = generateCode(graph, opt)
+
+   -- Optionally show the generated code. It's not the most readable,
+   -- but it's all there for your perusal
+   if opt.showCode then
+      print(code)
+   end
+
    local outer, err = (loadstring or load)(code)
    if outer == nil then
       print(code)
