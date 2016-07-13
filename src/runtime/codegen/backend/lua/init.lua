@@ -588,6 +588,16 @@ local function generateCode(graph, opt)
    local symbols, undefined, constants, tensorPoolViews = createSymbolTable(graph, execOrder, aliases, params, tensorPool, tensorLocals, opt)
    local objectMap, objectTable = collectObjects(execOrder)
 
+
+   -- Print out a dotfile of the computation graph if requested
+   if opt.dotFile then
+      if not debugger then
+         debugger = Debugger()
+      end
+      debugger.setMain(symbols, graph.grads, graph.answers)
+      debugger.generateDot(opt.dotFile)
+   end
+
    local out = StringBuilder.new()
    local outerArgNames = {"locals", "rlocals", "vlocals"}
    local outerArgs = { tensorLocals, tensorPool, tensorPoolViews }
@@ -741,6 +751,7 @@ local function generateCode(graph, opt)
    for i = 1, #graph.answers do
       retValues[#retValues + 1] = flattenAnswer(graph.answers[i])
    end
+
    return code, outerArgs, retValues
 end
 
