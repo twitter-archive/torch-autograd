@@ -90,8 +90,7 @@ function nodeApply(fun, gradFun, ...)
       end
       return newNode
    else
-      local values = {fun.fn(table.unpack(values))}
-      return table.unpack(values)
+      return fun.fn(table.unpack(values))
    end
 end
 
