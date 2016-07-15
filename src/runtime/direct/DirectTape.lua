@@ -156,6 +156,8 @@ function DirectTape.gradOnly(tape, arg, argnum, allAns, gradOutput)
                if gradUpdate then
                   if thisArg.outgrad == nil or thisArg.outgrad == 0 then
                      thisArg.outgrad = gradUpdate
+                  elseif torch.isTensor(thisArg.outgrad) then
+                     thisArg.outgrad:add(gradUpdate)
                   else
                      thisArg.outgrad = thisArg.outgrad + gradUpdate
                   end
