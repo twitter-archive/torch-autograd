@@ -1,5 +1,6 @@
 -- util
 local util = require 'autograd.util'
+local grad = require 'autograd'
 
 return function(opt, params)
    -- options:
@@ -7,15 +8,39 @@ return function(opt, params)
    local inputFeatures = opt.inputFeatures or 10
    local hiddenFeatures = opt.hiddenFeatures or 100
    local outputType = opt.outputType or 'last' -- 'last' or 'all'
+   local batchNormalization = opt.batchNormalization or false
+   local maxBatchNormalizationLayers = opt.maxBatchNormalizationLayers or 10
 
    -- container:
    params = params or {}
+   layers = layers or {}
 
    -- parameters:
    local p = {
       W = torch.zeros(inputFeatures+hiddenFeatures, 4 * hiddenFeatures),
       b = torch.zeros(1, 4 * hiddenFeatures),
    }
+   if batchNormalization then
+     -- translation and scaling parameters are shared across time.
+     local lstm_bn, p_lstm_bn = grad.nn.BatchNormalization(4 * hiddenFeatures)
+     local cell_bn, p_cell_bn = grad.nn.BatchNormalization(hiddenFeatures)
+
+     layers.lstm_bn = {lstm_bn}
+     layers.cell_bn = {cell_bn}
+
+     for i=2,#maxBatchNormalizationLayers do
+       local lstm_bn = grad.nn.BatchNormalization(4 * hiddenFeatures)
+       local cell_bn = grad.nn.BatchNormalization(hiddenFeatures)
+       layers.lstm_bn[i] = lstm_bn
+       layers.cell_bn[i] = cell_bn
+     end
+
+     -- initializing scaling to < 1 is recommended for LSTM batch norm.
+     p.lstm_bn_1 = p_lstm_bn[1]:fill(0.1)
+     p.lstm_bn_2 = p_lstm_bn[2]:zero()
+     p.cell_bn_1 = p_cell_bn[1]:fill(0.1)
+     p.cell_bn_2 = p_cell_bn[2]:zero()
+   end
    table.insert(params, p)
 
    -- function:
@@ -41,8 +66,28 @@ return function(opt, params)
          local hp = hs[t-1] or prevState.h or torch.zero(x.new(batch, hiddenFeatures))
          local cp = cs[t-1] or prevState.c or torch.zero(x.new(batch, hiddenFeatures))
 
+         -- batch norm for t, independent mean and std across time steps
+         local lstm_bn, cell_bn
+         if batchNormalization then
+           if layers.lstm_bn[t] then
+             lstm_bn = layers.lstm_bn[t]
+             cell_bn = layers.cell_bn[t]
+           else
+             -- all time steps beyond maxBatchNormalizationLayers uses the last one.
+             lstm_bn = layers.lstm_bn[#layers.lstm_bn]
+             cell_bn = layers.cell_bn[#layers.cell_bn]
+           end
+         end
+
          -- pack all dot products:
-         local dots = torch.cat(xt,hp,2) * p.W + torch.expand(p.b, batch, 4*hiddenFeatures)
+         local dots = torch.cat({xt, hp}, 2) * p.W
+
+         if batchNormalization then
+           -- use translation parameter from batch norm as bias.
+           dots = lstm_bn({p.lstm_bn_1, p.lstm_bn_2}, dots)
+         else
+           dots = dots + torch.expand(p.b, batch, 4 * hiddenFeatures)
+         end
 
          -- view as 4 groups:
          dots = torch.view(dots, batch, 4, hiddenFeatures)
@@ -60,6 +105,10 @@ return function(opt, params)
          -- next c:
          cs[t] = torch.cmul(forgetGate, cp) + torch.cmul(inputGate, inputValue)
 
+         if batchNormalization then
+           cs[t] = cell_bn({p.cell_bn_1, p.cell_bn_2}, cs[t])
+         end
+
          -- next h:
          hs[t] = torch.cmul(outputGate, torch.tanh(cs[t]))
       end
@@ -71,17 +120,16 @@ return function(opt, params)
       -- output:
       if outputType == 'last' then
          -- return last hidden code:
-         return hs[#hs], newState
+         return hs[#hs], newState, layers
       else
          -- return all:
          for i in ipairs(hs) do
             hs[i] = torch.view(hs[i], batch,1,hiddenFeatures)
          end
-         return x.cat(hs, 2), newState
+         return x.cat(hs, 2), newState, layers
       end
    end
 
    -- layers
-   return f, params
+   return f, params, layers
 end
-
