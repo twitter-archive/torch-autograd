@@ -1,6 +1,7 @@
 -- util
 local util = require 'autograd.util'
-local grad = require 'autograd'
+local functionalize = require('autograd.nnwrapper').functionalize
+local nn = functionalize('nn')
 
 return function(opt, params)
    -- options:
@@ -22,15 +23,15 @@ return function(opt, params)
    }
    if batchNormalization then
      -- translation and scaling parameters are shared across time.
-     local lstm_bn, p_lstm_bn = grad.nn.BatchNormalization(4 * hiddenFeatures)
-     local cell_bn, p_cell_bn = grad.nn.BatchNormalization(hiddenFeatures)
+     local lstm_bn, p_lstm_bn = nn.BatchNormalization(4 * hiddenFeatures)
+     local cell_bn, p_cell_bn = nn.BatchNormalization(hiddenFeatures)
 
      layers.lstm_bn = {lstm_bn}
      layers.cell_bn = {cell_bn}
 
      for i=2,#maxBatchNormalizationLayers do
-       local lstm_bn = grad.nn.BatchNormalization(4 * hiddenFeatures)
-       local cell_bn = grad.nn.BatchNormalization(hiddenFeatures)
+       local lstm_bn = nn.BatchNormalization(4 * hiddenFeatures)
+       local cell_bn = nn.BatchNormalization(hiddenFeatures)
        layers.lstm_bn[i] = lstm_bn
        layers.cell_bn[i] = cell_bn
      end
