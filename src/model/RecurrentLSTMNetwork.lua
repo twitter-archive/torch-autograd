@@ -3,7 +3,7 @@ local util = require 'autograd.util'
 local functionalize = require('autograd.nnwrapper').functionalize
 local nn = functionalize('nn')
 
-return function(opt, params, layers)
+return function(opt, params)
    -- options:
    opt = opt or {}
    local inputFeatures = opt.inputFeatures or 10
@@ -12,9 +12,9 @@ return function(opt, params, layers)
    local batchNormalization = opt.batchNormalization or false
    local maxBatchNormalizationLayers = opt.maxBatchNormalizationLayers or 10
 
-   -- container:
+   -- containers:
    params = params or {}
-   layers = layers or {}
+   layers = {}
 
    -- parameters:
    local p = {
@@ -45,7 +45,7 @@ return function(opt, params, layers)
    table.insert(params, p)
 
    -- function:
-   local f = function(params, x, prevState)
+   local f = function(params, x, prevState, layers)
       -- dims:
       local p = params[1] or params
       if torch.nDimension(x) == 2 then
