@@ -12,9 +12,9 @@ return function(opt, params)
    local batchNormalization = opt.batchNormalization or false
    local maxBatchNormalizationLayers = opt.maxBatchNormalizationLayers or 10
 
-   -- container:
+   -- containers:
    params = params or {}
-   layers = layers or {}
+   layers = {}
 
    -- parameters:
    local p = {
@@ -29,7 +29,7 @@ return function(opt, params)
      layers.lstm_bn = {lstm_bn}
      layers.cell_bn = {cell_bn}
 
-     for i=2,#maxBatchNormalizationLayers do
+     for i=2,maxBatchNormalizationLayers do
        local lstm_bn = nn.BatchNormalization(4 * hiddenFeatures)
        local cell_bn = nn.BatchNormalization(hiddenFeatures)
        layers.lstm_bn[i] = lstm_bn
@@ -45,7 +45,7 @@ return function(opt, params)
    table.insert(params, p)
 
    -- function:
-   local f = function(params, x, prevState)
+   local f = function(params, x, prevState, layers)
       -- dims:
       local p = params[1] or params
       if torch.nDimension(x) == 2 then
