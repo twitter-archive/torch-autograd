@@ -35,24 +35,36 @@ util.cast = cast
 -- which fails in autograd because we may be comparing numbers and Nodes. Node type is table, not number,
 -- and we cannot override this default behavior, so our metamethods will never be called.
 -- This unfortunate state of things is a good argument for a DSL, to improve the user experience.
+local Value = require 'autograd.runtime.codegen.Value'
+local DirectNode = require 'autograd.runtime.direct.DirectNode'
+local function getValue(v)
+   if Value.isValue(v) then
+      return v:get()
+   elseif DirectNode.isNode(v) then
+      return DirectNode.getValue(v)
+   else
+      return v
+   end
+end
+print(getValue)
 function util.lt(a, b)
-   return a < b
+   return getValue(a) < getValue(b)
 end
 
 function util.le(a, b)
-   return a <= b
+   return getValue(a) <= getValue(b)
 end
 
 function util.gt(a, b)
-   return a > b
+   return getValue(a) > getValue(b)
 end
 
 function util.ge(a, b)
-   return a >= b
+   return getValue(a) >= getValue(b)
 end
 
 function util.eq(a, b)
-   return a == b
+   return getValue(a) == getValue(b)
 end
 
 function util.oneHot(labels, n)

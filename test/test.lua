@@ -1567,7 +1567,7 @@ local tests = {
    ZeroGrad = function()
       --the output of this function does not depend on params, so its grad should be uniformly zero
       local innerFn = function(params, x, y)
-         return torch.norm(torch.add(x,y))
+         return torch.sum(torch.add(x,y))
       end
 
       local dneuralNet = autograd(innerFn)

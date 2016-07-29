@@ -3,7 +3,7 @@ local DirectNode = require 'autograd.runtime.direct.DirectNode'
 local util = require 'autograd.util'
 local overload = require 'autograd.overload'
 
-function getValue(v)
+local function getValue(v)
    if Value.isValue(v) then
       return v:get()
    elseif DirectNode.isNode(v) then
@@ -368,12 +368,6 @@ overload.module("torch", torch, function(module)
          local mask = torch.typeAs(torch.eq(torch.ne(ans,minVal),torch.ne(ans,maxVal)), g)
          return elemwiseMul(g, mask)
       end,
-      function(g, ans, x, minVal, maxVal)
-         error("Gradient not implemented w.r.t. min and max values of torch.clamp")
-      end,
-      function(g, ans, x, minVal, maxVal)
-         error("Gradient not implemented w.r.t. min and max values of torch.clamp")
-      end
    })
    module.gradient("contiguous", {
       function(g,ans,x)
@@ -433,23 +427,6 @@ overload.module("torch", torch, function(module)
       function(g,ans,x,axis)
          local repeater,nrepeats = repeatToMatchShape(x,axis)
          return repeater(g)/nrepeats
-      end
-   })
-   module.gradient("norm", {
-      function(g,ans,x,p,dim)
-         error("NOT IMPLEMENTED")
-      end,
-   })
-   module.gradient("var", {
-      function(g,ans,x,axis)
-         error("NOT IMPLEMENTED")
-         local repeater,nrepeats = repeatToMatchShape(x,axis)
-      end
-   })
-   module.gradient("std", {
-      function(g,ans,x,axis)
-         error("NOT IMPLEMENTED")
-         local repeater,nrepeats = repeatToMatchShape(x,axis)
       end
    })
    module.gradient("sqrt", {
@@ -707,11 +684,12 @@ overload.module("util", util, function(module)
       function(g, ans, x, template, dim, index) return nil end,
    })
    module.gradient("cat", functions.catGradient)
-   module.static("lt")
-   module.static("le")
-   module.static("gt")
-   module.static("ge")
-   module.static("eq")
+   module.gradient("lt", zeroGradient(2))
+   module.gradient("le", zeroGradient(2))
+   module.gradient("gt", zeroGradient(2))
+   module.gradient("ge", zeroGradient(2))
+   module.gradient("eq", zeroGradient(2))
+
    module.initializer("newTensorLike", "zerosLike")
 end)
 
