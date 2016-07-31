@@ -1489,8 +1489,8 @@ local tests = {
          end
       end
 
-      tester:assert(gradcheck(f,{a = torch.eye(5)}), "Incorrect gradient")
-      tester:assert(gradcheck(f,{a = torch.eye(1)}), "Incorrect gradient")
+      tester:assert(gradcheck(f,{a = torch.eye(3)*3}), "Incorrect gradient")
+      tester:assert(gradcheck(f,{a = torch.eye(3)*0.3}), "Incorrect gradient")
    end,
 
    CatNumber = function()
