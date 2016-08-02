@@ -26,8 +26,19 @@ return function(opt, params)
   table.insert(params, p)
 
   local soft_attention = function(params, subject, h)
-    -- Return soft attention over subject given hidden state.
-    -- Deterministic soft attention of Show, Attend, and Tell by Xu et al. (http://arxiv.org/abs/1502.03044)
+    --[[ Soft attention over subject given hidden state.
+
+    Deterministic soft attention of Show, Attend, and Tell by Xu et al. (http://arxiv.org/abs/1502.03044)
+
+    Parameters:
+    * `params`  - Weights to combine subject and hidden features to score choices.
+    * `subject` - ([batch,] subjectFeatures, subjectChoices) tensor.
+    * `h`       - ([batch,] hiddenFeatures) tensor.
+
+    Returns:
+    * `attention` - ([batch,], subjectFeatures) tensor that is the expectation of the attended subject vector.
+    * `focus`     - ([batch,], subjectChoices) tensor that is the probability of selecting any given subject choice.
+    --]]
     local p = params[1] or params
     local subject_in = subject
     local h_in = h

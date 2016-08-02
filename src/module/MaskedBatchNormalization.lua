@@ -16,8 +16,21 @@ return function(opt, params)
   table.insert(params, p)
 
   local function masked_batch_norm(params, x, mask, state, eps)
-    -- Masked batch norm for minibatches with variable length sequences
-    -- as described in Batch Normalized Recurrent Neural Networks by Laurent et al. (http://arxiv.org/abs/1510.01378)
+    --[[ Masked batch normalization for minibatches with variable length sequences.
+
+    Based on sequence batch norm from Batch Normalized Recurrent Neural Networks by Laurent et al.
+    (http://arxiv.org/abs/1510.01378)
+
+    Parameters:
+    * `params` - Gain and bias parameters to adjust normalized output.
+    * `x` - ([batch, [time,], nOutputs]) tensor to be normalized.
+    * `mask` - Tensor with the same size as x that is 1 where x is valid and 0 otherwise.
+    * `state` - Running mean and std estimates, momentum for estimates, and train flag.
+    * `eps` - Small constant to avoid divide by zero for small std.
+
+    Returns:
+    * `x_corrected` - ([batch, [time,], nOutputs]) batch normalized tensor.
+    --]]
     local p = params[1] or params
     local eps = eps or 1e-5
     local train = state.train or 1

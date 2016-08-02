@@ -9,7 +9,18 @@ return function(opt, params)
   table.insert(params, p)
 
   local function layer_norm(params, x, eps)
-    -- Layer Normalization of Ba, Kiros, and Hinton (https://arxiv.org/abs/1607.06450)
+    --[[ Layer Normalization of Ba, Kiros, and Hinton (https://arxiv.org/abs/1607.06450)
+
+    Normalizes activations x at a layer by their mean and std.
+
+    Parameters:
+    * `params` - Gain and bias parameters to adjust normalized output.
+    * `x` - ([batch, nOutputs]) tensor to be normalized.
+    * `eps` - Small constant to avoid divide by zero for small std.
+
+    Returns:
+    * `x_corrected` - ([batch,] nOutputs]) layer normalized tensor.
+    --]]
     local p = params[1] or params
     local eps = eps or 1e-5
     local x_in = x
