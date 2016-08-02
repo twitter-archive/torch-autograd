@@ -1247,6 +1247,166 @@ local tests = {
       tester:assert(gradcheck(loss, params, i), 'incorrect gradients')
    end,
 
+    Modules_LayerNormalization = function()
+      local f,params = autograd.module.LayerNormalization({nOutputs = 100})
+
+      -- Loss:
+      local loss = function(params, input)
+        local normed = f(params, input)
+        local l = torch.sum(normed)
+        return l, normed
+      end
+
+      dloss = autograd(loss)
+
+      params[1].gain:fill(1)
+      params[1].bias:fill(0.1)
+
+      local i = torch.randn(100) -- test 1D input
+      local l, i_normed = loss(params, i)
+      local grads = dloss(params, i)
+
+      tester:asserteq(type(l), 'number', 'loss should be a scalar')
+      tester:asserteq(grads[1].gain:dim(), 2, 'gain has incorrect dim')
+      tester:asserteq(grads[1].bias:dim(), 2, 'gain has incorrect dim')
+      tester:asserteq(i_normed:dim(), i:dim(), 'normed input has incorrect dim')
+
+      i = torch.randn(5,100) -- batch x nOutputs
+      l, i_normed = loss(params, i)
+      grads = dloss(params, i)
+
+      tester:asserteq(type(l), 'number', 'loss should be a scalar')
+      tester:asserteq(grads[1].gain:dim(), 2, 'gain has incorrect dim')
+      tester:asserteq(grads[1].bias:dim(), 2, 'gain has incorrect dim')
+      tester:asserteq(i_normed:dim(), i:dim(), 'normed input has incorrect dim')
+
+      -- Gradcheck
+      tester:assert(gradcheck(loss, params, i), 'incorrect gradients')
+    end,
+
+    Modules_SoftAttention = function()
+      local f,params = autograd.module.SoftAttention({
+        hiddenFeatures = 50,
+        subjectFeatures = 100,
+        subjectChoices = 16
+      })
+
+      -- Loss:
+      local loss = function(params, input, hidden)
+        local at, ft = f(params, input, hidden)
+        local l = torch.sum(at)
+        return l, at, ft
+      end
+
+      local dloss = autograd(loss)
+
+      params[1].W_att_subject:normal(0, 0.01)
+      params[1].W_att_h:normal(0, 0.01)
+      params[1].b_att:zero()
+
+      local x = torch.randn(100, 16)
+      local h = torch.randn(50)
+      local l, a, f = loss(params, x, h)
+      local grads = dloss(params, x, h)
+
+      tester:asserteq(type(l), 'number', 'loss should be a scalar')
+      tester:asserteq(grads[1].W_att_subject:dim(), 3, 'W_att_subject grad has incorrect dim')
+      tester:asserteq(grads[1].W_att_h:dim(), 2, 'W_att_h grad has incorrect dim')
+      tester:asserteq(grads[1].b_att:dim(), 2, 'b_att grad has incorrect dim')
+      tester:asserteq(torch.size(a, 1), torch.size(x,1), 'attention has incorrect dim')
+      tester:asserteq(torch.size(f, 1), torch.size(x,2), 'focus has incorrect dim')
+
+      -- Gradcheck
+      tester:assert(gradcheck(loss, params, x, h), 'incorrect gradients')
+
+      x = torch.randn(10, 100, 16)
+      h = torch.randn(10, 50)
+      local l, a, f = loss(params, x, h)
+      local grads = dloss(params, x, h)
+      tester:asserteq(type(l), 'number', 'loss should be a scalar')
+      tester:asserteq(grads[1].W_att_subject:dim(), 3, 'W_att_subject grad has incorrect dim')
+      tester:asserteq(grads[1].W_att_h:dim(), 2, 'W_att_h grad has incorrect dim')
+      tester:asserteq(grads[1].b_att:dim(), 2, 'b_att grad has incorrect dim')
+      tester:asserteq(torch.size(a, 2), torch.size(x,2), 'attention has incorrect dim')
+      tester:asserteq(torch.size(f, 2), torch.size(x,3), 'focus has incorrect dim')
+      tester:asserteq(torch.size(a, 1), torch.size(x,1), 'attention has incorrect batch size')
+      tester:asserteq(torch.size(f, 1), torch.size(x,1), 'focus has incorrect batch size')
+
+      -- Gradcheck
+      tester:assert(gradcheck(loss, params, x, h), 'incorrect gradients')
+    end,
+
+    Modules_MaskedBatchNormalization = function()
+      local f, params, state = autograd.module.MaskedBatchNormalization({nOutputs = 100})
+      local threshold = 1e-5
+      local eval_state = {momentum = state.momentum, train = 0,
+                          running_mean = state.running_mean,
+                          running_std = state.running_std}
+
+      -- Loss:
+      local loss = function(params, input, mask, state)
+        local normed = f(params, input, mask, state)
+        local l = torch.sum(normed)
+        return l, normed
+      end
+
+      local dloss = autograd(loss)
+
+      params[1].gain:fill(0.1)
+      params[1].bias:fill(0.1)
+
+      local i = torch.randn(100) -- test 1D input
+      local mask = torch.bernoulli(i.new(i:size()))
+      local pre_mean = state.running_mean:clone()
+      local pre_std = state.running_std:clone()
+      local l, i_normed = loss(params, i, mask, state)
+      local grads = dloss(params, i, mask, state)
+
+      tester:asserteq(type(l), 'number', 'loss should be a scalar')
+      tester:asserteq(grads[1].gain:dim(), 2, 'gain has incorrect dim')
+      tester:asserteq(grads[1].bias:dim(), 2, 'gain has incorrect dim')
+      tester:asserteq(i_normed:dim(), i:dim(), 'normed input has incorrect dim')
+      tester:assert(not pre_mean:equal(state.running_mean), 'running mean did not change with train = 1')
+      tester:assert(not pre_std:equal(state.running_std), 'running std did not change with train = 1')
+
+      -- Gradcheck
+      tester:assert(gradcheck(loss, params, i, mask, eval_state), 'incorrect gradients')
+
+      i = torch.randn(5,100) -- batch x nOutputs
+      mask = torch.bernoulli(i.new(i:size()))
+      pre_mean = eval_state.running_mean:clone()
+      pre_std = eval_state.running_std:clone()
+      l, i_normed = loss(params, i, mask, eval_state)
+      grads = dloss(params, i, mask, eval_state)
+
+      tester:asserteq(type(l), 'number', 'loss should be a scalar')
+      tester:asserteq(grads[1].gain:dim(), 2, 'gain has incorrect dim')
+      tester:asserteq(grads[1].bias:dim(), 2, 'gain has incorrect dim')
+      tester:asserteq(i_normed:dim(), i:dim(), 'normed input has incorrect dim')
+      tester:assert(pre_mean:equal(eval_state.running_mean), 'running mean changed with train = 0')
+      tester:assert(pre_std:equal(eval_state.running_std), 'running std changed with train = 0')
+
+      -- Gradcheck
+      tester:assert(gradcheck(loss, params, i, mask, eval_state), 'incorrect gradients')
+
+      i = torch.randn(5,10,100) -- batch x time x nOutputs
+      mask = torch.bernoulli(i.new(i:size()))
+      pre_mean = state.running_mean:clone()
+      pre_std = state.running_std:clone()
+      l, i_normed = loss(params, i, mask, state)
+      grads = dloss(params, i, mask, state)
+
+      tester:asserteq(type(l), 'number', 'loss should be a scalar')
+      tester:asserteq(grads[1].gain:dim(), 2, 'gain has incorrect dim')
+      tester:asserteq(grads[1].bias:dim(), 2, 'gain has incorrect dim')
+      tester:asserteq(i_normed:dim(), i:dim(), 'normed input has incorrect dim')
+      tester:assert(not pre_mean:equal(state.running_mean), 'running mean did not change with train = 1')
+      tester:assert(not pre_std:equal(state.running_std), 'running std did not change with train = 1')
+
+      -- Gradcheck
+      tester:assert(gradcheck(loss, params, i, mask, eval_state), 'incorrect gradients')
+    end,
+
    DebuggerDivZero = function()
       -- Parameters:
       local W = torch.Tensor(32,100):fill(.5)
@@ -1770,4 +1930,3 @@ tester:add(prefixTests("Optimized_", tests, { })):run(prefixTests("Optimized_", 
 autograd.optimize(false)
 tester = torch.Tester()
 tester:add(prefixTests("Direct_", tests, { GradGrad = true, AutoModule = true, DebuggerDivZero = true, StableGradients = true, ZeroGrad = true, SimpleGradGrad = true })):run(arg[1])
-

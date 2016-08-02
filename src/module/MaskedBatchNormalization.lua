@@ -1,5 +1,4 @@
 local util = require 'autograd.util'
--- masked batch norm for minibatches with variable length sequences
 return function(opt, params)
   local opt = opt or {}
   local params = params or {}
@@ -7,9 +6,9 @@ return function(opt, params)
   local nOutputs = opt.nOutputs or 10
   local momentum = opt.momentum or 0.1
 
-  batchNormState = {momentum = momentum, train = true,
+  batchNormState = {momentum = momentum, train = 1,
                     running_mean = torch.zeros(1, nOutputs),
-                    running_std = torch.zeros(1, nOutputs)}
+                    running_std = torch.ones(1, nOutputs)}
 
   -- initializing gain to < 1 is recommended for LSTM batch norm.
   p = {gain = torch.zeros(1, nOutputs):fill(0.1),
@@ -17,28 +16,35 @@ return function(opt, params)
   table.insert(params, p)
 
   local function masked_batch_norm(params, x, mask, state, eps)
+    -- Masked batch norm for minibatches with variable length sequences
+    -- as described in Batch Normalized Recurrent Neural Networks by Laurent et al. (http://arxiv.org/abs/1510.01378)
+    local p = params[1] or params
     local eps = eps or 1e-5
-    local momentum = state.momentum or 0.1
     local train = state.train or 1
+    local momentum = (state.momentum or 0.1) * train -- kill state updates during evaluation
+    local x_in = x
+    local mask_in = mask
+    if torch.nDimension(x) == 3 then -- collapse batch and time dimensions
+      x_in = torch.view(x, -1, torch.size(x, 3))
+      mask_in = torch.view(mask, -1, torch.size(mask, 3))
+    elseif torch.nDimension(x) == 1 then -- expand batch dimension
+      x_in = torch.view(x, 1, torch.size(x, 1))
+      mask_in = torch.view(mask, 1, torch.size(mask, 1))
+    end
     local n = torch.sum(mask)
-    local mask = torch.expand(mask, torch.size(x))
-    local x_masked = torch.cmul(x, mask)
-    local x_normed
+    mask_in = torch.expand(mask_in, torch.size(x_in))
+    local x_masked = torch.cmul(x_in, mask_in)
     local mean = torch.sum(x_masked / n, 1)
-    mean = torch.mul(mean, train) + torch.mul(state.running_mean, 1 - train)
-    local combined_mean = momentum * mean + (1 - momentum) * state.running_mean
-    state.running_mean = combined_mean -- NOTE: Assignment doesn't work in direct mode.
-    local x_centered = torch.cmul(x_masked - torch.expand(combined_mean, torch.size(x)), mask)
+    state.running_mean = momentum * mean + (1 - momentum) * state.running_mean
+    local x_centered = torch.cmul(x_masked - torch.expand(state.running_std, torch.size(x_in)), mask_in)
     local var = torch.sum(torch.cmul(x_centered, x_centered) / n, 1) + eps
     local std = torch.sqrt(var)
-    std = torch.mul(std, train) + torch.mul(state.running_std, 1 - train)
-    local combined_std = momentum * std + (1 - momentum) * state.running_std
-    state.running_std = combined_std
-    x_normed = torch.cdiv(x_centered, torch.expand(combined_std, torch.size(x)))
-    local gain = torch.expand(params.gain, torch.size(x))
-    local bias = torch.expand(params.bias, torch.size(x))
-    local x_corrected = torch.cmul(x_normed, gain) + bias
+    state.running_std = momentum * std + (1 - momentum) * state.running_std
+    local x_normed = torch.cdiv(x_centered, torch.expand(state.running_std, torch.size(x_in)))
+    local gain = torch.expand(p.gain, torch.size(x_in))
+    local bias = torch.expand(p.bias, torch.size(x_in))
+    local x_corrected = torch.view(torch.cmul(x_normed, gain) + bias, torch.size(x))
     return x_corrected
   end
-  return params, masked_batch_norm
+  return masked_batch_norm, params, batchNormState
 end

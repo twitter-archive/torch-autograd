@@ -9,16 +9,22 @@ return function(opt, params)
   table.insert(params, p)
 
   local function layer_norm(params, x, eps)
+    -- Layer Normalization of Ba, Kiros, and Hinton (https://arxiv.org/abs/1607.06450)
+    local p = params[1] or params
     local eps = eps or 1e-5
-    local n = torch.size(x,2)
-    local mean = torch.expand(torch.mean(x, 2), torch.size(x))
-    local x_centered = x - mean
-    local std = torch.expand(torch.sqrt(torch.sum(torch.cmul(x_centered, x_centered) / n, 2)) + eps, torch.size(x))
+    local x_in = x
+    if torch.nDimension(x) == 1 then
+      x_in = torch.view(x, 1, torch.size(x, 1))
+    end
+    local n = torch.size(x_in,2)
+    local mean = torch.expand(torch.mean(x_in, 2), torch.size(x_in))
+    local x_centered = x_in - mean
+    local std = torch.expand(torch.sqrt(torch.sum(torch.cmul(x_centered, x_centered) / n, 2)) + eps, torch.size(x_in))
     local x_normed = torch.cdiv(x_centered, std)
-    local gain = torch.expand(params.gain, torch.size(x))
-    local bias = torch.expand(params.bias, torch.size(x))
-    local x_corrected = torch.cmul(x_normed, gain) + bias
+    local gain = torch.expand(p.gain, torch.size(x_in))
+    local bias = torch.expand(p.bias, torch.size(x_in))
+    local x_corrected = torch.view(torch.cmul(x_normed, gain) + bias, torch.size(x))
     return x_corrected
   end
-  return params, layer_norm
+  return layer_norm, params
 end
