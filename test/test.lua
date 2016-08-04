@@ -611,6 +611,32 @@ local tests = {
       end
    end,
 
+   SinCosTan = function()
+      local fns = {'sin', 'cos', 'tan'}
+
+      for _,f in pairs(fns) do
+         local x = torch.Tensor(5):normal()
+         local fn = function(params)
+            return 2 * torch.sum(torch[f](params.x))
+         end
+
+         tester:assert(gradcheck(fn, {x=x}), string.format('incorrect gradient for %s', f))
+      end
+   end,
+
+   SinhCoshTanh = function()
+      local fns = {'sinh', 'cosh', 'tanh'}
+
+      for _,f in pairs(fns) do
+         local x = torch.Tensor(5):normal()
+         local fn = function(params)
+            return 2 * torch.sum(torch[f](params.x))
+         end
+
+         tester:assert(gradcheck(fn, {x=x}), string.format('incorrect gradient for %s', f))
+      end
+   end,
+
    GradCheck_Scale = function()
       -- Parameters:
       local W = torch.Tensor(32,100):normal()

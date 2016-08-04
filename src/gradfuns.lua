@@ -342,12 +342,12 @@ overload.module("torch", torch, function(module)
    })
    module.gradient("sinh", {
       function(g, ans, x)
-         return torch.cosh(x)
+         return elemwiseMul(g, torch.cosh(x))
       end
    })
    module.gradient("cosh", {
       function(g, ans, x)
-         return torch.sinh(x)
+         return elemwiseMul(g, torch.sinh(x))
       end
    })
 
@@ -692,5 +692,3 @@ overload.module("util", util, function(module)
 
    module.initializer("newTensorLike", "zerosLike")
 end)
-
-
