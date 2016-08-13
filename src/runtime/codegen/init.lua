@@ -69,11 +69,11 @@ local function copyStableTensors(retValues, stableGrads)
    end
 end
 
-function pctStr(n, tot)
+local function pctStr(n, tot)
    return tostring(math.floor((n / tot) * 100.0)) .. "%"
 end
 
-function padMin(s, min)
+local function padMin(s, min)
    if #s < min then
       return s .. string.rep(" ", min - #s)
    end

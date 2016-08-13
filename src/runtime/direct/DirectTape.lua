@@ -13,7 +13,7 @@ local currentProfiler = nil
 -- we'd like to make sure that if we're passing nodes in,
 -- that we unpack the value in those nodes, apply the function
 -- to the underlying value, and then wrap the value in a node
-function nodeApply(fun, gradFun, ...)
+local function nodeApply(fun, gradFun, ...)
    local arg = {...}
    local parent = nil
    local values = { }

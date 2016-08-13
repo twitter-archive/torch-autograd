@@ -16,7 +16,7 @@ local SpatialNetwork = require 'autograd.model.SpatialNetwork'
    -- inputStride = 1, -- NOTE: currently don't supported per-layer inputStrides. If we did, it'd be {4,1,1,1,1}
    -- poolings = {3,3,3,3,3} -- We don't set kW/H and dW/H separately.
 -- }
-mlpOpt = {
+local mlpOpt = {
    hiddenFeatures = {4096,4096,1000},
    batchNormalization = true,
    dropoutProbs = {0.5,0.5,0},
