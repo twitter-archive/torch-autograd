@@ -302,7 +302,7 @@ function Graph.reentryDepth()
    return reentryDepth
 end
 
-function markDifferentiable(value, differentiableMap, args)
+local function markDifferentiable(value, differentiableMap, args)
    if Value.isValue(value) then
       if value.type == Value.TABLE then
          markDifferentiable(value:get(), differentiableMap)

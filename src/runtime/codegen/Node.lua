@@ -2,7 +2,7 @@ local Value = require 'autograd.runtime.codegen.Value'
 local Source = require 'autograd.runtime.codegen.Source'
 local util = require 'autograd.util'
 
-Node = { }
+local Node = { }
 Node.__index = Node
 
 function Node.new(forwardFn, gradientFn, inputs, mutationFlow)
