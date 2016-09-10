@@ -8,7 +8,7 @@ source = {
 description = {
    summary = "Automatic differentiation for Torch.",
    homepage = "",
-   license = "MIT",
+   license = "Apache 2.0",
 }
 
 dependencies = {
