@@ -14,7 +14,7 @@ return function(opt, params)
 
    -- containers:
    params = params or {}
-   layers = {}
+   local layers = {}
 
    -- parameters:
    local p = {
