@@ -4,8 +4,8 @@ return function(opt, params)
   local params = params or {}
 
   local nOutputs = opt.nOutputs or 10
-  p = {gain = torch.ones(1, nOutputs),
-       bias = torch.zeros(1, nOutputs)}
+  local p = {gain = torch.ones(1, nOutputs),
+             bias = torch.zeros(1, nOutputs)}
   table.insert(params, p)
 
   local function layer_norm(params, x, eps)

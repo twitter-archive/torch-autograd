@@ -13,9 +13,9 @@ return function(opt, params)
   local subjectFeatures = opt.subjectFeatures or 15
   local subjectChoices = opt.subjectChoices or 20
 
-  p = {W_att_subject = torch.zeros(1, 1, subjectFeatures),
-       W_att_h = torch.zeros(hiddenFeatures, subjectChoices),
-       b_att = torch.zeros(1, subjectChoices)}
+  local p = {W_att_subject = torch.zeros(1, 1, subjectFeatures),
+             W_att_h = torch.zeros(hiddenFeatures, subjectChoices),
+             b_att = torch.zeros(1, subjectChoices)}
 
   if layerNormalization then
     local focus_ln_params = LayerNorm({nOutputs = subjectChoices})
