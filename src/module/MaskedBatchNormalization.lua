@@ -6,13 +6,13 @@ return function(opt, params)
   local nOutputs = opt.nOutputs or 10
   local momentum = opt.momentum or 0.1
 
-  batchNormState = {momentum = momentum, train = 1,
-                    running_mean = torch.zeros(1, nOutputs),
-                    running_std = torch.ones(1, nOutputs)}
+  local batchNormState = {momentum = momentum, train = 1,
+                         running_mean = torch.zeros(1, nOutputs),
+                         running_std = torch.ones(1, nOutputs)}
 
   -- initializing gain to < 1 is recommended for LSTM batch norm.
-  p = {gain = torch.zeros(1, nOutputs):fill(0.1),
-       bias = torch.zeros(1, nOutputs)}
+  local p = {gain = torch.zeros(1, nOutputs):fill(0.1),
+             bias = torch.zeros(1, nOutputs)}
   table.insert(params, p)
 
   local function masked_batch_norm(params, x, mask, state, eps)
