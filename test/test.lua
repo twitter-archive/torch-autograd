@@ -1908,6 +1908,27 @@ local tests = {
       tester:assert(gradcheck(bmmFn, {X=X, Y=Y}), "Incorrect gradient")
    end,
 
+   Gather = function()
+      local X = torch.randn(5,5)
+      local index = torch.LongTensor{{1, 2, 3, 4, 5}, {2, 3, 4, 5, 1}}
+
+      local gather = function(inputs, index)
+         return torch.sum(torch.gather(inputs.X, 1, index))
+      end
+      tester:assert(gradcheck(gather, {X = X}, index), "Incorrect gradient")
+   end,
+
+   Scatter = function()
+      local X = torch.rand(2, 5)
+      local index = torch.LongTensor{{1, 2, 3, 1, 1}, {3, 1, 1, 2, 3}}
+      local Z = torch.zeros(3, 5)
+
+      local scatter = function(inputs, index, Z)
+         return torch.sum(torch.scatter(Z, 1, index, inputs.X))
+      end
+      tester:assert(gradcheck(scatter, {X = X}, index, Z), "Incorrect gradient")
+   end,
+
    Baddbmm = function()
       local v1 = torch.randn(1)[1]
       local v2 = torch.randn(1)[1]

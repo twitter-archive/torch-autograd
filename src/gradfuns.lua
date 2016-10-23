@@ -549,6 +549,16 @@ overload.module("torch", torch, function(module)
    --    function(g, ans, x, size, dim) return nil end,
 
    -- })
+   
+   module.gradient("gather", {
+      function(g, ans, x, dim, index) return torch.scatter(util.zerosLike(x), dim, index, g) end,
+   })
+   module.gradient("scatter", {
+      function(g, ans, x, dim, index, val) return nil end,
+      function(g, ans, x, dim, index, val) return nil end,
+      function(g, ans, x, dim, index, val) return nil end,
+      function(g, ans, x, dim, index, val) return torch.gather(g, dim, index) end,
+   })
 
    module.gradient("bmm", {
       function(g, ans, x, y) return torch.bmm(g, torch.transpose(y, 3, 2)) end,
