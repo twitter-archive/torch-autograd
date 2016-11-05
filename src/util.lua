@@ -46,7 +46,7 @@ local function getValue(v)
       return v
    end
 end
-print(getValue)
+
 function util.lt(a, b)
    return getValue(a) < getValue(b)
 end
