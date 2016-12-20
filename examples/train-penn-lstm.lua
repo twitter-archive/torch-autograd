@@ -28,6 +28,7 @@ end
 local d = require 'autograd'
 local util = require 'autograd.util'
 local model = require 'autograd.model'
+model.RecurrentFWNetwork = require '../src/model/RecurrentFWNetwork'
 
 d.optimize(true)
 
@@ -57,12 +58,12 @@ print('Loaded datasets: ', {
 })
 
 -- Define LSTM layers:
-local lstm1,params = model.RecurrentLSTMNetwork({
+local lstm1,params = model.RecurrentFWNetwork({
    inputFeatures = opt.wordDim,
    hiddenFeatures = opt.hiddens,
    outputType = 'all',
 })
-local lstm2 = model.RecurrentLSTMNetwork({
+local lstm2 = model.RecurrentFWNetwork({
    inputFeatures = opt.hiddens,
    hiddenFeatures = opt.hiddens,
    outputType = 'all',
