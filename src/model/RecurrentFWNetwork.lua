@@ -10,6 +10,8 @@ return function(opt, params)
    local l = opt.lambda or 0.9
    local e = opt.eta or 0.5
    local S = opt.S or 1
+   local LayerNorm = opt.LayerNorm or true
+   local eps = eps or 1e-5
    local outputType = opt.outputType or 'last' -- 'last' or 'all'
    local relu = d.nn.ReLU()
 
@@ -61,7 +63,20 @@ return function(opt, params)
          hs[t] = torch.zero(x.new(batch, hiddenFeatures))
          for s = 0, S do
             -- next h:
-            hs[t] = relu(dot + hs[t] * A)
+            hs[t] = dot + hs[t] * A
+            if LayerNorm then
+               local h = hs[t]
+               if torch.nDimension(hs[t]) == 1 then
+                  h = torch.view(hs[t], 1, torch.size(hs[t], 1))
+               end
+               local n = torch.size(h, 2)
+               h = h - torch.expand(torch.mean(h, 2), torch.size(h))
+               local std = torch.expand(
+                  torch.sqrt(torch.sum(torch.cmul(h, h) / n, 2) + eps),
+               torch.size(h))
+               hs[t] = torch.view(torch.cdiv(h, std), torch.size(hs[t]))
+            end
+            hs[t] = relu(hs[t])
          end
       end
 
