@@ -1,6 +1,7 @@
 -- util
 local util = require 'autograd.util'
-local d = require 'autograd'
+local functionalize = require('autograd.nnwrapper').functionalize
+local nn = functionalize('nn')
 
 return function(opt, params)
    -- options:
@@ -13,7 +14,7 @@ return function(opt, params)
    local LayerNorm = opt.LayerNorm or true
    local eps = eps or 1e-5
    local outputType = opt.outputType or 'last' -- 'last' or 'all'
-   local relu = d.nn.ReLU()
+   local relu = nn.ReLU()
 
    -- container:
    params = params or {}
