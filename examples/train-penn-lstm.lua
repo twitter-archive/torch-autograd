@@ -15,6 +15,7 @@ Options:
    --paramRange     (default .1)      initial parameter range
    --dropout        (default 0)       dropout probability on hidden states
    --type           (default float)   tensor type: cuda | float | double
+   --model          (default LSTM)    recursive model: LSTM | GRU | FW
 ]]
 
 -- CUDA?
@@ -57,12 +58,12 @@ print('Loaded datasets: ', {
 })
 
 -- Define LSTM layers:
-local lstm1,params = model.RecurrentLSTMNetwork({
+local lstm1,params = model['Recurrent'..opt.model..'Network']({
    inputFeatures = opt.wordDim,
    hiddenFeatures = opt.hiddens,
    outputType = 'all',
 })
-local lstm2 = model.RecurrentLSTMNetwork({
+local lstm2 = model['Recurrent'..opt.model..'Network']({
    inputFeatures = opt.hiddens,
    hiddenFeatures = opt.hiddens,
    outputType = 'all',

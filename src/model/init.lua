@@ -5,7 +5,8 @@ local model = {
    RecurrentNetwork = require 'autograd.model.RecurrentNetwork',
    RecurrentLSTMNetwork = require 'autograd.model.RecurrentLSTMNetwork',
    RecurrentGRUNetwork = require 'autograd.model.RecurrentGRUNetwork',
-   AlexNet = require 'autograd.model.AlexNet'
+   RecurrentFWNetwork = require 'autograd.model.RecurrentFWNetwork',
+   AlexNet = require 'autograd.model.AlexNet',
 }
 
 return model
