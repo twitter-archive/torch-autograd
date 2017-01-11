@@ -34,6 +34,7 @@ return function(opt, params)
          x = torch.view(x, 1, torch.size(x, 1), torch.size(x, 2))
       end
       local batch = torch.size(x, 1)
+      assert(batch == 1, 'Batch mode not yet supprted.')
       local steps = torch.size(x, 2)
 
       -- hiddens:
@@ -45,9 +46,6 @@ return function(opt, params)
       -- fast weights
       local A = prevState.A or torch.zero(x.new(hiddenFeatures, hiddenFeatures))
 
-      -- fast weights update
-      A = l * A + e * (torch.t(hp) * hp)
-
       local hs = {}
       -- go over time:
       for t = 1, steps do
@@ -56,6 +54,9 @@ return function(opt, params)
 
          -- prev h
          hp = hs[t-1] or hp
+
+         -- fast weights update
+         A = l * A + e * (torch.t(hp) * hp)
 
          -- pack all dot products:
          local dot = torch.cat(xt, hp, 2) * p.W
