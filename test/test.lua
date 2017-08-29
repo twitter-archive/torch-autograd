@@ -1530,10 +1530,10 @@ local tests = {
          end
       end
 
-      local state = { learningRate = learningRate }
+      local config, state = { learningRate = learningRate }, { }
       local loss3
       for e=1, 5 do
-         local optimfn, states = autograd.optim.sgd(df, state, params3)
+         local optimfn, configs, states = autograd.optim.sgd(df, config, state, params3)
          loss3 = 0
          for i=1,nData do
             local grads, loss = optimfn(xs:narrow(1, i, 1), ys:narrow(1, i, 1))
@@ -1583,7 +1583,7 @@ local tests = {
       local g = autograd(f, {optimize = true})
 
       -- FAILS FOR OTHER OPTIMIZERS AS WELL
-      local optimfn, states = autograd.optim.sgd(g, {learningRate=1e-2}, params)
+      local optimfn, configs, states = autograd.optim.sgd(g, {learningRate=1e-2}, {}, params)
 
       for i=1,3 do
          -- Get images in BHWD format, labels in one-hot format:
