@@ -229,7 +229,7 @@ module = customnnfuncs.MyNnxModule(...)
 grad.nn = grad.functionalize('nn')
 ```
 
-On top of this functional API, existing `nn` modules and containers, with arbitarily
+On top of this functional API, existing `nn` modules and containers, with arbitrarily
 nested parameters, can also be wrapped into functions. This is particularly handy
 when doing transfer learning from existing models:
 
