@@ -1,5 +1,6 @@
 -- Autograd
 local autograd = require 'autograd'
+local util = require 'autograd.util'
 
 -- Perturbation (finite diffs):
 local perturbation = 1e-6
@@ -12,20 +13,30 @@ local function jacobianFromAutograd(func, inputs, key)
    -- Autograd:
    local df = autograd(func)
    local grads = df(table.unpack(inputs))
-   local gradsVerify = df(table.unpack(inputs))
 
    -- Find grad:
    local g = autograd.util.nestedGet(grads, key)
+   local g_clone
+   if torch.isTensor(g) then
+     g_clone = g:clone()
+   end
+
+   -- Get the grad again
+   local gradsVerify = df(table.unpack(inputs))
    local gVerify = autograd.util.nestedGet(gradsVerify, key)
    local err
+   local overwrite_err = 0
    if torch.isTensor(g) then
       err = (g - gVerify):abs():max()
+      overwrite_err = (g - g_clone):abs():max()
    else
       err = torch.abs(g - gVerify)
    end
 
    if err ~= 0 then
       error("autograd gradient not deterministic")
+   elseif overwrite_err ~= 0 then
+      error("autograd gradient overwritten when called twice")
    end
 
    -- Return grads:
