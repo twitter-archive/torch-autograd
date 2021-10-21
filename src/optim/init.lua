@@ -1,10 +1,11 @@
 local util = require 'autograd.util'
 
 local function wrap(optimfn)
-   return function(fn, state, params)
-      local states = { }
+   return function(fn, config, state, params)
+      local configs, states = { }, { }
       local flatParams = util.sortedFlatten(params)
       for i = 1, #flatParams do
+         configs[i] = util.deepCopy(config)
          states[i] = util.deepCopy(state)
       end
       return function(...)
@@ -15,10 +16,10 @@ local function wrap(optimfn)
             local grad = flatGrads[i]
             optimfn(function()
                return loss, grad
-            end, flatParams[i], states[i])
+            end, flatParams[i], configs[i], states[i])
          end
          return table.unpack(out)
-      end, states
+      end, configs, states
    end
 end
 
